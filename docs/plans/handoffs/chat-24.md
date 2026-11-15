@@ -103,8 +103,55 @@ Still open from the roadmap: D19, D21, D25, D28, D29, D31–D33, G7 / D4.
 
 ## Next step
 
-**S10 — Course validation: release and delivery views (M2)**, with binding proposals moved there in Chat 21. Its
-scope and acceptance are to be agreed with the owner.
+**S10 — Course validation from the studio (M2)**, issue
+[#123](https://github.com/thesis-fedfalco-2026/AIM-PRO-AILiteracy/issues/123). Owner decisions (15 November 2026):
+the delivery course is created from the studio; bindings are proposed and can be changed; activation can be proposed
+and its refusal is shown in words; two PRs (part 1: release and delivery course creation; part 2: import, policy
+preview, activation). Start it in a new chat once this PR is merged; the prompt below.
+
+### Prompt for Chat 25
+
+```text
+You are Chat 25 of the ALM prototype (repo thesis-fedfalco-2026/AIM-PRO-AILiteracy, checkout
+~/development/py-prototype). Your step is **S10 part 1** (issue #123): a release is proposed from the studio on the
+course's project, read in its teacher view and inspected (receipts, frozen closure, findings), and a delivery course
+is created from the studio. Part 2 (the import with proposed and changeable bindings, the policy preview, the
+activation refused in words) follows in another PR.
+
+## Where things stand
+
+- S09d (generation by blocks of units, PR #119) and S09c2 part 2 (teacher views of every proposal kind, PR #122) are
+  merged. Read docs/plans/handoffs/chat-23.md and chat-24.md.
+- Owner decisions of issue #123 are final; do not reopen them.
+
+## Protocol
+
+1. Verify the baseline: git status, git log --oneline -3, gh pr list --state open, the Python suite with
+   `python -m unittest discover -q` and telemetry off (LANGFUSE_ENABLED=false CREWAI_DISABLE_TELEMETRY=true
+   CREWAI_TRACING_ENABLED=false), python -m aimpro.generate --check, python -m services.api_common.openapi --check,
+   and in apps/ npm run check:client, typecheck, test. Report any difference from the Chat 24 handoff.
+2. Read AGENTS.md, the roadmap (working protocol, S10, D10, D23, D25), docs/architecture/role-applications.md
+   (course creation, S09c2), learning/releases.py, services/authoring_api/releases.py and courses.py, and the CLI
+   commands propose-release, show-release, propose-delivery-import, propose-activation.
+3. Check, before any change, how a delivery course created through POST /courses gets the source scopes and the
+   subjects that the import and its policy preview need (D23), and how this touches D25 (open). If an owner decision
+   is needed, stop and ask; write part 1's acceptance with the owner if it changes.
+4. Contract tests first (API and core), then the implementation; studio unit tests and a browser test for what the
+   studio shows; axe.
+5. Write docs/plans/handoffs/chat-25.md, open one focused PR, wait for CI and report.
+
+## Constraints
+
+- Code, tests, docs and GitHub content in English; chat with the owner in Italian. Do not spawn agents.
+- No live model run; synthetic seed only. Never edit an AIM-PRO/jjodel export or the ALM metamodel.
+- Layout and visual design are owned by someone else: change labels and data, not styling.
+- Installing a policy preview stays a host operator action, never a browser action.
+- Leave the others' uncommitted changes (README.md, docs/architecture/system-overview.md,
+  docs/plans/handoffs/chat-01.md, docs/plans/sequential-chat-plan.md, examples/lpo-ai/) alone and out of PRs.
+- The owner's demo stack (ports 58000/58001, /tmp/alm-demo): never stop or restart it; read its stores read-only.
+  When it runs, the browser tests run in CI.
+- Do not decide D19, D21, D25, D28, D29, D31–D33 or G7/D4. Propose roadmap changes in the handoff.
+```
 
 ## PR and CI
 
