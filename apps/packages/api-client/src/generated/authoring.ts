@@ -71,6 +71,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/contexts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The contexts the signed-in subject may read, by id */
+        get: operations["context_list_contexts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/contexts/{context_id}": {
         parameters: {
             query?: never;
@@ -735,6 +752,25 @@ export interface components {
             project: components["schemas"]["EntityRef"];
             /** Request Id */
             request_id: string;
+        };
+        /**
+         * ContextEntry
+         * @description A context the subject may read: its lifecycle and the subject's roles in its policy.
+         */
+        ContextEntry: {
+            /** Context Id */
+            context_id: string;
+            /** Mode */
+            mode: string;
+            /** Roles */
+            roles: string[];
+            /** Status */
+            status: string;
+        };
+        /** ContextList */
+        ContextList: {
+            /** Contexts */
+            contexts: components["schemas"]["ContextEntry"][];
         };
         /**
          * ContextSummary
@@ -2470,6 +2506,44 @@ export interface operations {
             };
             /** @description Not authorized, unmapped identity or missing CSRF token */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Internal error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    context_list_contexts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContextList"];
+                };
+            };
+            /** @description No valid session */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

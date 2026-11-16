@@ -1,58 +1,91 @@
-import { Button } from '@alm/ui';
-import { useId, useState } from 'react';
-import type { FormEvent } from 'react';
+import { Button, StatusMessage } from '@alm/ui';
+import { useCallback, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 
+import { useBuildServices } from '../course-build/BuildServices';
+import type { CourseEntry } from '../course-build/buildApi';
 import { CreateCourse } from '../course-build/CreateCourse';
+import { readable } from '../review/model';
 import { buildPath, coursePath, inboxPath } from '../review/paths';
+
+const MODES = ['PREPARATION', 'LEARNING'] as const;
+const STATUSES = ['DRAFT', 'ACTIVE', 'PAUSED', 'CLOSED'] as const;
+const ROLES = ['ADMINISTRATOR', 'CONTENT_RESPONSIBLE', 'ASSESSOR', 'OBSERVER', 'LEARNER'] as const;
+
+/** Whether a code of the API is one the catalogue names; any other is shown with `readable`. */
+const known = <T extends string>(codes: readonly T[], code: string): code is T => (codes as readonly string[]).includes(code);
+
+function CourseItem({ course }: { course: CourseEntry }) {
+  const { t } = useTranslation();
+  const { mode, status } = course;
+  return (
+    <li>
+      <p><Link to={coursePath(course.context_id)}>{course.context_id}</Link></p>
+      <p className="alm-muted">
+        {t('home.courseMeta', {
+          mode: known(MODES, mode) ? t(`home.mode.${mode}`) : readable(mode),
+          status: known(STATUSES, status) ? t(`home.status.${status}`) : readable(status),
+          roles: course.roles.map((role) => (known(ROLES, role) ? t(`home.role.${role}`) : readable(role))).join(', '),
+        })}
+      </p>
+      <p><Link to={inboxPath(course.context_id)}>{t('home.openReview')}</Link></p>
+    </li>
+  );
+}
+
+/** The courses the signed-in person may read, each opened from its link; no context id to type. */
+function CourseList() {
+  const { t } = useTranslation();
+  const id = useId();
+  const { api } = useBuildServices();
+  const [courses, setCourses] = useState<CourseEntry[] | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  const load = useCallback(() => {
+    let current = true;
+    setFailed(false);
+    setCourses(null);
+    api.listCourses().then((listed) => { if (current) setCourses(listed); },
+      () => { if (current) setFailed(true); });
+    return () => { current = false; };
+  }, [api]);
+  useEffect(load, [load]);
+
+  let body;
+  if (failed) {
+    body = (
+      <>
+        <StatusMessage tone="error">{t('home.coursesFailed')}</StatusMessage>
+        <Button variant="secondary" onClick={() => void load()}>{t('home.coursesRetry')}</Button>
+      </>
+    );
+  } else if (courses === null) body = <StatusMessage>{t('home.coursesLoading')}</StatusMessage>;
+  else if (courses.length === 0) body = <p className="alm-muted">{t('home.coursesEmpty')}</p>;
+  else {
+    body = (
+      <ul data-testid="course-list">
+        {courses.map((course) => <CourseItem key={course.context_id} course={course} />)}
+      </ul>
+    );
+  }
+  return (
+    <section aria-labelledby={`${id}-heading`}>
+      <h2 id={`${id}-heading`}>{t('home.coursesHeading')}</h2>
+      {body}
+    </section>
+  );
+}
 
 export function HomePage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const id = useId();
-  const [contextId, setContextId] = useState('');
-  const [missing, setMissing] = useState(false);
-
-  const go = (path: (contextId: string) => string) => {
-    const value = contextId.trim();
-    setMissing(value === '');
-    if (value) void navigate(path(value));
-  };
-  const open = (event: FormEvent) => {
-    event.preventDefault();
-    go(coursePath);
-  };
 
   return (
     <>
       <h1>{t('home.title')}</h1>
       <p>{t('home.intro')}</p>
-      <section aria-labelledby={`${id}-heading`}>
-        <h2 id={`${id}-heading`}>{t('home.openHeading')}</h2>
-        <form className="alm-form" noValidate onSubmit={open}>
-          <div className="alm-field">
-            <label htmlFor={`${id}-context`}>{t('home.contextLabel')}</label>
-            <p id={`${id}-hint`} className="alm-muted">{t('home.contextHint')}</p>
-            {missing ? <p id={`${id}-error`} className="alm-field-error">{t('home.contextRequired')}</p> : null}
-            <input
-              id={`${id}-context`}
-              className="alm-input"
-              type="text"
-              autoComplete="off"
-              spellCheck={false}
-              value={contextId}
-              aria-invalid={missing}
-              aria-describedby={missing ? `${id}-hint ${id}-error` : `${id}-hint`}
-              onChange={(event) => setContextId(event.target.value)}
-            />
-          </div>
-          <div className="alm-actions">
-            <Button type="submit">{t('home.open')}</Button>
-            <Button variant="secondary" onClick={() => go(inboxPath)}>{t('home.openReview')}</Button>
-          </div>
-        </form>
-      </section>
+      <CourseList />
       <CreateCourse heading={t('home.createHeading')} intro={t('home.createIntro')} submit={t('home.create')}
         onCreated={(created) => void navigate(buildPath(created))} />
     </>

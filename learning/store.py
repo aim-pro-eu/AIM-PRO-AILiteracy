@@ -404,6 +404,9 @@ class LearningStore:
             raise ValueError("Reference unavailable in this context")
         return validate_entity(json.loads(row["payload"]), self.contract)
 
+    def context_ids(self) -> tuple[str, ...]:
+        return tuple(row[0] for row in self.db.execute("SELECT id FROM contexts ORDER BY id").fetchall())
+
     def has_context(self, context_id: str) -> bool:
         return self.db.execute("SELECT 1 FROM contexts WHERE id=?", (context_id,)).fetchone() is not None
 

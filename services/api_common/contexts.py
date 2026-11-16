@@ -5,7 +5,8 @@ whose ``policy_ref`` equals the context's ``policies`` reference is the policy;
 no match makes the context unavailable. The directory is read on every
 request, so an operator installs an approved policy preview by copying the
 file, without a restart. A missing context and a missing policy give the same
-answer, so the response does not reveal which contexts exist.
+answer, the context is unavailable; responses may reveal which contexts exist
+(D35).
 
 The API writes one kind of policy file: the policy of a course created from the
 studio (module ``courses``, S09a). It is a new file, written whole or not at
@@ -22,7 +23,7 @@ from uuid import uuid4
 
 from fastapi import Depends, Request, Response
 
-from learning.contracts import EntityRef
+from learning.contracts import Entity, EntityRef
 from learning.metamodel import load_contract
 from learning.policies import TrustedPolicy
 from learning.service import LearningService
@@ -62,9 +63,9 @@ class PolicyDirectory:
             found.append(policy)
         return found
 
-    def find(self, ref: EntityRef) -> TrustedPolicy | None:
-        """The policy whose ``policy_ref`` is exactly ``ref``."""
-        found = [policy for policy in self.installed() if policy.policy_ref == ref]
+    def find(self, ref: EntityRef, installed: list[TrustedPolicy] | None = None) -> TrustedPolicy | None:
+        """The policy whose ``policy_ref`` is exactly ``ref``, among ``installed`` when given."""
+        found = [policy for policy in (self.installed() if installed is None else installed) if policy.policy_ref == ref]
         if len(found) > 1:
             raise PolicyDirectoryError('A policy reference is installed in more than one file')
         return found[0] if found else None
@@ -113,6 +114,22 @@ class ContextServices:
             if not store.has_context(context_id):
                 return None
             return EntityRef.model_validate(store.read_context(context_id).fields['policies'])
+
+    def readable(self, subject_key: str) -> list[tuple[Entity, TrustedPolicy]]:
+        """The contexts whose installed policy lets the subject read them, by id, each with that policy (D35).
+
+        A context whose policy is not installed is unavailable and left out.
+        """
+        installed = self.policies.installed()
+        found = []
+        with LearningStore(self.store) as store, store.read_transaction():
+            for context_id in store.context_ids():
+                context = store.read_context(context_id)
+                policy = self.policies.find(EntityRef.model_validate(context.fields['policies']), installed)
+                grant = policy.subjects.get(subject_key) if policy else None
+                if grant and 'read' in grant.actions.get(context_id, []):
+                    found.append((context, policy))
+        return found
 
     def bootstrap(self, context_id: str, subject_key: str, policy: TrustedPolicy):
         """Create the context with ``policy``, as the CLI ``bootstrap`` does; returns its root."""

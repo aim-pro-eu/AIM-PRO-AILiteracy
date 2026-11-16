@@ -56,23 +56,42 @@ const writes = (requests: Request[]) => requests.filter((request) => request.met
 afterEach(cleanup);
 
 describe('home', () => {
-  it('opens the course or the review inbox of the context entered', async () => {
-    const { router } = await renderStudio({ 'GET /auth/session': [signedIn],
-      [SUMMARY]: [summary()], [PENDING_LIST]: [pending()] });
-    const field = await screen.findByLabelText(en.home.contextLabel);
-    fireEvent.click(screen.getByRole('button', { name: en.home.open }));
-    expect(screen.getByText(en.home.contextRequired)).toBeTruthy();
-    expect(field.getAttribute('aria-invalid')).toBe('true');
-    fireEvent.change(field, { target: { value: ' my context ' } });
-    fireEvent.click(screen.getByRole('button', { name: en.home.openReview }));
-    await waitFor(() => expect(router.state.location.pathname).toBe('/studio/contexts/my%20context/review'));
+  const COURSES = 'GET /contexts';
+  const listed = (...contexts: unknown[]): Reply => ({ status: 200, body: { contexts } });
+  const course = (context_id: string, roles: string[], mode = 'PREPARATION', status = 'DRAFT') =>
+    ({ context_id, mode, status, roles });
+
+  it('lists the courses of the signed-in person, each with its lifecycle and roles', async () => {
+    await renderStudio({ 'GET /auth/session': [signedIn], [COURSES]: [listed(
+      course('ctx', ['ADMINISTRATOR', 'CONTENT_RESPONSIBLE']), course('delivery', ['LEARNER'], 'LEARNING', 'ACTIVE'),
+      course('odd', ['NEW_ROLE'], 'NEW_MODE', 'NEW_STATUS'))] });
+    const items = within(await screen.findByTestId('course-list')).getAllByRole('listitem');
+    expect(items.map((item) => item.textContent)).toEqual([
+      'ctxIn preparation · draft · Your roles: administrator, content responsibleReview inbox',
+      'deliveryIn delivery · active · Your roles: learnerReview inbox',
+      // A code the catalogue does not name is shown in words, never hidden.
+      'oddNew mode · New status · Your roles: New roleReview inbox',
+    ]);
+    expect(screen.queryByRole('textbox', { name: /context/i })).toBeNull();
   });
 
-  it('opens the course by default', async () => {
-    const { router } = await renderStudio({ 'GET /auth/session': [signedIn] });
-    fireEvent.change(await screen.findByLabelText(en.home.contextLabel), { target: { value: 'ctx' } });
-    fireEvent.submit(screen.getByRole('button', { name: en.home.open }).closest('form')!);
-    await waitFor(() => expect(router.state.location.pathname).toBe('/studio/contexts/ctx/course'));
+  it('opens the course or its review inbox from the list', async () => {
+    const { router } = await renderStudio({ 'GET /auth/session': [signedIn],
+      [COURSES]: [listed(course('my course', ['ADMINISTRATOR'])), listed(course('ctx', ['ADMINISTRATOR']))],
+      [SUMMARY]: [summary()], [PENDING_LIST]: [pending()] });
+    fireEvent.click(await screen.findByRole('link', { name: 'my course' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/studio/contexts/my%20course/course'));
+    await act(() => router.navigate('/'));
+    const item = (await screen.findByRole('link', { name: 'ctx' })).closest('li')!;
+    fireEvent.click(within(item).getByRole('link', { name: en.home.openReview }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/studio/contexts/ctx/review'));
+  });
+
+  it('says when there is no course yet, and offers to try again when the list fails', async () => {
+    await renderStudio({ 'GET /auth/session': [signedIn], [COURSES]: [error(500), listed()] });
+    fireEvent.click(await screen.findByRole('button', { name: en.home.coursesRetry }));
+    expect(await screen.findByText(en.home.coursesEmpty)).toBeTruthy();
+    expect(screen.queryByText(en.home.coursesFailed)).toBeNull();
   });
 });
 

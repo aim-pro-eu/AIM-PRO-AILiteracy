@@ -47,6 +47,7 @@ describe('studio shell', () => {
     await renderStudio({
       'GET /auth/session': [{ status: 200, body: SESSION }],
       'POST /auth/logout': [{ status: 403 }],
+      'GET /contexts': [{ status: 200, body: { contexts: [] } }],
     });
     const button = await screen.findByRole('button', { name: en.session.signOut });
     await act(async () => button.click());

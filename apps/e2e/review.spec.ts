@@ -22,8 +22,9 @@ const about = (entities: Entity[], proposal: EntityRef) => ({
 test('a reviewer reviews and applies the Evaluator proposal of the seed', async ({ page, seed }) => {
   const proposal = evaluatorProposal(seed);
   await page.goto('/studio/');
-  await page.getByLabel(en.home.contextLabel).fill(seed.authoring_context);
-  await page.getByRole('button', { name: en.home.openReview }).click();
+  await page.getByTestId('course-list').getByRole('listitem')
+    .filter({ has: page.getByRole('link', { name: seed.authoring_context, exact: true }) })
+    .getByRole('link', { name: en.home.openReview }).click();
 
   const awaiting = page.getByRole('region', { name: en.review.inbox.pendingHeading });
   await expect(awaiting.getByText('Proposed by admin · Points to check: 12')).toBeVisible();

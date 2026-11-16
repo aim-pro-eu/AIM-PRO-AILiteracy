@@ -242,7 +242,8 @@ request the API reads the context's `policies` reference and loads the
 `*.json` file whose `policy_ref` equals it exactly (`PolicyDirectory` in
 `services/api_common/contexts.py`). No match means the context is unavailable
 (404 `context_unavailable`); a context that does not exist gives the same
-answer, so a response does not reveal which contexts exist. The directory is
+answer. Responses may reveal which contexts exist (D35, 16 November 2026,
+removes the earlier rule that they never do). The directory is
 read on every request: installing an approved policy preview stays a host
 operator action, a file copy, and needs no restart. A file that is not a valid
 trusted policy, or a `policy_ref` found in two files, refuses every resolution
@@ -428,7 +429,7 @@ S05 and S06 endpoints only; nothing in the API, the core or the store changed.
 
 | Page | Path under `/studio/` | Reads | Writes |
 | --- | --- | --- | --- |
-| Home | `/` | — | — (a form opens the inbox of the context id entered) |
+| Home | `/` | `GET /contexts` | `POST /courses` |
 | Review inbox | `/contexts/{context_id}/review` | `GET /contexts/{context_id}`, `GET …/pending-proposals` | — |
 | Proposal | `/contexts/{context_id}/review/{proposal_id}` | the same two reads | `POST …/decisions`, `POST …/applications` |
 
@@ -438,9 +439,12 @@ S05 and S06 endpoints only; nothing in the API, the core or the store changed.
   assessment is named "Proposed assessment: " plus the first line of its
   activity instruction, with the number of points to check; other entries show
   the first sentence of the proposal's `proposedChange`.
-- **No context list.** The API does not list contexts (a response never reveals
-  which contexts exist, D10), so the home page asks for the context id, as the
-  CLI's `--context` does.
+- **Course list (D35, 16 November 2026).** The home page lists the courses of
+  the signed-in subject (`GET /contexts`): every context whose installed policy
+  grants the subject `read` in it, by id, with its mode, status and the
+  subject's roles in words. Each course opens its course page or its review
+  inbox; no context id is typed. A context whose policy is not installed is
+  unavailable and is not listed.
 - **Teacher view first (owner validation, 9 November 2026).** The first version
   showed the data model (field paths, versions, hashes, structure records); the
   owner found it incomprehensible for a teacher. The proposal page now leads

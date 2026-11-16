@@ -24,12 +24,30 @@
   "home": {
     "title": "Studio",
     "intro": "Create a course, see a course as a whole, and review the proposals that await a person.",
-    "openHeading": "Open a course",
-    "contextLabel": "Context id",
-    "contextHint": "The id of the execution context, as given to the CLI with --context.",
-    "contextRequired": "Enter the id of a context.",
-    "open": "Open the course",
-    "openReview": "Open the review inbox",
+    "coursesHeading": "Your courses",
+    "coursesLoading": "Loading your courses…",
+    "coursesFailed": "Your courses could not be loaded. Try again in a moment.",
+    "coursesRetry": "Try again",
+    "coursesEmpty": "You have no course yet. Create one below.",
+    "courseMeta": "{{mode}} · {{status}} · Your roles: {{roles}}",
+    "openReview": "Review inbox",
+    "mode": {
+      "PREPARATION": "In preparation",
+      "LEARNING": "In delivery"
+    },
+    "status": {
+      "DRAFT": "draft",
+      "ACTIVE": "active",
+      "PAUSED": "paused",
+      "CLOSED": "closed"
+    },
+    "role": {
+      "ADMINISTRATOR": "administrator",
+      "CONTENT_RESPONSIBLE": "content responsible",
+      "ASSESSOR": "assessor",
+      "OBSERVER": "observer",
+      "LEARNER": "learner"
+    },
     "createHeading": "Create a course",
     "createIntro": "A new course starts empty, in preparation. You become its administrator; nobody else can see it yet.",
     "courseLabel": "Course id",
