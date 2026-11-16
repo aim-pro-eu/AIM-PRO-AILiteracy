@@ -11,6 +11,8 @@ export type JobView = Schemas['JobView'];
 export type JobStatus = JobView['status'];
 export type ProjectProposal = Schemas['ProjectProposal'];
 export type ProjectInspection = Schemas['ProjectInspection'];
+export type ReleaseProposal = Schemas['ReleaseProposal'];
+export type ReleaseInspection = Schemas['ReleaseInspection'];
 export type SourceDiscovery = Schemas['SourceDiscoveryView'];
 export type SourcePreparation = Schemas['SourcePreparationView'];
 export type SourcePlan = Schemas['SourcePlan'];
@@ -107,6 +109,12 @@ export interface BuildApi {
   proposeCompletionRules(contextId: string, csrfToken: string, command: {
     requestId: string; project: EntityRef; baseContext: EntityRef;
   }): Promise<ProjectProposal>;
+  /** Propose a frozen release of the project's exact current selection; the same request id replays. */
+  proposeRelease(contextId: string, csrfToken: string, command: {
+    requestId: string; project: EntityRef; domain: EntityRef; baseContext: EntityRef;
+  }): Promise<ReleaseProposal>;
+  /** An applied release: its approvals, the exact records it freezes and its findings. */
+  inspectRelease(contextId: string, release: EntityRef): Promise<ReleaseInspection>;
 }
 
 const REASONS: Record<number, ReviewFailure> = {
@@ -278,6 +286,20 @@ export function createBuildApi(client: AuthoringClient): BuildApi {
         params: { path: { context_id: contextId } },
         headers: writing(csrfToken),
         body: { request_id: requestId, project, base_context: baseContext },
+      }));
+    },
+
+    async proposeRelease(contextId, csrfToken, { requestId, project, domain, baseContext }) {
+      return settle(() => client.POST('/contexts/{context_id}/releases', {
+        params: { path: { context_id: contextId } },
+        headers: writing(csrfToken),
+        body: { request_id: requestId, project, domain, base_context: baseContext },
+      }));
+    },
+
+    async inspectRelease(contextId, release) {
+      return settle(() => client.GET('/contexts/{context_id}/resources/{resource_id}/versions/{version}/release', {
+        params: { path: { context_id: contextId, resource_id: release.id, version: release.version } },
       }));
     },
   };

@@ -7,7 +7,7 @@ import { Link } from 'react-router';
 import { readable, refOf } from '../review/model';
 import { proposalPath } from '../review/paths';
 import { ReviewError } from '../review/reviewApi';
-import type { EntityRef } from '../review/reviewApi';
+import type { Entity, EntityRef } from '../review/reviewApi';
 import { useCsrfToken, useReviewServices } from '../review/ReviewServices';
 import { ENDED_STATUSES } from './buildApi';
 import type { GeneratorCommand, GeneratorKind, JobView, ProjectInspection } from './buildApi';
@@ -24,10 +24,22 @@ const GENERATORS: { kind: GeneratorKind; role: 'evaluator' | 'teacher' | 'traine
   { kind: 'generate-project-trainer', role: 'trainer', step: 7 },
 ];
 
-/** What the forms send: the course's current version and the project's current selections. */
+/** What the forms send: the course's current version, the project's current selections and its model in the course. */
 interface Course {
   base: EntityRef;
   inspection: ProjectInspection;
+  domain: EntityRef | null;
+}
+
+/** The course's current model of the project: the domain model a release freezes. */
+function projectModel(context: Entity, project: EntityRef): EntityRef | null {
+  const models = Array.isArray(context.fields.models) ? context.fields.models : [];
+  for (const model of models) {
+    if (typeof model !== 'object' || model === null || Array.isArray(model)) continue;
+    const { type, id, version } = model;
+    if (type === 'DomainModel' && id === `${project.id}:model` && typeof version === 'string') return { type, id, version };
+  }
+  return null;
 }
 
 type CourseState = { status: 'loading' } | { status: 'ready'; course: Course; reloading: boolean } | { status: 'error' };
@@ -44,8 +56,8 @@ function useCourse(contextId: string, projectId: string) {
   useEffect(() => {
     let current = true;
     Promise.all([review.inbox(contextId), api.inspectProject(contextId, projectId)]).then(
-      ([inbox, inspection]) => current && setState({
-        status: 'ready', course: { base: refOf(inbox.context), inspection }, reloading: false }),
+      ([inbox, inspection]) => current && setState({ status: 'ready', reloading: false,
+        course: { base: refOf(inbox.context), inspection, domain: projectModel(inbox.context, inspection.project) } }),
       () => current && setState({ status: 'error' }),
     );
     return () => {
@@ -66,13 +78,21 @@ export const assessmentsOf = (inspection: ProjectInspection): EntityRef[] =>
 const lines = (text: string) => text.split('\n').map((line) => line.trim()).filter(Boolean);
 
 /** The exact refs a form sends. */
-function Refs({ project, base, assessments }: { project: EntityRef; base: EntityRef; assessments?: EntityRef[] | undefined }) {
+function Refs({ project, base, assessments, domain }: {
+  project: EntityRef; base: EntityRef; assessments?: EntityRef[] | undefined; domain?: EntityRef | undefined;
+}) {
   const { t } = useTranslation();
   const refText = (ref: EntityRef) => <><code>{ref.id}</code> {t('build.generators.version', { version: ref.version })}</>;
   return (
     <dl className="alm-facts" data-testid="sent-refs">
       <dt>{t('build.generators.project')}</dt>
       <dd>{refText(project)}</dd>
+      {domain ? (
+        <>
+          <dt>{t('build.release.domain')}</dt>
+          <dd>{refText(domain)}</dd>
+        </>
+      ) : null}
       <dt>{t('build.generators.base')}</dt>
       <dd>{refText(base)}</dd>
       {assessments ? (
@@ -229,6 +249,62 @@ function CompletionForm({ contextId, course, reloading, onReload }: {
   );
 }
 
+/** Freeze the project's exact current selection as a release, to be reviewed; nothing reaches students. */
+function ReleaseForm({ contextId, course, reloading, onReload }: {
+  contextId: string; course: Course; reloading: boolean; onReload(): void;
+}) {
+  const { t } = useTranslation();
+  const id = useId();
+  const { api, newRequestId } = useBuildServices();
+  const csrfToken = useCsrfToken();
+  const { busy, notice, run } = useStep();
+  const staleAware = useStaleAware(onReload);
+  const [proposal, setProposal] = useState<EntityRef | null>(null);
+  const sent = useRef<{ key: string; requestId: string } | null>(null);
+  const { project, manifest } = course.inspection;
+  const { domain } = course;
+  const present = new Set(manifest.artifacts.map((artifact) => artifact.kind));
+  const missing = (manifest.required_kinds ?? []).filter((kind) => !present.has(kind));
+  const stale = course.inspection.stale_dependencies.length > 0;
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    if (reloading || domain === null) return;
+    const key = JSON.stringify([project, domain, course.base]);
+    if (sent.current?.key !== key) sent.current = { key, requestId: newRequestId() };
+    const { requestId } = sent.current;
+    void run(() => staleAware(async () => {
+      const proposed = await api.proposeRelease(contextId, csrfToken, { requestId, project, domain, baseContext: course.base });
+      setProposal(proposed.proposal);
+      return { tone: 'info', text: t('build.release.proposed') };
+    }));
+  };
+
+  let body;
+  if (missing.length > 0) {
+    body = <p className="alm-muted">{t('build.release.needsParts', { kinds: missing.map(readable).join(', ') })}</p>;
+  } else if (stale) body = <p className="alm-muted">{t('build.release.needsFresh')}</p>;
+  else if (domain === null) body = <p className="alm-muted">{t('build.release.needsModel')}</p>;
+  else {
+    body = (
+      <form className="alm-form" noValidate onSubmit={submit}>
+        <Button type="submit" busy={busy || reloading}>{t('build.release.submit')}</Button>
+      </form>
+    );
+  }
+  return (
+    <section aria-labelledby={`${id}-heading`}>
+      <h2 id={`${id}-heading`}>{t('build.release.heading')}</h2>
+      <p>{t('build.release.intro')}</p>
+      <h3>{t('build.generators.sends')}</h3>
+      <Refs project={project} base={course.base} domain={domain ?? undefined} />
+      {body}
+      {notice ? <StatusMessage tone={notice.tone}>{notice.text}</StatusMessage> : null}
+      {proposal ? <p><Link to={proposalPath(contextId, proposal.id)}>{t('build.release.review')}</Link></p> : null}
+    </section>
+  );
+}
+
 /** Content made from an earlier version of what it depends on, which the author generates again. */
 function StaleContent({ inspection }: { inspection: ProjectInspection }) {
   const { t } = useTranslation();
@@ -237,7 +313,7 @@ function StaleContent({ inspection }: { inspection: ProjectInspection }) {
   return <StatusMessage tone="error">{t('build.generators.staleContent', { targets: targets.join(', ') })}</StatusMessage>;
 }
 
-/** The Evaluator, Teacher and Trainer forms and the completion rules of the course's project. */
+/** The Evaluator, Teacher and Trainer forms, the completion rules and the release of the course's project. */
 export function GeneratorsStep({ contextId, projectId, onJob }: {
   contextId: string; projectId: string; onJob(job: JobView): void;
 }) {
@@ -261,6 +337,7 @@ export function GeneratorsStep({ contextId, projectId, onJob }: {
           reloading={reloading} onReload={reload} onJob={onJob} />
       ))}
       <CompletionForm contextId={contextId} course={course} reloading={reloading} onReload={reload} />
+      <ReleaseForm contextId={contextId} course={course} reloading={reloading} onReload={reload} />
     </>
   );
 }

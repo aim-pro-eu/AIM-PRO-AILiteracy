@@ -3,6 +3,7 @@ import { useParams } from 'react-router';
 
 import { BuildPage } from '../course-build/BuildPage';
 import { CoursePage } from '../course/CoursePage';
+import { ReleasePage } from '../release/ReleasePage';
 import { ProposalPage } from './ProposalPage';
 import { ReviewInboxPage } from './ReviewInboxPage';
 import { SyllabusEditPage } from './SyllabusEditPage';
@@ -33,10 +34,17 @@ function SyllabusEditRoute() {
   return <SyllabusEditPage key={`${contextId}/${proposalId}`} contextId={contextId} proposalId={proposalId} />;
 }
 
+function ReleaseRoute() {
+  const { contextId = '', releaseId = '', version = '' } = useParams();
+  return <ReleasePage key={`${contextId}/${releaseId}/${version}`} contextId={contextId}
+    release={{ type: 'Resource', id: releaseId, version }} />;
+}
+
 export const reviewRoutes: RouteObject[] = [
   { path: 'contexts/:contextId/course', element: <CourseRoute /> },
   { path: 'contexts/:contextId/build', element: <BuildRoute /> },
   { path: 'contexts/:contextId/review', element: <InboxRoute /> },
   { path: 'contexts/:contextId/review/:proposalId', element: <ProposalRoute /> },
   { path: 'contexts/:contextId/review/:proposalId/edit', element: <SyllabusEditRoute /> },
+  { path: 'contexts/:contextId/releases/:releaseId/versions/:version', element: <ReleaseRoute /> },
 ];

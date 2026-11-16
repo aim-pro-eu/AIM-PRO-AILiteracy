@@ -5,7 +5,7 @@ import { Link } from 'react-router';
 
 import { readable } from '../review/model';
 import { LoadFailure, useStatusLabel } from '../review/parts';
-import { buildPath, inboxPath, proposalPath } from '../review/paths';
+import { buildPath, inboxPath, proposalPath, releasePath } from '../review/paths';
 import type { Inbox } from '../review/reviewApi';
 import { RubricTable } from '../review/RubricTable';
 import { INTENT_KEYS } from '../review/SyllabusView';
@@ -19,6 +19,7 @@ const SECTIONS = [
   ['course-strategies', 'course.strategies.heading'],
   ['course-assessments', 'course.assessments.heading'],
   ['course-materials', 'course.materials.heading'],
+  ['course-releases', 'course.releases.heading'],
   ['course-history', 'course.history.heading'],
 ] as const;
 
@@ -216,6 +217,20 @@ function CourseSections({ contextId, course }: { contextId: string; course: Cour
             </ul>
           </>
         ) : null}
+      </section>
+
+      <section aria-labelledby="course-releases">
+        <h2 id="course-releases">{t('course.releases.heading')}</h2>
+        <p>{t('course.releases.intro')}</p>
+        {course.releases.length === 0 ? <p>{t('course.releases.empty')}</p> : (
+          <ol>
+            {course.releases.map((release, index) => (
+              <li key={`${release.id}\u0000${release.version}`}>
+                <Link to={releasePath(contextId, release)}>{t('course.releases.inspect', { number: index + 1 })}</Link>
+              </li>
+            ))}
+          </ol>
+        )}
       </section>
 
       <section aria-labelledby="course-history">

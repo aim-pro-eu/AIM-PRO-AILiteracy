@@ -550,6 +550,7 @@ browser recorded.
 | `generation.spec.ts`: the review of an Evaluator job's drafts (S09c, S09d) | on the seed's authoring context, an Evaluator job queued through the API with the browser's session (no form before S09c2), its requirement holding the synthetic reviewer's marker; the job list shows it proposed with "Blocks of units written: 1 of 1"; "How the review agent judged the drafts of this job": block 1 draft 1 not accepted ("Content complete: no", its reason labelled as model text), block 1 draft 2 accepted, the assembled draft accepted; the job view does not hold the reason; axe |
 | `teacher-views.spec.ts`: every proposal kind in words (S09c2, part 2) | on the seed, every proposal of the authoring context and the delivery imports of both delivery contexts, pending or decided, opened by URL: each has its title (syllabus, project initialization, assessments, teacher and trainer content, completion rules, release, delivery import; never "Proposed change"), the initialization says what it creates, the release lists its parts by kind, the import names its resources and agents, a decided proposal shows no comparison; axe on each; the course page links decided proposals with "Read this proposal" |
 | `cycle.spec.ts`: the rest of the authoring cycle (S09c2) | a new course: upload, Curator, approve and apply the syllabus, initialize and apply the project; the Evaluator form shows the project and course version it sends (read back through the API), the Teacher form says it needs the assessments; axe; another author applies an Evaluator proposal through the API, so the form's job is refused at queue time (409): the form says the course changed and shows the new course version; the Evaluator queued again, its proposal read in its teacher view (rubric; axe), approved and applied; the Teacher form shows the applied assessment it sends; the Teacher and Trainer proposals read with their material texts (axe), approved and applied; the completion rules proposed from the build page, read part by part (axe), approved and applied; the project inspection lists the five artifacts with their receipts and no stale dependency, and every node of the design has a rule |
+| `release.spec.ts`: a release and its delivery course (S10, part 1) | on the seed's authoring context, the build page's release step shows the project model it sends; the release proposed from it, read in its teacher view (its parts; axe), approved and applied; "Inspect this release": nothing stands in the way, seven approvals (the release, its project and five parts), what it freezes, no problem; axe; a delivery course created from the release page opens on its course page, its policy file names the creator on that course only, and it is in PREPARATION/DRAFT without a model; axe; the course page lists both releases, and the seeded one inspects with nothing in the way |
 | `build.spec.ts`: a syllabus not accepted (issue #112) | upload; the Curator by a query holding the synthetic reviewer's `REJECT_EVERY` marker ends with a proposal; the job list shows the fixed notice; axe; the syllabus view says the review agent accepted no draft, with its reason as model text; axe; approve and apply; the course shows the structure |
 | `build.spec.ts`: an invalid file | a text file is refused with "The file is not UTF-8 JSON"; no report; the export directory and the database file are unchanged; axe |
 | `accessibility.spec.ts` | axe on the home page (also with its validation error), the inbox with and without pending proposals, the proposal page with every disclosure open, its validation errors, the apply step, a refused application, and an unavailable context |
@@ -1083,6 +1084,41 @@ Issue #121; acceptance agreed with the owner in Chat 21 and split in Chat 22.
    verdict kept in its package.
 5. The course page links every proposal: "Review this proposal" while it can be
    decided or applied, "Read this proposal" after (labels and data only).
+
+## Release and delivery course from the studio (S10, part 1)
+
+Issue #123; owner decisions of 15 November 2026 (the delivery course is created
+from the studio; two PRs) and 16 November 2026 (each context keeps its own
+policy, below).
+
+1. **A release is proposed from the studio.** `POST /contexts/{context_id}/releases`
+   does what the CLI `propose-release` does: the exact selected project, its
+   domain model and the base context, with the ALM request id (the same id
+   replays the same proposal); a stale base is 409 and a refusal 422. API
+   version 0.13.0. The build page's step "9. Release" sends the project of the
+   inspection, the course's model of that project (the `DomainModel`
+   `<project id>:model` among the context's models) and the course version, and
+   says first which parts are missing or out of date. The proposal is read in
+   its teacher view (S09c2), decided and applied through the review endpoints.
+2. **An applied release is inspected.** The page
+   `/contexts/{context_id}/releases/{release id}/versions/{version}` reads
+   `show-release` (`GET …/resources/{id}/versions/{version}/release`, S05) and
+   says whether anything stands in the way of delivering the release; who
+   approved the release, its project and each part (with a link to each
+   proposal, or "no approval of this exact version was found"); the exact
+   records it freezes, by type; and each finding with its reason and what to
+   do. The course page lists the releases of its release catalogue, first to
+   last, and an applied release proposal links to its page.
+3. **The delivery course is created from the release page**, with `POST /courses`
+   unchanged (D23): a new course in PREPARATION/DRAFT with its own policy for
+   its creator, and the template's source scopes as any course. The form is
+   offered only for a release with no finding; the new course opens on its
+   course page. The import is proposed there in part 2.
+4. **Each context keeps its own policy** (owner, 16 November 2026). Today the
+   import reads the authoring context with the delivery context's policy, which
+   only works when one policy covers both, as in the seed. Part 2 makes the
+   import read the authoring context with its own installed policy (D10), the
+   subject being authorized by both; nothing in part 1 depends on it.
 
 ## Local identity smoke test
 

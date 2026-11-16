@@ -124,6 +124,16 @@ describe('course overview', () => {
     expect(applied.materials.map((material) => material.title)).toEqual(['Synthetic WORKSHEET']);
   });
 
+  it('lists the releases of the course\'s release catalogues, first to last (S10)', () => {
+    expect(course.releases).toEqual([]);
+    const release = (version: string) => ({ type: 'Resource', id: 'authoring-release:abc', version });
+    const catalogue = entity('DomainModel', 'authoring-release:abc:catalogue', { definitions: [release('r1'), release('r2')] });
+    const project = entity('DomainModel', 'authoring-project:abc:model', { definitions: [ref('Resource', 'authoring-project:abc')] });
+    const context = entity('ExecutionContext', 'ctx', { ...CONTEXT.fields, models: [ref('DomainModel', 'authoring-project:abc:model'),
+      ref('DomainModel', 'authoring-release:abc:catalogue')] });
+    expect(courseOverview(context, [context, ...ENTITIES, project, catalogue])!.releases).toEqual([release('r1'), release('r2')]);
+  });
+
   it('stops at a node that refers to itself', () => {
     const loop = entity('ProcessNode', 'phase-1', { name: 'Loop', kind: 'PHASE', children: [ref('ProcessNode', 'phase-1')] });
     const looped = courseOverview(CONTEXT, [CONTEXT, DESIGN, loop])!;

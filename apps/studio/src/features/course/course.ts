@@ -1,5 +1,5 @@
 import { proposalExplanation, proposalStatus } from '../review/model';
-import type { Entity, JsonValue } from '../review/reviewApi';
+import type { Entity, EntityRef, JsonValue } from '../review/reviewApi';
 import type { Criterion } from '../review/teacher';
 
 /**
@@ -29,6 +29,8 @@ export interface CourseOverview {
   /** Cited external sources (a locator, not a text). */
   sources: { title: string; url: string; conditions: string }[];
   history: HistoryEntry[];
+  /** The releases of the course's projects, first to last: each is inspected on its own page (S10). */
+  releases: EntityRef[];
 }
 
 export interface CourseSyllabus {
@@ -184,5 +186,15 @@ export function courseOverview(context: Entity, entities: Entity[]): CourseOverv
     sources: resources.filter(({ fields }) => isLocator(text(fields.contentOrLocator)))
       .map(({ fields }) => ({ title: text(fields.title), url: text(fields.contentOrLocator).trim(), conditions: text(fields.usageConditions) })),
     history,
+    releases: releasesOf(context, get),
   };
+}
+
+/** The release catalogues of the context's models hold every release of a project, first to last. */
+function releasesOf(context: Entity, get: (type: string, id: string) => Entity | undefined): EntityRef[] {
+  return objects(context.fields.models).map((model) => text(model.id))
+    .filter((id) => id.startsWith('authoring-release:') && id.endsWith(':catalogue'))
+    .flatMap((id) => objects(get('DomainModel', id)?.fields.definitions))
+    .filter((ref) => ref.type === 'Resource' && text(ref.id) && text(ref.version))
+    .map((ref) => ({ type: 'Resource', id: text(ref.id), version: text(ref.version) }));
 }

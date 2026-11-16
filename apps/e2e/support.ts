@@ -23,6 +23,7 @@ export interface SeedManifest {
   delivery_policy_preview: string;
   project_id: string;
   project: EntityRef;
+  release: EntityRef;
   pending_proposals: Record<string, EntityRef[]>;
 }
 

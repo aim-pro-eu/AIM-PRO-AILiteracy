@@ -247,7 +247,8 @@
       },
       "release": {
         "heading": "What this release freezes",
-        "intro": "Approving freezes the course as it is now, so that it can be delivered exactly as reviewed. Nothing reaches students: the delivery, its resources and its permissions come with a later import, reviewed on its own."
+        "intro": "Approving freezes the course as it is now, so that it can be delivered exactly as reviewed. Nothing reaches students: the delivery, its resources and its permissions come with a later import, reviewed on its own.",
+        "inspect": "Inspect this release: its approvals, what it freezes and its delivery course"
       },
       "delivery": {
         "heading": "What this delivery brings",
@@ -415,6 +416,12 @@
       "heading": "Syllabus in use: {{title}}",
       "editedBy": "Edited by {{teacher}}.",
       "intents": "Planned activities: {{intents}}"
+    },
+    "releases": {
+      "heading": "Releases",
+      "intro": "Each applied release freezes the course as it was reviewed, first to last. Inspect one to check it and to create its delivery course.",
+      "empty": "No release yet.",
+      "inspect": "Release {{number}}: inspect it"
     }
   },
   "build": {
@@ -611,7 +618,7 @@
       "proposed": "The project is proposed and waits for your review.",
       "review": "Review the proposed project",
       "selected": "Project “{{project}}” is initialized.",
-      "next": "Next, the steps below: the assessments, the teacher and trainer content, and the completion rules."
+      "next": "Next, the steps below: the assessments, the teacher and trainer content, the completion rules and the release."
     },
     "reviews": {
       "summary": "How the review agent judged the Curator's drafts",
@@ -687,6 +694,56 @@
       "submit": "Propose the completion rules",
       "proposed": "The completion rules are proposed and wait for your review.",
       "review": "Review the proposed completion rules"
+    },
+    "release": {
+      "heading": "9. Release",
+      "intro": "A release freezes the project exactly as it is now: every part as it was approved and applied. Nothing reaches students: a delivery course brings the release in later, with its own review.",
+      "domain": "Project model",
+      "needsParts": "Prepare these parts of the project first: {{kinds}}.",
+      "needsFresh": "Generate the content listed above again first: a release freezes a project whose content is up to date.",
+      "needsModel": "The course has no model of this project yet: apply the project first.",
+      "submit": "Propose the release",
+      "proposed": "The release is proposed and waits for your review. Once it is applied, inspect it from the course page.",
+      "review": "Review the proposed release"
+    }
+  },
+  "release": {
+    "title": "Release",
+    "back": "Back to the course",
+    "intro": "A release freezes the course exactly as it was reviewed. This page checks it: who approved each part, the exact records it freezes, and what stands in the way of delivering it.",
+    "loading": "Reading the release…",
+    "failed": "The release could not be read. Try again.",
+    "refused": "This release cannot be inspected here: {{detail}}",
+    "ready": "Nothing stands in the way: the release, its project and every part it freezes were approved and applied in this course.",
+    "notReady_one": "{{count}} problem stands in the way of delivering this release. It is listed below.",
+    "notReady_other": "{{count}} problems stand in the way of delivering this release. They are listed below.",
+    "approvals": {
+      "heading": "Approvals",
+      "intro": "Each part is delivered only in the exact version that was approved and applied in this course.",
+      "release": "The release “{{title}}”",
+      "project": "The project “{{title}}”",
+      "part": "{{kind}}: {{title}}",
+      "unknownKind": "Part",
+      "approved": "{{part}}: approved and applied.",
+      "missing": "{{part}}: no approval of this exact version was found.",
+      "read": "Read the proposal"
+    },
+    "frozen": {
+      "heading": "What it freezes",
+      "intro_one": "The release freezes {{count}} record in this exact version: later changes to the course do not change it.",
+      "intro_other": "The release freezes {{count}} records in these exact versions: later changes to the course do not change them.",
+      "type": "{{type}} ({{count}})",
+      "record": "{{title}} (version {{version}})"
+    },
+    "findings": {
+      "heading": "Problems",
+      "none": "None.",
+      "resolution": "What to do: {{resolution}}"
+    },
+    "delivery": {
+      "heading": "Create a delivery course",
+      "intro": "A delivery course is a new course, in preparation, where this release is brought in for students. You become its administrator. The release is brought in by an import, proposed and reviewed in the delivery course; students get nothing until that course is activated.",
+      "submit": "Create the delivery course"
     }
   }
 }
