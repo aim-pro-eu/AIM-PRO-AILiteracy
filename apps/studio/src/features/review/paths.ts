@@ -12,3 +12,7 @@ export const syllabusEditPath = (contextId: string, proposalId: string) => `${pr
 
 export const releasePath = (contextId: string, release: { id: string; version: string }) =>
   `/contexts/${encodeURIComponent(contextId)}/releases/${encodeURIComponent(release.id)}/versions/${encodeURIComponent(release.version)}`;
+
+/** The import of an applied release of `authoringId` into the delivery course `contextId` (S10, part 2). */
+export const importPath = (contextId: string, authoringId: string, release: { id: string; version: string }) =>
+  `/contexts/${encodeURIComponent(contextId)}/import?${new URLSearchParams({ from: authoringId, release: release.id, version: release.version })}`;

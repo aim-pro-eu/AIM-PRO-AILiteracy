@@ -133,7 +133,8 @@ class ContextServices:
             policy = self.policies.find(reference)
             if policy is None:
                 raise ContextUnavailable('policy not installed')
-            yield LearningService(store, self.contract, policy, _no_agents)
+            # Another context, such as the authoring course of a delivery import, is read with its own policy.
+            yield LearningService(store, self.contract, policy, _no_agents, policies=self.policies.find)
 
 
 def open_context(request: Request, context_id: str):

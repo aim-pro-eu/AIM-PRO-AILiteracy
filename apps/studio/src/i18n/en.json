@@ -148,7 +148,8 @@
       "seeCourse": "See the result on the course page",
       "conflict": "The proposal can no longer be applied as approved: {{detail}} The page now shows its current state.",
       "forbidden": "You are not allowed to apply this proposal. Nothing was changed.",
-      "failed": "The application did not complete. Try again: the retry repeats the same operation, so the change is applied at most once."
+      "failed": "The application did not complete. Try again: the retry repeats the same operation, so the change is applied at most once.",
+      "appliedImport": "Import applied. The course is now at version {{version}} and names the reviewed policy preview, which is not installed yet: the course stays unavailable until an operator installs that exact file in the policy directory."
     },
     "teacher": {
       "titleAssessment": "Proposed assessment",
@@ -422,7 +423,8 @@
       "intro": "Each applied release freezes the course as it was reviewed, first to last. Inspect one to check it and to create its delivery course.",
       "empty": "No release yet.",
       "inspect": "Release {{number}}: inspect it"
-    }
+    },
+    "delivery": "This is a delivery course: it holds a frozen release, which is not built further here. Students get nothing until the course is activated."
   },
   "build": {
     "title": "Build the course",
@@ -742,8 +744,62 @@
     },
     "delivery": {
       "heading": "Create a delivery course",
-      "intro": "A delivery course is a new course, in preparation, where this release is brought in for students. You become its administrator. The release is brought in by an import, proposed and reviewed in the delivery course; students get nothing until that course is activated.",
+      "intro": "A delivery course is a new course, in preparation, where this release is brought in for students. You become its administrator, then choose the resource each requirement uses. The release is brought in by an import, proposed and reviewed in the delivery course; students get nothing until that course is activated.",
       "submit": "Create the delivery course"
+    }
+  },
+  "delivery": {
+    "import": {
+      "title": "Import a release",
+      "back": "Back to the release",
+      "intro": "The release of the course “{{from}}” is brought into the delivery course “{{course}}” unchanged. Choose the resource each requirement uses, then propose the import: it is reviewed in “{{course}}”, and approving it does not install anything.",
+      "loading": "Reading the release and the delivery course…",
+      "configured": "This course already holds a configuration. An import goes into a new delivery course only.",
+      "notReady": "Problems stand in the way of delivering this release: open the release to read them. No import can be proposed.",
+      "bindings": {
+        "heading": "The resource each requirement uses",
+        "intro": "The release fixes one exact resource for each requirement, proposed below. Keep it, or leave the requirement without a resource: the course then cannot be activated.",
+        "label": "Requirement {{number}}: {{purpose}}",
+        "pinned": "{{title}} (proposed, the version the release fixes)",
+        "none": "No resource",
+        "unpinned": "The release fixes no resource for this requirement."
+      },
+      "completion": {
+        "heading": "Completion",
+        "intro_one": "The design has {{count}} completion rule: its part is completed when all its activities are completed.",
+        "intro_other": "The design has {{count}} completion rules: each part is completed when all its activities are completed."
+      },
+      "summary_one": "{{count}} of {{total}} requirements gets a resource.",
+      "summary_other": "{{count}} of {{total}} requirements get a resource.",
+      "submit": "Propose the import",
+      "proposed_one": "The import is proposed with {{count}} resource. Nothing has changed yet: it awaits review in this course.",
+      "proposed_other": "The import is proposed with {{count}} resources. Nothing has changed yet: it awaits review in this course.",
+      "review": "Review the import",
+      "refused": "The import cannot be proposed: {{detail}}",
+      "forbidden": "You are not allowed to import this release here. Both courses must allow you to.",
+      "conflict": "The delivery course changed meanwhile. Reload the page and try again.",
+      "failed": "The import could not be proposed. Try again: the retry repeats the same request."
+    },
+    "policy": {
+      "heading": "Trusted policy preview",
+      "intro": "Once the import is applied, the course uses this policy: it adds a source scope for the resources above, for this course only. The preview never replaces the course’s installed policy, and neither the studio nor approval installs it.",
+      "operator": "An operator installs it after the approval, as a new file in the policy directory (for example “{{file}}”), copied exactly. Until then, the applied course is unavailable.",
+      "download": "Download the preview as {{file}}"
+    },
+    "activation": {
+      "heading": "Activation",
+      "intro": "Activation opens the course to students (LEARNING, ACTIVE). It is proposed, then reviewed like any change; the studio shows why it is refused when it cannot be proposed.",
+      "submit": "Propose activation",
+      "proposed": "Activation is proposed. It awaits review in this course.",
+      "review": "Review the activation",
+      "refused_one": "Activation cannot be proposed: {{count}} reason. Nothing was recorded; the course stays in preparation.",
+      "refused_other": "Activation cannot be proposed: {{count}} reasons. Nothing was recorded; the course stays in preparation.",
+      "assessor": "“{{activity}}” is an assessment, and no assessor is configured for students yet (decision D4): the course stays in preparation.",
+      "other": "{{reason}} What to do: {{resolution}} ({{code}})",
+      "refusedDetail": "Activation cannot be proposed: {{detail}}",
+      "forbidden": "You are not allowed to activate this course.",
+      "conflict": "The course changed meanwhile. Reload the page and try again.",
+      "failed": "Activation could not be proposed. Try again."
     }
   }
 }

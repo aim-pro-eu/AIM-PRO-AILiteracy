@@ -205,6 +205,17 @@ class ReleaseInspectionTest(ReleaseTest):
         self.assertEqual(list(view.closure), sorted(view.closure, key=lambda r: (r.type, r.id, r.version)))
         for item in view.closure:
             self.assertNotIn(item.version, {'latest', 'LATEST'})
+        # What a delivery import binds: each requirement of the frozen design with the resource the release pins.
+        pins = {s.requirement: s.resource for s in self.author.selections(release, 'scope')}
+        self.assertEqual({r.requirement: r.resource for r in view.requirements}, pins)
+        self.assertEqual(len(view.requirements), 7)
+        for item in view.requirements:
+            self.assertIn(item.requirement, view.closure)
+            self.assertEqual(item.purpose, self.store.read(item.requirement, owner=AUTH).fields['purpose'])
+            self.assertEqual(item.title, self.store.read(item.resource, owner=AUTH).fields['title'])
+        self.assertEqual(set(view.completion_rules), {r for r in view.closure if r.type == 'RuleDefinition'
+                                                      and r.id.startswith('completion-rule:')})
+        self.assertTrue(view.completion_rules)
         # A later authoring revision, even pending with a Lead ACCEPT, changes nothing.
         revision = self.author.generate('ASSESSMENT', '2')
         package = self.author.packages['ASSESSMENT']
@@ -232,6 +243,7 @@ class ReleaseInspectionTest(ReleaseTest):
         self.assertIsNone(view.project_receipt)
         self.assertTrue(all(a.receipt is None for a in view.artifacts))
         self.assertIn('RELEASE_UNAPPROVED', {f.code for f in view.findings})
+        self.assertEqual((view.requirements, view.completion_rules), ((), ()))
         with self.assertRaisesRegex(ValueError, 'approved and applied'):
             self.author.delivery_import(release, service=revoked)
 
@@ -349,6 +361,130 @@ class DeliveryImportTest(ReleaseTest):
         with self.assertRaisesRegex(ValueError, 'migration'):
             self.author.delivery_import(release, DELIVERY_TWO, 'import-again')
         self.assertEqual(self.store.read_context(DELIVERY_TWO).fields['models'], [])
+
+COURSE = 'architecture-course'
+
+
+def course_policy(actions=('read', 'bootstrap', 'propose', 'decide', 'apply', 'interact')):
+    """A course's own policy, as POST /courses writes it: its creator administers this context only."""
+    return TrustedPolicy.model_validate({
+        'policy_ref': {'type': 'PolicySet', 'id': 'course:' + COURSE, 'version': '1'},
+        'subjects': {'admin': {'roles': ['ADMINISTRATOR', 'CONTENT_RESPONSIBLE'], 'actions': {COURSE: list(actions)}}},
+        'scopes': {}})
+
+
+def revoked(policy, context_id, *actions):
+    """The same policy reference with ``actions`` removed for the subject in ``context_id``."""
+    data = policy.model_dump(mode='json')
+    grants = data['subjects']['admin']['actions']
+    grants[context_id] = [a for a in grants[context_id] if a not in actions]
+    return TrustedPolicy.model_validate(data)
+
+
+@on_both_backends
+class SeparatePolicyImportTest(ReleaseTest):
+    """Each context keeps its own trusted policy (owner decision of 16 November 2026, #123).
+
+    The import reads the authoring context with the authoring context's installed
+    policy, and the subject must be authorized by both, at proposal and at application.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.installed = {trusted_policy().policy_ref: trusted_policy(), course_policy().policy_ref: course_policy()}
+        self.course = self.course_service(course_policy())
+        self.course.bootstrap(COURSE, 'admin')
+
+    def course_service(self, policy):
+        return LearningService(self.store, load_contract(), policy,
+            Mock(side_effect=AssertionError('Release commands must not construct agents')),
+            policies=self.installed.get)
+
+    def test_import_is_accepted_when_both_policies_authorize_the_subject(self):
+        release = self.released()
+        authoring = self.store.read_context(AUTH)
+        self.assertNotIn(COURSE, trusted_policy().subjects['admin'].actions)
+        result = self.author.delivery_import(release, COURSE, 'course-import', service=self.course)
+        scope = result.policy_preview.scopes[COURSE + ':course-import']
+        self.assertEqual(result.policy_preview.policy_ref.id, 'course:' + COURSE)
+        self.assertEqual(scope.contexts, [COURSE])
+        self.assertEqual(scope.subjects, ['admin'])
+        self.assertEqual(set(result.policy_preview.scopes), {COURSE + ':course-import'})
+        proposal = self.store.read(result.proposal, owner=COURSE)
+        self.author.review_and_apply(COURSE, proposal, 'course-import', service=self.course)
+        root = self.store.read_context(COURSE)
+        self.assertEqual(root.fields['policies'], result.policy_preview.policy_ref.model_dump())
+        self.assertEqual(root.fields['learningDesign'], result.design.model_dump())
+        self.assertEqual(self.store.read_context(AUTH), authoring)
+        # The installed preview is the course's policy from then on; activation reads no other context.
+        with self.assertRaises(ActivationRefused) as refused:
+            self.activation(self.install(result), COURSE)
+        self.assertEqual({f.code for f in refused.exception.findings}, {'RELEASE_RUNTIME_ROLE'})
+
+    def test_import_is_refused_when_either_policy_does_not_authorize_the_subject(self):
+        release = self.released()
+        def refused(service, error, pattern):
+            with self.assertRaisesRegex(error, pattern):
+                self.author.delivery_import(release, COURSE, 'refused', service=service)
+        self.installed[trusted_policy().policy_ref] = revoked(trusted_policy(), AUTH, 'propose')
+        refused(self.course, ValueError, 'not authorized')
+        self.installed[trusted_policy().policy_ref] = revoked(trusted_policy(), AUTH, 'read')
+        refused(self.course, ValueError, 'not authorized')
+        del self.installed[trusted_policy().policy_ref]
+        refused(self.course, ValueError, 'policy of the authoring context is not installed')
+        self.installed[trusted_policy().policy_ref] = trusted_policy()
+        refused(self.course_service(course_policy(('read',))), ValueError, 'not authorized')
+        # The authoring context's policy is never borrowed from the destination's.
+        refused(LearningService(self.store, load_contract(), course_policy(), Mock()), ValueError, 'not installed')
+        self.assertFalse(self.store.owned(COURSE, 'ChangeProposal'))
+        self.assertEqual(self.store.read_context(COURSE).fields['models'], [])
+
+    def test_application_rechecks_both_policies(self):
+        release = self.released()
+        result = self.author.delivery_import(release, COURSE, 'course-import', service=self.course)
+        proposal = self.store.read(result.proposal, owner=COURSE)
+        self.course.decide(COURSE, 'admin', proposal.ref, 'APPROVE', 'Synthetic destination review')
+        destination = self.store.read_context(COURSE)
+        self.installed[trusted_policy().policy_ref] = revoked(trusted_policy(), AUTH, 'propose')
+        with self.assertRaisesRegex(ValueError, 'not authorized'):
+            self.course.apply(COURSE, 'admin', proposal.ref, 'course-import')
+        del self.installed[trusted_policy().policy_ref]
+        with self.assertRaisesRegex(ValueError, 'not installed'):
+            self.course.apply(COURSE, 'admin', proposal.ref, 'course-import')
+        self.assertEqual(self.store.read_context(COURSE), destination)
+        self.installed[trusted_policy().policy_ref] = trusted_policy()
+        self.course.apply(COURSE, 'admin', proposal.ref, 'course-import')
+        self.assertEqual(self.store.read_context(COURSE).fields['learningDesign'], result.design.model_dump())
+
+    def test_cli_reads_the_authoring_policy_from_other_policy(self):
+        release = self.released()
+        files = {}
+        for name, policy in (('course', course_policy()), ('authoring', trusted_policy())):
+            files[name] = Path(self.temp.name) / (name + '.json')
+            files[name].write_text(policy.model_dump_json())
+        bundle = Path(self.temp.name) / 'import.json'
+        bundle.write_text(DeliveryImport(release=release.ref, authoring_context=AUTH,
+            base_context=self.store.read_context(COURSE).ref, scope_name='cli-scope',
+            bindings=self.author.selections(release, 'cli-scope')).model_dump_json())
+        def cli(*options, code=0):
+            output, errors = StringIO(), StringIO()
+            with redirect_stdout(output), redirect_stderr(errors):
+                self.assertEqual(main(['--db', str(self.path), '--policy', str(files['course']), *options,
+                    '--subject', 'admin', '--context', COURSE, 'propose-delivery-import', str(bundle),
+                    '--request-id', 'cli-import', '--policy-preview', str(Path(self.temp.name) / 'preview.json')]),
+                    code, errors.getvalue())
+            return errors.getvalue()
+        cli(code=2)
+        self.assertFalse(self.store.owned(COURSE, 'ChangeProposal'))
+        cli('--other-policy', str(files['authoring']))
+        self.assertTrue(self.store.owned(COURSE, 'ChangeProposal'))
+
+    def test_shared_policy_needs_no_other_installed_policy(self):
+        release = self.released()
+        result, _ = self.imported(release)
+        self.assertEqual(self.store.read_context(DELIVERY).fields['policies'],
+                         result.policy_preview.policy_ref.model_dump())
+
 
 @on_both_backends
 class ActivationTest(ReleaseTest):

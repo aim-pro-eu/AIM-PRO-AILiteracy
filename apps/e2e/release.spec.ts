@@ -47,8 +47,9 @@ test('a release is proposed, applied and inspected, and its delivery course is c
   const delivery = section(page, en.release.delivery.heading);
   await delivery.getByLabel(en.home.courseLabel).fill(DELIVERY);
   await delivery.getByRole('button', { name: en.release.delivery.submit }).click();
-  await expect(page).toHaveURL(`/studio/contexts/${DELIVERY}/course`);
-  await expect(page.getByText(en.course.notStarted)).toBeVisible();
+  // It opens on the import of this release (S10, part 2; the import itself is delivery.spec.ts).
+  await expect(page).toHaveURL(new RegExp(`/studio/contexts/${DELIVERY}/import\\?from=${seed.authoring_context}&`));
+  await expect(page.getByRole('heading', { name: en.delivery.import.title, level: 1 })).toBeVisible();
   const policy = JSON.parse(readFileSync(`${SEED}policies/course-${DELIVERY}-1.json`, 'utf8')) as {
     subjects: Record<string, { actions: Record<string, string[]> }>;
   };

@@ -3,6 +3,8 @@ import { StatusMessage } from '@alm/ui';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 
+import { ActivationSection } from '../delivery/ActivationSection';
+import { isImportedDelivery } from '../delivery/delivery';
 import { readable } from '../review/model';
 import { LoadFailure, useStatusLabel } from '../review/parts';
 import { buildPath, inboxPath, proposalPath, releasePath } from '../review/paths';
@@ -264,12 +266,16 @@ function CourseContent({ contextId, inbox }: { contextId: string; inbox: Inbox }
     );
   }
   if (!course) return <StatusMessage>{t('course.notVisible')}</StatusMessage>;
+  // A delivery course holds a frozen release: it is not built further, only activated (S10).
+  const delivery = isImportedDelivery(inbox.context);
   return (
     <>
       <p className="alm-lead"><strong>{course.name}</strong></p>
       <p className="alm-muted">{t('course.state', { status: readable(course.status), mode: readable(course.mode) })}</p>
+      {delivery ? <p>{t('course.delivery')}</p> : null}
       <p><Link to={inboxPath(contextId)}>{t('course.review', { count: inbox.pending.length })}</Link></p>
-      <p><Link to={buildPath(contextId)}>{t('course.continueBuild')}</Link></p>
+      {delivery ? null : <p><Link to={buildPath(contextId)}>{t('course.continueBuild')}</Link></p>}
+      {delivery && course.mode === 'PREPARATION' && mayAuthor(inbox, subjectKey) ? <ActivationSection inbox={inbox} /> : null}
       <CourseSections contextId={contextId} course={course} />
     </>
   );

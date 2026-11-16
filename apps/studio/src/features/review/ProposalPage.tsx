@@ -20,6 +20,7 @@ import { coursePath, inboxPath, releasePath, syllabusEditPath } from './paths';
 import { isSyllabusProposal } from './syllabus';
 import { SyllabusView } from './SyllabusView';
 import { KIND_TITLES, plainIssues, teacherView } from './teacher';
+import type { ProposalKind } from './teacher';
 import { Issues, TeacherView } from './TeacherView';
 import { useInbox } from './useInbox';
 
@@ -163,7 +164,7 @@ function SyllabusContent({ inbox, proposal, issues }: {
 function ProposalContent({ inbox, proposalId, busy, onDecide, onApply }: {
   inbox: Inbox; proposalId: string; busy: boolean;
   onDecide(pending: PendingProposal, decision: DecisionKind, reason: string): void;
-  onApply(proposal: Entity): void;
+  onApply(proposal: Entity, kind: ProposalKind): void;
 }) {
   const { t } = useTranslation();
   const pending = inbox.pending.find((item) => item.proposal.id === proposalId);
@@ -175,7 +176,7 @@ function ProposalContent({ inbox, proposalId, busy, onDecide, onApply }: {
 function ProposalBody({ inbox, proposal, pending, busy, onDecide, onApply }: {
   inbox: Inbox; proposal: Entity; pending: PendingProposal | undefined; busy: boolean;
   onDecide(pending: PendingProposal, decision: DecisionKind, reason: string): void;
-  onApply(proposal: Entity): void;
+  onApply(proposal: Entity, kind: ProposalKind): void;
 }) {
   const { t } = useTranslation();
   const statusLabel = useStatusLabel();
@@ -200,7 +201,7 @@ function ProposalBody({ inbox, proposal, pending, busy, onDecide, onApply }: {
       </p>
       {view && view.kind !== 'other' ? null : <p>{explanation.summary}</p>}
       {pending || status === 'APPROVED' ? null : <p>{t('review.proposal.notPending', { status: statusLabel(status) })}</p>}
-      {status === 'APPROVED' ? <ApplyStep busy={busy} onApply={() => onApply(proposal)} /> : null}
+      {status === 'APPROVED' ? <ApplyStep busy={busy} onApply={() => onApply(proposal, view?.kind ?? 'other')} /> : null}
       {!syllabus && content.status === 'loading' ? <StatusMessage>{t('review.proposal.loadingContent')}</StatusMessage> : null}
       {!syllabus && content.status === 'error' ? <StatusMessage tone="error">{t('review.proposal.contentFailed')}</StatusMessage> : null}
       {view ? <TeacherView view={view} issues={issues} /> : null}
@@ -223,7 +224,7 @@ export function ProposalPage({ contextId, proposalId }: { contextId: string; pro
   const { state, reload } = useInbox(contextId);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [busy, setBusy] = useState(false);
-  const [applied, setApplied] = useState(false);
+  const [applied, setApplied] = useState<ProposalKind | null>(null);
 
   /** Run a write; `settle` maps a failure to the notice and says whether the page reloads. */
   const write = async (run: () => Promise<Notice>, settle: (failure: ReviewFailure, detail: string) => [Notice, boolean]) => {
@@ -262,11 +263,13 @@ export function ProposalPage({ contextId, proposalId }: { contextId: string; pro
     }, true],
   );
 
-  const apply = (proposal: Entity) => void write(
+  const apply = (proposal: Entity, kind: ProposalKind) => void write(
     async () => {
       const change = await api.apply(contextId, csrfToken, refOf(proposal), operations.for(contextId, refOf(proposal)));
-      setApplied(true);
-      return { tone: 'info', text: t('review.apply.applied', { version: String(change.fields.newVersion ?? '') }) };
+      setApplied(kind);
+      // An applied import names a policy that is not installed yet: the course is unavailable until an operator installs it.
+      const text = kind === 'import' ? 'review.apply.appliedImport' : 'review.apply.applied';
+      return { tone: 'info', text: t(text, { version: String(change.fields.newVersion ?? '') }) };
     },
     // Without an answer the change may or may not be applied: keep the page, a retry replays the operation.
     (failure, detail) => failure === 'failed' ? [{ tone: 'error', text: t('review.apply.failed') }, false] : [{
@@ -281,7 +284,7 @@ export function ProposalPage({ contextId, proposalId }: { contextId: string; pro
       <p><Link to={inboxPath(contextId)}>{t('review.proposal.back')}</Link></p>
       <h1>{t('review.proposal.title')}</h1>
       {notice ? <StatusMessage tone={notice.tone}>{notice.text}</StatusMessage> : null}
-      {applied ? <p><Link to={coursePath(contextId)}>{t('review.apply.seeCourse')}</Link></p> : null}
+      {applied && applied !== 'import' ? <p><Link to={coursePath(contextId)}>{t('review.apply.seeCourse')}</Link></p> : null}
       {state.status === 'loading' ? <StatusMessage>{t('review.inbox.loading')}</StatusMessage> : null}
       {state.status === 'error' ? <LoadFailure reason={state.reason} onRetry={reload} /> : null}
       {state.status === 'ready'

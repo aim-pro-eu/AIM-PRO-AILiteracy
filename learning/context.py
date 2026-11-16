@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Iterable, Literal
+from typing import Callable, Iterable, Literal
 
 from learning.contracts import Entity, EntityRef, Finding, Record, Text
 from learning.metamodel import Contract
@@ -62,6 +62,8 @@ class RunContext:
     request: LearningRequest
     participant: Entity
     specializations: tuple[Entity, ...] = ()
+    # The installed trusted policy of another context, by its exact reference (D10); ``None``: this policy only.
+    policies: Callable[[EntityRef], TrustedPolicy | None] | None = None
 
 
 def references(value) -> Iterable[EntityRef]:

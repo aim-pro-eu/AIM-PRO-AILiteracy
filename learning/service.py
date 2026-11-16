@@ -20,9 +20,13 @@ ABANDONED_CONTENT = 'Request abandoned by an administrator.'
 
 
 class LearningService:
-    def __init__(self, store, contract, policy, orchestrator_factory):
+    def __init__(self, store, contract, policy, orchestrator_factory, policies=None):
+        """``policies`` finds the installed trusted policy of another context by its exact reference, or ``None``.
+
+        Only a delivery import reads another context, the authoring one, with that context's own policy.
+        """
         self.store, self.contract, self.policy = store, contract, policy
-        self.orchestrator_factory = orchestrator_factory
+        self.orchestrator_factory, self.policies = orchestrator_factory, policies
 
     def _context(self, context_id, subject_key, request=None):
         root = self.store.read_context(context_id)
@@ -31,7 +35,7 @@ class LearningService:
         snapshot = load_context(self.store, request, self.policy, self.contract)
         participant = next(snapshot.get(ref) for ref in root.fields['participants']
                            if snapshot.get(ref).fields['subjectKey'] == subject_key)
-        return RunContext(snapshot, self.policy, self.contract, request, participant)
+        return RunContext(snapshot, self.policy, self.contract, request, participant, policies=self.policies)
 
     def bootstrap(self, context_id, subject_key):
         ref = EntityRef(type='ExecutionContext', id=context_id, version='1')

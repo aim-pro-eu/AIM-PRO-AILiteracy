@@ -222,8 +222,21 @@ describe('teacher view of the project, its release and a delivery import (S09c2 
       rule('rule-unit', 'i1', 'Complete this process node only when every direct child is COMPLETED.')], []);
     expect(view.kind).toBe('import');
     expect(view.delivery).toEqual({ units: 1, bindings: [{ need: 'Use the cited source.', resource: 'Synthetic prompting guide' }],
-      agents: [{ role: 'TRAINER', name: 'guided-practice-coach' }], scopes: ['delivery', 'wp3'] });
+      agents: [{ role: 'TRAINER', name: 'guided-practice-coach' }], scopes: ['delivery', 'wp3'], policy: null });
     expect(view.changes).toEqual([]);
+  });
+
+  it('shows the trusted policy an import proposes, in full, with a new file name for the operator (S10)', () => {
+    const proposed = { policy_ref: { type: 'PolicySet', id: 'course:delivery', version: 'v2' },
+      subjects: { admin: { roles: ['ADMINISTRATOR'], actions: { delivery: ['read'] } } },
+      scopes: { 'delivery:delivery': { contexts: ['delivery'], subjects: ['admin'], resources: ['["wp3:test","v1"]'] } },
+      rule_bindings: [] };
+    const policy = entity('PolicySet', 'course:delivery', 'v2', { sourceScopes: ['wp3', 'delivery:delivery'],
+      approvalConditions: [], permissions: ['Trusted local configuration; generated text grants no authority',
+        `Proposed trusted local policy configuration: ${JSON.stringify(proposed)}`] });
+    const view = teacherView([CONTEXT, policy], []);
+    expect(view.kind).toBe('import');
+    expect(view.delivery?.policy).toEqual({ file: 'course-delivery-v2.json', json: JSON.stringify(proposed, null, 2) });
   });
 
   it('says when the review agent did not accept generated content, with its assessment as model text', () => {
