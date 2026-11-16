@@ -57,6 +57,14 @@ class ReleasedArtifact(Record):
     receipt: ReviewReceipt | None = None
 
 
+class ReleasedRequirement(Record):
+    """A requirement of the frozen design with the exact resource the release pins for it, if any."""
+    requirement: EntityRef
+    purpose: Text
+    resource: EntityRef | None = None
+    title: Text | None = None
+
+
 class ReleaseInspection(Record):
     release: EntityRef
     manifest: ReleaseManifest
@@ -65,6 +73,9 @@ class ReleaseInspection(Record):
     artifacts: tuple[ReleasedArtifact, ...]
     closure: tuple[EntityRef, ...]
     findings: tuple[Finding, ...]
+    # What a delivery import binds; empty while the release has findings.
+    requirements: tuple[ReleasedRequirement, ...] = ()
+    completion_rules: tuple[EntityRef, ...] = ()
 
 
 class BindingSelection(Record):
@@ -113,6 +124,12 @@ class ActivationProposal(Record):
     policy: EntityRef
 
 
+class ActivationOutcome(Record):
+    """An activation proposal, or the findings that refuse it; a refusal records nothing."""
+    proposal: ActivationProposal | None = None
+    findings: tuple[Finding, ...] = ()
+
+
 class ActivationRefused(ValueError):
     """Activation is refused with explicit findings; nothing was reserved or saved."""
 
@@ -139,15 +156,24 @@ def _reserved(entity):
 
 
 def _other_context(store, context, context_id):
-    """Load another context for the same trusted subject inside the caller's transaction."""
+    """Load another context for the same subject inside the caller's transaction, with its own installed policy.
+
+    Each context keeps its own trusted policy (owner decision of 16 November 2026, #123): the caller's
+    policy authorized the subject here, the other context's policy must authorize it there.
+    """
     root = store.read_context(context_id)
+    reference = EntityRef.model_validate(root.fields['policies'])
+    policy = (context.policy if reference == context.policy.policy_ref else
+              context.policies(reference) if context.policies else None)
+    if policy is None or policy.policy_ref != reference:
+        raise ValueError('The trusted policy of the authoring context is not installed')
     request = context.request.model_copy(update={'context_ref': root.ref})
-    snapshot = load_context(store, request, context.policy, context.contract)
+    snapshot = load_context(store, request, policy, context.contract)
     participant = next((snapshot.get(r) for r in root.fields['participants']
                         if snapshot.get(r).fields['subjectKey'] == request.subject_key), None)
     if participant is None:
         raise ValueError('Subject is not a participant of the authoring context')
-    return RunContext(snapshot, context.policy, context.contract, request, participant)
+    return RunContext(snapshot, policy, context.contract, request, participant, policies=context.policies)
 
 
 def _history(store, root):
@@ -301,8 +327,12 @@ def inspect_release(service, context_id, subject_key, release_ref):
         if not {manifest.project, manifest.design, *manifest.artifacts} <= set(closure):
             findings.append(Finding(code='RELEASE_CLOSURE', target=manifest.domain.id,
                 reason='The release domain omits its exact project, design or artifacts.'))
+        requirements, rules = (), ()
+        if not findings:
+            requirements, rules = _bindable(manifest, {ref: store.read(ref, owner=context_id) for ref in closure})
         return ReleaseInspection(release=resource.ref, manifest=manifest, receipt=release_receipt,
-            project_receipt=project_receipt, artifacts=artifacts, closure=closure, findings=tuple(findings))
+            project_receipt=project_receipt, artifacts=artifacts, closure=closure, findings=tuple(findings),
+            requirements=requirements, completion_rules=rules)
 
 
 def _receipts(store, authoring, release, manifest):
@@ -326,6 +356,19 @@ def _pins(manifest, pinned):
                 if pins.setdefault(requirement, resource) != resource:
                     raise ValueError('Release packages pin one requirement to different resources')
     return pins
+
+
+def _bindable(manifest, pinned):
+    """The requirements of the frozen design's activities with their pins, and its nodes' completion rules."""
+    _, nodes, activities = _design(pinned, manifest.design)
+    pins, requirements = _pins(manifest, pinned), {}
+    for activity in activities:
+        for ref in map(EntityRef.model_validate, activity.fields['resourceRequirements']):
+            resource = pins.get(ref.id)
+            requirements.setdefault(ref, ReleasedRequirement(requirement=ref, purpose=pinned[ref].fields['purpose'],
+                resource=resource, title=pinned[resource].fields['title'] if resource in pinned else None))
+    rules = dict.fromkeys(EntityRef.model_validate(n.fields['completionRule']) for n in nodes if n.fields.get('completionRule'))
+    return tuple(requirements.values()), tuple(rules)
 
 
 def _workers(context, roles, scope_name, identity, domain):

@@ -20,6 +20,8 @@ def parse_args(argv=None):
     parser = argparse.ArgumentParser(description='Local ALM lifecycle with explicit context and policy')
     parser.add_argument('--db', required=True, help='SQLite file, sqlite:///path or postgresql:// URL')
     parser.add_argument('--policy', type=Path, required=True)
+    parser.add_argument('--other-policy', type=Path, action='append', default=[],
+        help='Installed trusted policy of another context, such as the authoring context of a delivery import; repeatable')
     parser.add_argument('--subject', required=True)
     parser.add_argument('--context', required=True)
     commands = parser.add_subparsers(dest='command', required=True)
@@ -181,10 +183,12 @@ def main(argv=None):
     try:
         contract = load_contract()
         policy = TrustedPolicy.model_validate(json.loads(args.policy.read_text()))
-        if policy.policy_ref.type != 'PolicySet':
+        others = [TrustedPolicy.model_validate(json.loads(path.read_text())) for path in args.other_policy]
+        if any(p.policy_ref.type != 'PolicySet' for p in (policy, *others)):
             raise ValueError('Invalid policy reference')
+        installed = {p.policy_ref: p for p in others}
         with LearningStore(args.db) as store:
-            service = LearningService(store,contract,policy,_orchestrator)
+            service = LearningService(store,contract,policy,_orchestrator,policies=installed.get)
             command = args.command
             if command == 'bootstrap':
                 result = entity_data(service.bootstrap(args.context,args.subject))
