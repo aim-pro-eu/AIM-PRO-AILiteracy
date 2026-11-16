@@ -88,6 +88,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/contexts/{context_id}/activations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Propose LEARNING/ACTIVE for an applied delivery import, or the findings that refuse it (CLI propose-activation) */
+        post: operations["propose_activation_contexts__context_id__activations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/contexts/{context_id}/aimpro-exports": {
         parameters: {
             query?: never;
@@ -167,6 +184,23 @@ export interface paths {
         put?: never;
         /** Record a human decision on the reviewed payload; 409 if its key or revision is stale */
         post: operations["decide_contexts__context_id__decisions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/contexts/{context_id}/delivery-imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Propose importing an applied release into this new delivery course (CLI propose-delivery-import) */
+        post: operations["propose_delivery_import_contexts__context_id__delivery_imports_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -536,6 +570,33 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * ActivationOutcome
+         * @description An activation proposal, or the findings that refuse it; a refusal records nothing.
+         */
+        ActivationOutcome: {
+            /**
+             * Findings
+             * @default []
+             */
+            findings: components["schemas"]["Finding"][];
+            proposal?: components["schemas"]["ActivationProposal"] | null;
+        };
+        /** ActivationProposal */
+        ActivationProposal: {
+            policy: components["schemas"]["EntityRef"];
+            proposal: components["schemas"]["EntityRef"];
+            release: components["schemas"]["EntityRef"];
+        };
+        /**
+         * ActivationRequest
+         * @description ``propose-activation``: the base context, with the ALM request id.
+         */
+        ActivationRequest: {
+            base_context: components["schemas"]["EntityRef"];
+            /** Request Id */
+            request_id: string;
+        };
+        /**
          * AimproExport
          * @description An AIM-PRO project export in the worker's export directory, at this exact SHA-256.
          */
@@ -614,6 +675,13 @@ export interface components {
              * @enum {string}
              */
             kind: "generate-project-assessments";
+        };
+        /** BindingSelection */
+        BindingSelection: {
+            requirement: components["schemas"]["EntityRef"];
+            resource: components["schemas"]["EntityRef"];
+            /** Usage Scope */
+            usage_scope: string;
         };
         /**
          * BlockProgress
@@ -792,6 +860,30 @@ export interface components {
             /** Review Payload Key */
             review_payload_key: string;
             target: components["schemas"]["EntityRef"];
+        };
+        /**
+         * DeliveryImportRequest
+         * @description ``propose-delivery-import``: the release, its authoring course, the bindings and handlers, with the ALM request id.
+         */
+        DeliveryImportRequest: {
+            /** Authoring Context */
+            authoring_context: string;
+            base_context: components["schemas"]["EntityRef"];
+            /**
+             * Bindings
+             * @default []
+             */
+            bindings: components["schemas"]["BindingSelection"][];
+            /**
+             * Completion Handlers
+             * @default []
+             */
+            completion_handlers: components["schemas"]["RuleBinding"][];
+            release: components["schemas"]["EntityRef"];
+            /** Request Id */
+            request_id: string;
+            /** Scope Name */
+            scope_name: string;
         };
         /** DiscoveredExcerpt */
         DiscoveredExcerpt: {
@@ -1103,6 +1195,35 @@ export interface components {
              */
             status: "ok";
         };
+        /** ImportPreview */
+        ImportPreview: {
+            /** Activities */
+            activities: string[];
+            /** Mode */
+            mode: string;
+            /** Readiness Findings */
+            readiness_findings: components["schemas"]["Finding"][];
+            /** Resource Keys */
+            resource_keys: string[];
+            /** Scope */
+            scope: string;
+            /** Status */
+            status: string;
+            /** Workers */
+            workers: string[];
+        };
+        /** ImportProposal */
+        ImportProposal: {
+            /** Bindings */
+            bindings: components["schemas"]["EntityRef"][];
+            design: components["schemas"]["EntityRef"];
+            domain: components["schemas"]["EntityRef"];
+            policy_preview: components["schemas"]["TrustedPolicy"];
+            preview: components["schemas"]["ImportPreview"];
+            proposal: components["schemas"]["EntityRef"];
+            release: components["schemas"]["EntityRef"];
+            runtime_model: components["schemas"]["EntityRef"];
+        };
         /**
          * JobList
          * @description The jobs of a context, newest first.
@@ -1373,18 +1494,40 @@ export interface components {
             receipt?: components["schemas"]["ReviewReceipt"] | null;
             resource: components["schemas"]["EntityRef"];
         };
+        /**
+         * ReleasedRequirement
+         * @description A requirement of the frozen design with the exact resource the release pins for it, if any.
+         */
+        ReleasedRequirement: {
+            /** Purpose */
+            purpose: string;
+            requirement: components["schemas"]["EntityRef"];
+            resource?: components["schemas"]["EntityRef"] | null;
+            /** Title */
+            title?: string | null;
+        };
         /** ReleaseInspection */
         ReleaseInspection: {
             /** Artifacts */
             artifacts: components["schemas"]["ReleasedArtifact"][];
             /** Closure */
             closure: components["schemas"]["EntityRef"][];
+            /**
+             * Completion Rules
+             * @default []
+             */
+            completion_rules: components["schemas"]["EntityRef"][];
             /** Findings */
             findings: components["schemas"]["Finding"][];
             manifest: components["schemas"]["ReleaseManifest"];
             project_receipt?: components["schemas"]["ReviewReceipt"] | null;
             receipt?: components["schemas"]["ReviewReceipt"] | null;
             release: components["schemas"]["EntityRef"];
+            /**
+             * Requirements
+             * @default []
+             */
+            requirements: components["schemas"]["ReleasedRequirement"][];
         };
         /** ReleaseManifest */
         ReleaseManifest: {
@@ -1448,6 +1591,15 @@ export interface components {
              */
             proposal: string;
         };
+        /** RuleBinding */
+        RuleBinding: {
+            /**
+             * Handler
+             * @enum {string}
+             */
+            handler: "answer_key_match" | "all_true" | "all_completed";
+            rule: components["schemas"]["EntityRef"];
+        };
         /** ScenarioInput */
         ScenarioInput: {
             /** Competency Ids */
@@ -1476,6 +1628,21 @@ export interface components {
             scenario_model_id: string;
             /** Source Sha256 */
             source_sha256: string;
+        };
+        /** ScopeGrant */
+        ScopeGrant: {
+            /** Activities */
+            activities?: string[];
+            /** Contexts */
+            contexts: string[];
+            /** Operations */
+            operations?: string[];
+            /** Resources */
+            resources?: string[];
+            /** Sources */
+            sources?: string[];
+            /** Subjects */
+            subjects: string[];
         };
         /** SelectedExcerpt */
         SelectedExcerpt: {
@@ -1686,6 +1853,15 @@ export interface components {
             kind: "PROMPT_VARIANT" | "PEER_FAILURE" | "PROMPT_MOVE_CARD" | "TRANSCRIPT" | "OTHER";
             /** Unit Key */
             unit_key: string;
+        };
+        /** SubjectGrant */
+        SubjectGrant: {
+            /** Actions */
+            actions: {
+                [key: string]: ("read" | "interact" | "submit" | "propose" | "decide" | "apply" | "bootstrap")[];
+            };
+            /** Roles */
+            roles: ("LEARNER" | "CONTENT_RESPONSIBLE" | "ASSESSOR" | "OBSERVER" | "ADMINISTRATOR")[];
         };
         /** SyllabusArtifact */
         SyllabusArtifact: {
@@ -2041,6 +2217,20 @@ export interface components {
             /** Transcript Key */
             transcript_key: string;
         };
+        /** TrustedPolicy */
+        TrustedPolicy: {
+            policy_ref: components["schemas"]["EntityRef"];
+            /** Rule Bindings */
+            rule_bindings?: components["schemas"]["RuleBinding"][];
+            /** Scopes */
+            scopes?: {
+                [key: string]: components["schemas"]["ScopeGrant"];
+            };
+            /** Subjects */
+            subjects: {
+                [key: string]: components["schemas"]["SubjectGrant"];
+            };
+        };
         /** UnitComparison */
         UnitComparison: {
             after: components["schemas"]["SyllabusUnit"] | null;
@@ -2316,6 +2506,86 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ContextSummary"];
+                };
+            };
+            /** @description No valid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not authorized, unmapped identity or missing CSRF token */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not found, or the context is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Conflict with the current state; reload and retry */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Invalid request or data */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Internal error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    propose_activation_contexts__context_id__activations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                context_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActivationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivationOutcome"];
                 };
             };
             /** @description No valid session */
@@ -2721,6 +2991,86 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Entity"];
+                };
+            };
+            /** @description No valid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not authorized, unmapped identity or missing CSRF token */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not found, or the context is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Conflict with the current state; reload and retry */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Invalid request or data */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Internal error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    propose_delivery_import_contexts__context_id__delivery_imports_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                context_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeliveryImportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportProposal"];
                 };
             };
             /** @description No valid session */

@@ -1,6 +1,73 @@
 {
   "components": {
     "schemas": {
+      "ActivationOutcome": {
+        "additionalProperties": false,
+        "description": "An activation proposal, or the findings that refuse it; a refusal records nothing.",
+        "properties": {
+          "findings": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Finding"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "proposal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActivationProposal"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "ActivationOutcome",
+        "type": "object"
+      },
+      "ActivationProposal": {
+        "additionalProperties": false,
+        "properties": {
+          "policy": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "proposal": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "release": {
+            "$ref": "#/components/schemas/EntityRef"
+          }
+        },
+        "required": [
+          "proposal",
+          "release",
+          "policy"
+        ],
+        "title": "ActivationProposal",
+        "type": "object"
+      },
+      "ActivationRequest": {
+        "additionalProperties": false,
+        "description": "``propose-activation``: the base context, with the ALM request id.",
+        "properties": {
+          "base_context": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "request_id": {
+            "minLength": 1,
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "base_context",
+          "request_id"
+        ],
+        "title": "ActivationRequest",
+        "type": "object"
+      },
       "AimproExport": {
         "additionalProperties": false,
         "description": "An AIM-PRO project export in the worker's export directory, at this exact SHA-256.",
@@ -195,6 +262,29 @@
           "command"
         ],
         "title": "AssessmentJob",
+        "type": "object"
+      },
+      "BindingSelection": {
+        "additionalProperties": false,
+        "properties": {
+          "requirement": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "resource": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "usage_scope": {
+            "minLength": 1,
+            "title": "Usage Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "requirement",
+          "resource",
+          "usage_scope"
+        ],
+        "title": "BindingSelection",
         "type": "object"
       },
       "BlockProgress": {
@@ -677,6 +767,58 @@
           "review_payload_key"
         ],
         "title": "DecisionRequest",
+        "type": "object"
+      },
+      "DeliveryImportRequest": {
+        "additionalProperties": false,
+        "description": "``propose-delivery-import``: the release, its authoring course, the bindings and handlers, with the ALM request id.",
+        "properties": {
+          "authoring_context": {
+            "minLength": 1,
+            "title": "Authoring Context",
+            "type": "string"
+          },
+          "base_context": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "bindings": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/BindingSelection"
+            },
+            "title": "Bindings",
+            "type": "array"
+          },
+          "completion_handlers": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/RuleBinding"
+            },
+            "title": "Completion Handlers",
+            "type": "array"
+          },
+          "release": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "request_id": {
+            "minLength": 1,
+            "title": "Request Id",
+            "type": "string"
+          },
+          "scope_name": {
+            "minLength": 1,
+            "title": "Scope Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "release",
+          "authoring_context",
+          "base_context",
+          "scope_name",
+          "request_id"
+        ],
+        "title": "DeliveryImportRequest",
         "type": "object"
       },
       "DiscoveredExcerpt": {
@@ -1415,6 +1557,113 @@
           "status"
         ],
         "title": "HealthView",
+        "type": "object"
+      },
+      "ImportPreview": {
+        "additionalProperties": false,
+        "properties": {
+          "activities": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Activities",
+            "type": "array"
+          },
+          "mode": {
+            "minLength": 1,
+            "title": "Mode",
+            "type": "string"
+          },
+          "readiness_findings": {
+            "items": {
+              "$ref": "#/components/schemas/Finding"
+            },
+            "title": "Readiness Findings",
+            "type": "array"
+          },
+          "resource_keys": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Resource Keys",
+            "type": "array"
+          },
+          "scope": {
+            "minLength": 1,
+            "title": "Scope",
+            "type": "string"
+          },
+          "status": {
+            "minLength": 1,
+            "title": "Status",
+            "type": "string"
+          },
+          "workers": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Workers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "mode",
+          "status",
+          "scope",
+          "resource_keys",
+          "activities",
+          "workers",
+          "readiness_findings"
+        ],
+        "title": "ImportPreview",
+        "type": "object"
+      },
+      "ImportProposal": {
+        "additionalProperties": false,
+        "properties": {
+          "bindings": {
+            "items": {
+              "$ref": "#/components/schemas/EntityRef"
+            },
+            "title": "Bindings",
+            "type": "array"
+          },
+          "design": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "domain": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "policy_preview": {
+            "$ref": "#/components/schemas/TrustedPolicy"
+          },
+          "preview": {
+            "$ref": "#/components/schemas/ImportPreview"
+          },
+          "proposal": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "release": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "runtime_model": {
+            "$ref": "#/components/schemas/EntityRef"
+          }
+        },
+        "required": [
+          "proposal",
+          "release",
+          "domain",
+          "design",
+          "runtime_model",
+          "bindings",
+          "policy_preview",
+          "preview"
+        ],
+        "title": "ImportProposal",
         "type": "object"
       },
       "JobList": {
@@ -2240,6 +2489,14 @@
             "title": "Closure",
             "type": "array"
           },
+          "completion_rules": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/EntityRef"
+            },
+            "title": "Completion Rules",
+            "type": "array"
+          },
           "findings": {
             "items": {
               "$ref": "#/components/schemas/Finding"
@@ -2272,6 +2529,14 @@
           },
           "release": {
             "$ref": "#/components/schemas/EntityRef"
+          },
+          "requirements": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ReleasedRequirement"
+            },
+            "title": "Requirements",
+            "type": "array"
           }
         },
         "required": [
@@ -2408,6 +2673,48 @@
         "title": "ReleasedArtifact",
         "type": "object"
       },
+      "ReleasedRequirement": {
+        "additionalProperties": false,
+        "description": "A requirement of the frozen design with the exact resource the release pins for it, if any.",
+        "properties": {
+          "purpose": {
+            "minLength": 1,
+            "title": "Purpose",
+            "type": "string"
+          },
+          "requirement": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "resource": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "requirement",
+          "purpose"
+        ],
+        "title": "ReleasedRequirement",
+        "type": "object"
+      },
       "ReviewReceipt": {
         "additionalProperties": false,
         "properties": {
@@ -2450,6 +2757,29 @@
           "proposal"
         ],
         "title": "RevisionJob",
+        "type": "object"
+      },
+      "RuleBinding": {
+        "additionalProperties": false,
+        "properties": {
+          "handler": {
+            "enum": [
+              "answer_key_match",
+              "all_true",
+              "all_completed"
+            ],
+            "title": "Handler",
+            "type": "string"
+          },
+          "rule": {
+            "$ref": "#/components/schemas/EntityRef"
+          }
+        },
+        "required": [
+          "rule",
+          "handler"
+        ],
+        "title": "RuleBinding",
         "type": "object"
       },
       "ScenarioInput": {
@@ -2526,6 +2856,65 @@
           "limitations"
         ],
         "title": "ScenarioInput",
+        "type": "object"
+      },
+      "ScopeGrant": {
+        "additionalProperties": false,
+        "properties": {
+          "activities": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Activities",
+            "type": "array"
+          },
+          "contexts": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Contexts",
+            "type": "array"
+          },
+          "operations": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Operations",
+            "type": "array"
+          },
+          "resources": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Resources",
+            "type": "array"
+          },
+          "sources": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "subjects": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Subjects",
+            "type": "array"
+          }
+        },
+        "required": [
+          "contexts",
+          "subjects"
+        ],
+        "title": "ScopeGrant",
         "type": "object"
       },
       "SelectedExcerpt": {
@@ -3026,6 +3415,53 @@
           "brief"
         ],
         "title": "StimulusRequirement",
+        "type": "object"
+      },
+      "SubjectGrant": {
+        "additionalProperties": false,
+        "properties": {
+          "actions": {
+            "additionalProperties": {
+              "items": {
+                "enum": [
+                  "read",
+                  "interact",
+                  "submit",
+                  "propose",
+                  "decide",
+                  "apply",
+                  "bootstrap"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "propertyNames": {
+              "minLength": 1
+            },
+            "title": "Actions",
+            "type": "object"
+          },
+          "roles": {
+            "items": {
+              "enum": [
+                "LEARNER",
+                "CONTENT_RESPONSIBLE",
+                "ASSESSOR",
+                "OBSERVER",
+                "ADMINISTRATOR"
+              ],
+              "type": "string"
+            },
+            "title": "Roles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "roles",
+          "actions"
+        ],
+        "title": "SubjectGrant",
         "type": "object"
       },
       "SyllabusArtifact": {
@@ -3912,6 +4348,47 @@
         "title": "TranscriptPeerLink",
         "type": "object"
       },
+      "TrustedPolicy": {
+        "additionalProperties": false,
+        "properties": {
+          "policy_ref": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "rule_bindings": {
+            "items": {
+              "$ref": "#/components/schemas/RuleBinding"
+            },
+            "title": "Rule Bindings",
+            "type": "array"
+          },
+          "scopes": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ScopeGrant"
+            },
+            "propertyNames": {
+              "minLength": 1
+            },
+            "title": "Scopes",
+            "type": "object"
+          },
+          "subjects": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SubjectGrant"
+            },
+            "propertyNames": {
+              "minLength": 1
+            },
+            "title": "Subjects",
+            "type": "object"
+          }
+        },
+        "required": [
+          "policy_ref",
+          "subjects"
+        ],
+        "title": "TrustedPolicy",
+        "type": "object"
+      },
       "UnitComparison": {
         "additionalProperties": false,
         "properties": {
@@ -4054,7 +4531,7 @@
   },
   "info": {
     "title": "ALM Authoring API",
-    "version": "0.13.0"
+    "version": "0.14.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -4427,6 +4904,108 @@
         "summary": "Context summary with the same redaction as the CLI show",
         "tags": [
           "contexts"
+        ]
+      }
+    },
+    "/contexts/{context_id}/activations": {
+      "post": {
+        "operationId": "propose_activation_contexts__context_id__activations_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "context_id",
+            "required": true,
+            "schema": {
+              "title": "Context Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivationOutcome"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not authorized, unmapped identity or missing CSRF token"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not found, or the context is unavailable"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Conflict with the current state; reload and retry"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Invalid request or data"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal error"
+          }
+        },
+        "summary": "Propose LEARNING/ACTIVE for an applied delivery import, or the findings that refuse it (CLI propose-activation)",
+        "tags": [
+          "releases"
         ]
       }
     },
@@ -5022,6 +5601,108 @@
         "summary": "Record a human decision on the reviewed payload; 409 if its key or revision is stale",
         "tags": [
           "review"
+        ]
+      }
+    },
+    "/contexts/{context_id}/delivery-imports": {
+      "post": {
+        "operationId": "propose_delivery_import_contexts__context_id__delivery_imports_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "context_id",
+            "required": true,
+            "schema": {
+              "title": "Context Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliveryImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportProposal"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not authorized, unmapped identity or missing CSRF token"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not found, or the context is unavailable"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Conflict with the current state; reload and retry"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Invalid request or data"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal error"
+          }
+        },
+        "summary": "Propose importing an applied release into this new delivery course (CLI propose-delivery-import)",
+        "tags": [
+          "releases"
         ]
       }
     },
