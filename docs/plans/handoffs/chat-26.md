@@ -199,4 +199,8 @@ PR [#126](https://github.com/thesis-fedfalco-2026/AIM-PRO-AILiteracy/pull/126). 
 [43896443684](https://github.com/thesis-fedfalco-2026/AIM-PRO-AILiteracy/actions/runs/43896443684): six jobs passed,
 `browser` failed in both: 18 tests passed, `delivery.spec.ts` failed at the teacher view's preview, which held the same
 policy with its keys sorted (the proposal's canonical copy) while the test compared it as text with the import page's
-copy (the API's key order). The test now compares the parsed policies. CI of the fix: see the PR.
+copy (the API's key order). The test now compares the parsed policies. CI of the fix, on `a3797ac`: push run
+[43899209426](https://github.com/thesis-fedfalco-2026/AIM-PRO-AILiteracy/actions/runs/43899209426) and pull_request
+run [43899221292](https://github.com/thesis-fedfalco-2026/AIM-PRO-AILiteracy/actions/runs/43899221292): all 7 jobs of
+each passed, `browser` included (19 tests; `delivery.spec.ts`: the import with one requirement unbound, its teacher
+view and preview, the application, the operator's installation, activation refused in words; axe).
