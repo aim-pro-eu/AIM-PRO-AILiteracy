@@ -249,6 +249,12 @@ trusted policy, or a `policy_ref` found in two files, refuses every resolution
 (500, logged with the file name) instead of choosing one. Subdirectories and
 other files are ignored.
 
+A request reads one context, with one exception: a delivery import (S10) also
+reads its authoring context, with that context's own installed policy, resolved
+the same way (the `policies` resolver of `LearningService`). Its subject must be
+authorized by both policies, at proposal and again at application; an authoring
+context whose policy is not installed refuses the import (422).
+
 Since S09a the API writes one kind of file there: the policy of a course created
 from the studio (`POST /courses`, see "Course from an AIM-PRO model"). It is a
 new file, written under a temporary name that no reader lists and then linked to
@@ -550,7 +556,8 @@ browser recorded.
 | `generation.spec.ts`: the review of an Evaluator job's drafts (S09c, S09d) | on the seed's authoring context, an Evaluator job queued through the API with the browser's session (no form before S09c2), its requirement holding the synthetic reviewer's marker; the job list shows it proposed with "Blocks of units written: 1 of 1"; "How the review agent judged the drafts of this job": block 1 draft 1 not accepted ("Content complete: no", its reason labelled as model text), block 1 draft 2 accepted, the assembled draft accepted; the job view does not hold the reason; axe |
 | `teacher-views.spec.ts`: every proposal kind in words (S09c2, part 2) | on the seed, every proposal of the authoring context and the delivery imports of both delivery contexts, pending or decided, opened by URL: each has its title (syllabus, project initialization, assessments, teacher and trainer content, completion rules, release, delivery import; never "Proposed change"), the initialization says what it creates, the release lists its parts by kind, the import names its resources and agents, a decided proposal shows no comparison; axe on each; the course page links decided proposals with "Read this proposal" |
 | `cycle.spec.ts`: the rest of the authoring cycle (S09c2) | a new course: upload, Curator, approve and apply the syllabus, initialize and apply the project; the Evaluator form shows the project and course version it sends (read back through the API), the Teacher form says it needs the assessments; axe; another author applies an Evaluator proposal through the API, so the form's job is refused at queue time (409): the form says the course changed and shows the new course version; the Evaluator queued again, its proposal read in its teacher view (rubric; axe), approved and applied; the Teacher form shows the applied assessment it sends; the Teacher and Trainer proposals read with their material texts (axe), approved and applied; the completion rules proposed from the build page, read part by part (axe), approved and applied; the project inspection lists the five artifacts with their receipts and no stale dependency, and every node of the design has a rule |
-| `release.spec.ts`: a release and its delivery course (S10, part 1) | on the seed's authoring context, the build page's release step shows the project model it sends; the release proposed from it, read in its teacher view (its parts; axe), approved and applied; "Inspect this release": nothing stands in the way, seven approvals (the release, its project and five parts), what it freezes, no problem; axe; a delivery course created from the release page opens on its course page, its policy file names the creator on that course only, and it is in PREPARATION/DRAFT without a model; axe; the course page lists both releases, and the seeded one inspects with nothing in the way |
+| `release.spec.ts`: a release and its delivery course (S10, part 1) | on the seed's authoring context, the build page's release step shows the project model it sends; the release proposed from it, read in its teacher view (its parts; axe), approved and applied; "Inspect this release": nothing stands in the way, seven approvals (the release, its project and five parts), what it freezes, no problem; axe; a delivery course created from the release page opens on the import of that release, its policy file names the creator on that course only, and it is in PREPARATION/DRAFT without a model; axe; the course page lists both releases, and the seeded one inspects with nothing in the way |
+| `delivery.spec.ts`: a release imported and its activation refused (S10, part 2) | from the seeded release page, a delivery course created; the import form proposes, for each of the seven requirements, the resource the release pins; axe; the first set to "No resource": "6 of 7"; the import proposed with six resources and its policy preview shown in full, naming the new course; no policy file installed; its teacher view lists six resources and the same preview; axe; approved and applied: the course is unavailable and no policy file was written; the test, as operator, installs the preview; on the course page, activation proposed and refused in words (the assessment without assessor, D4, and the unbound requirement, R08); axe; the course is still PREPARATION/DRAFT with six bindings |
 | `build.spec.ts`: a syllabus not accepted (issue #112) | upload; the Curator by a query holding the synthetic reviewer's `REJECT_EVERY` marker ends with a proposal; the job list shows the fixed notice; axe; the syllabus view says the review agent accepted no draft, with its reason as model text; axe; approve and apply; the course shows the structure |
 | `build.spec.ts`: an invalid file | a text file is refused with "The file is not UTF-8 JSON"; no report; the export directory and the database file are unchanged; axe |
 | `accessibility.spec.ts` | axe on the home page (also with its validation error), the inbox with and without pending proposals, the proposal page with every disclosure open, its validation errors, the apply step, a refused application, and an unavailable context |
@@ -1112,13 +1119,68 @@ policy, below).
 3. **The delivery course is created from the release page**, with `POST /courses`
    unchanged (D23): a new course in PREPARATION/DRAFT with its own policy for
    its creator, and the template's source scopes as any course. The form is
-   offered only for a release with no finding; the new course opens on its
-   course page. The import is proposed there in part 2.
-4. **Each context keeps its own policy** (owner, 16 November 2026). Today the
-   import reads the authoring context with the delivery context's policy, which
-   only works when one policy covers both, as in the seed. Part 2 makes the
-   import read the authoring context with its own installed policy (D10), the
-   subject being authorized by both; nothing in part 1 depends on it.
+   offered only for a release with no finding; since part 2 the new course
+   opens on the import of that release.
+4. **Each context keeps its own policy** (owner, 16 November 2026), implemented
+   in part 2, below.
+
+## Delivery import and activation from the studio (S10, part 2)
+
+Issue #123; owner decisions of 15 November 2026 (bindings proposed and
+changeable; activation proposed and refused in words) and 16 November 2026 (each
+context keeps its own policy; the list of each requirement is the resource the
+release pins, or none).
+
+1. **Each context keeps its own trusted policy.** The import reads the authoring
+   context with the authoring context's installed policy, found by its exact
+   reference as D10 finds a request's policy; the subject must be authorized by
+   the delivery context's policy (to propose there) and by the authoring
+   context's (to read and propose there, with content authority). The
+   application rechecks both under its write lock: a policy changed or removed
+   in between refuses it. In the core, `LearningService` takes a `policies`
+   resolver (the API passes `PolicyDirectory.find`) and `RunContext` carries it;
+   without one, only the context's own policy is known, so the seed's shared
+   policy works as before. The CLI takes `--other-policy FILE` (repeatable) for
+   the same purpose.
+2. **What an import binds is read from the release.** `show-release` (and its
+   API route) now also lists, once the release has no finding, each
+   `ResourceRequirement` of the frozen design with the exact resource the
+   release pins for it (`_pins`) and its title, and the completion rules of the
+   design's parts.
+3. **The import.** `POST /contexts/{context_id}/delivery-imports` does what
+   `propose-delivery-import` does (`DeliveryImport` plus `request_id`; the
+   result `ImportProposal` holds the policy preview); `POST
+   /contexts/{context_id}/activations` does what `propose-activation` does, and
+   answers `ActivationOutcome`: the proposal, or, when refused, the findings and
+   no proposal, with nothing recorded (status 200: the refusal is the answer,
+   not an error). API version 0.14.0.
+4. **The import page** `/contexts/{delivery}/import?from={authoring}&release={id}&version={version}`
+   lists each requirement ("Requirement n: purpose") with a list holding the
+   resource the release pins, proposed, and "No resource"; the core accepts no
+   other resource (owner, 16 November 2026). It says how many requirements get
+   a resource and how many completion rules the design has; each is bound to
+   `all_completed`, the condition of the fixed completion rule (S09c2). The
+   scope is `{delivery}:delivery`. The exact selection is sent; a retry of the
+   same selection reuses its request id. A course that already holds a
+   configuration, or a release with findings, gets no form.
+5. **The policy preview is shown in full**, on the import page after the
+   proposal and in the import's teacher view (read from the proposed
+   `PolicySet`), with a file name for the operator
+   (`{policy id with - for :}-{version}.json`). Neither the studio nor approval
+   installs it, and it never replaces the installed file: an operator copies
+   the exact reviewed preview into `ALM_POLICY_DIR` as a new file. Until then
+   the applied course names a policy that is not installed and is unavailable
+   (404): the proposal page says so after the application, with no link to the
+   course.
+6. **Activation.** The course page of an imported delivery course in
+   PREPARATION says it is a delivery course, offers no build link, and has a
+   section "Activation". "Propose activation" shows the refusal in words: for
+   `RELEASE_RUNTIME_ROLE` on an assessment, the activity's first line and
+   decision D4; any other finding with its reason, what to do and its code. An
+   accepted activation links to its proposal. With D4 open, every release of an
+   assessed course is refused.
+7. **Who may import.** The import's scope grants the delivery course's
+   participants, which is its creator only (D25 open).
 
 ## Local identity smoke test
 

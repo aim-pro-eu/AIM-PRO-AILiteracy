@@ -101,6 +101,12 @@ The import bundle is a `DeliveryImport` record:
 writes the current policy file. A refused activation exits with status 2 and
 prints its findings as JSON on standard error.
 
+Each context keeps its own trusted policy (owner decision of 16 November 2026,
+issue #123). When the authoring context has another policy than the delivery
+context, step 4 and the application of the import (step 5) also need it:
+`--other-policy authoring-policy.json` (repeatable). Without it, only the
+`--policy` file is known, which works when one policy covers both contexts.
+
 ## What each command checks
 
 ### `propose-release`
@@ -128,6 +134,9 @@ One read transaction, no writes. It reports:
 - findings: `RELEASE_UNAPPROVED`, `RELEASE_PROJECT_RECEIPT`,
   `RELEASE_ARTIFACT_RECEIPT`, `RELEASE_DOMAIN_UNREVIEWED`, `RELEASE_PIN_MISMATCH`,
   `RELEASE_EXECUTION_STATE`, `RELEASE_CLOSURE` and stale-dependency findings.
+- when there is no finding, what an import binds: each requirement of the
+  frozen design with the exact resource the release pins for it (or none) and
+  its title, and the completion rules of the design's parts.
 
 A Lead ACCEPT is never a receipt: only an applied human decision is. Later
 authoring revisions leave the output unchanged. A release that was never applied
@@ -137,8 +146,12 @@ is not stored and is reported as not applied.
 
 It refuses a destination that already holds learner history (occurrences,
 evidence, states or evaluations) or any configuration ("requires a reviewed
-migration"). It then reads the release through `released_entities`, which
-rechecks every receipt and that the manifest pins match the reviewed project.
+migration"). It reads the authoring context with that context's own installed
+trusted policy: the subject must be authorized by the destination's policy and
+by the authoring context's, and an authoring policy that is not installed
+refuses the import. It then reads the release through `released_entities`,
+which rechecks every receipt and that the manifest pins match the reviewed
+project. Application rechecks the same, with both policies as installed then.
 
 The proposal holds:
 
