@@ -1,8 +1,9 @@
 import type { RouteObject } from 'react-router';
-import { useParams } from 'react-router';
+import { useParams, useSearchParams } from 'react-router';
 
 import { BuildPage } from '../course-build/BuildPage';
 import { CoursePage } from '../course/CoursePage';
+import { ImportPage } from '../delivery/ImportPage';
 import { ReleasePage } from '../release/ReleasePage';
 import { ProposalPage } from './ProposalPage';
 import { ReviewInboxPage } from './ReviewInboxPage';
@@ -40,6 +41,15 @@ function ReleaseRoute() {
     release={{ type: 'Resource', id: releaseId, version }} />;
 }
 
+function ImportRoute() {
+  const { contextId = '' } = useParams();
+  const [search] = useSearchParams();
+  const authoringId = search.get('from') ?? '';
+  const release = { type: 'Resource', id: search.get('release') ?? '', version: search.get('version') ?? '' };
+  return <ImportPage key={`${contextId}/${authoringId}/${release.id}/${release.version}`} contextId={contextId}
+    authoringId={authoringId} release={release} />;
+}
+
 export const reviewRoutes: RouteObject[] = [
   { path: 'contexts/:contextId/course', element: <CourseRoute /> },
   { path: 'contexts/:contextId/build', element: <BuildRoute /> },
@@ -47,4 +57,5 @@ export const reviewRoutes: RouteObject[] = [
   { path: 'contexts/:contextId/review/:proposalId', element: <ProposalRoute /> },
   { path: 'contexts/:contextId/review/:proposalId/edit', element: <SyllabusEditRoute /> },
   { path: 'contexts/:contextId/releases/:releaseId/versions/:version', element: <ReleaseRoute /> },
+  { path: 'contexts/:contextId/import', element: <ImportRoute /> },
 ];

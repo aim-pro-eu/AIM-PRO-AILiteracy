@@ -13,6 +13,8 @@ export type ProjectProposal = Schemas['ProjectProposal'];
 export type ProjectInspection = Schemas['ProjectInspection'];
 export type ReleaseProposal = Schemas['ReleaseProposal'];
 export type ReleaseInspection = Schemas['ReleaseInspection'];
+export type ImportProposal = Schemas['ImportProposal'];
+export type ActivationOutcome = Schemas['ActivationOutcome'];
 export type SourceDiscovery = Schemas['SourceDiscoveryView'];
 export type SourcePreparation = Schemas['SourcePreparationView'];
 export type SourcePlan = Schemas['SourcePlan'];
@@ -113,8 +115,25 @@ export interface BuildApi {
   proposeRelease(contextId: string, csrfToken: string, command: {
     requestId: string; project: EntityRef; domain: EntityRef; baseContext: EntityRef;
   }): Promise<ReleaseProposal>;
-  /** An applied release: its approvals, the exact records it freezes and its findings. */
+  /** An applied release: its approvals, the exact records it freezes, its findings and what an import binds. */
   inspectRelease(contextId: string, release: EntityRef): Promise<ReleaseInspection>;
+  /** Propose importing an applied release into this new delivery course; the same request id replays. */
+  proposeImport(contextId: string, csrfToken: string, command: ImportCommand): Promise<ImportProposal>;
+  /** Propose activating an applied import: a proposal, or the findings that refuse it (nothing is recorded then). */
+  proposeActivation(contextId: string, csrfToken: string, command: {
+    requestId: string; baseContext: EntityRef;
+  }): Promise<ActivationOutcome>;
+}
+
+/** What a delivery import sends: the release, its course, the exact resource of each bound requirement, the handlers. */
+export interface ImportCommand {
+  requestId: string;
+  release: EntityRef;
+  authoringContext: string;
+  baseContext: EntityRef;
+  scopeName: string;
+  bindings: { requirement: EntityRef; resource: EntityRef }[];
+  completionRules: EntityRef[];
 }
 
 const REASONS: Record<number, ReviewFailure> = {
@@ -300,6 +319,29 @@ export function createBuildApi(client: AuthoringClient): BuildApi {
     async inspectRelease(contextId, release) {
       return settle(() => client.GET('/contexts/{context_id}/resources/{resource_id}/versions/{version}/release', {
         params: { path: { context_id: contextId, resource_id: release.id, version: release.version } },
+      }));
+    },
+
+    async proposeImport(contextId, csrfToken, command) {
+      return settle(() => client.POST('/contexts/{context_id}/delivery-imports', {
+        params: { path: { context_id: contextId } },
+        headers: writing(csrfToken),
+        body: {
+          request_id: command.requestId, release: command.release, authoring_context: command.authoringContext,
+          base_context: command.baseContext, scope_name: command.scopeName,
+          bindings: command.bindings.map(({ requirement, resource }) => ({
+            requirement, resource, usage_scope: command.scopeName })),
+          // The fixed completion rule of each part (S09c2) completes when all its activities are completed.
+          completion_handlers: command.completionRules.map((rule) => ({ rule, handler: 'all_completed' as const })),
+        },
+      }));
+    },
+
+    async proposeActivation(contextId, csrfToken, { requestId, baseContext }) {
+      return settle(() => client.POST('/contexts/{context_id}/activations', {
+        params: { path: { context_id: contextId } },
+        headers: writing(csrfToken),
+        body: { request_id: requestId, base_context: baseContext },
       }));
     },
   };

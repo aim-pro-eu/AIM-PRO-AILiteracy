@@ -72,7 +72,10 @@ describe('an applied release (S10)', () => {
     const delivery = region(en.release.delivery.heading);
     fireEvent.change(delivery.getByLabelText(en.home.courseLabel), { target: { value: 'delivery-1' } });
     fireEvent.click(delivery.getByRole('button', { name: en.release.delivery.submit }));
-    await waitFor(() => expect(router.state.location.pathname).toBe('/studio/contexts/delivery-1/course'));
+    // The delivery course opens on the import of this release.
+    await waitFor(() => expect(router.state.location.pathname).toBe('/studio/contexts/delivery-1/import'));
+    expect(Object.fromEntries(new URLSearchParams(router.state.location.search)))
+      .toEqual({ from: 'ctx', release: RELEASE.id, version: RELEASE.version });
     const post = requests.find((request) => request.method === 'POST')!;
     expect(post.headers.get('X-CSRF-Token')).toBe(SESSION.csrf_token);
     expect(await post.json()).toEqual({ context_id: 'delivery-1' });

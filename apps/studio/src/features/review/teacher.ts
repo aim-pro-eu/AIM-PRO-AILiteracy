@@ -1,3 +1,5 @@
+import { proposedPolicy } from '../delivery/delivery';
+import type { PolicyPreview } from '../delivery/delivery';
 import type { Entity, EntityRef, Finding, JsonValue } from './reviewApi';
 
 /**
@@ -46,9 +48,9 @@ export interface TeacherView {
   project: { id: string; selected: CoursePart[]; missing: string[] } | null;
   /** For a release: the parts it freezes, and the release itself, which is inspected once applied. */
   release: { parts: CoursePart[]; resource: EntityRef | null } | null;
-  /** For a delivery import: its units, the resource each requirement uses, its agents and its source scopes. */
+  /** For a delivery import: its units, the resource each requirement uses, its agents, its source scopes and policy. */
   delivery: { units: number; bindings: { need: string; resource: string }[]; agents: { role: string; name: string }[];
-    scopes: string[] } | null;
+    scopes: string[]; policy: PolicyPreview | null } | null;
   /** The review agent's assessment of generated content it did not accept (model text), or null. */
   notAccepted: string | null;
   /** Whether `changes` compares the proposal with the course: only while it can still be decided or applied. */
@@ -280,6 +282,7 @@ function deliveryOf(candidates: Entity[], applied: Entity[]): TeacherView['deliv
       need: text(find(fields.requirement)?.fields.purpose), resource: titleOf(find(fields.resource), fields.resource) })),
     agents: ofType('AgentSpecialization').map(({ fields }) => ({ role: text(fields.role), name: text(fields.registryName) })),
     scopes: ofType('PolicySet').flatMap(({ fields }) => texts(fields.sourceScopes)),
+    policy: proposedPolicy(candidates),
   };
 }
 

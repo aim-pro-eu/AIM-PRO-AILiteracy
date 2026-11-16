@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
+import { PolicyPreviewSection } from '../delivery/PolicyPreviewSection';
 import { readable } from './model';
 import { RubricTable } from './RubricTable';
 import type { ContentChange, CoursePart, Issue, PlainIssues, TeacherView as View } from './teacher';
@@ -196,6 +197,7 @@ export function TeacherView({ view, issues }: { view: View; issues: PlainIssues 
       {view.notAccepted !== null
         ? <p data-testid="not-accepted">{t('review.teacher.notAccepted', { reason: view.notAccepted })}</p> : null}
       {view.delivery ? <Delivery delivery={view.delivery} /> : null}
+      {view.delivery?.policy ? <PolicyPreviewSection preview={view.delivery.policy} /> : null}
       {view.compared ? <Changes changes={view.changes} /> : null}
 
       {view.activities.length > 0 ? (

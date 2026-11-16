@@ -9,7 +9,7 @@ import { useBuildServices } from '../course-build/BuildServices';
 import { CreateCourse } from '../course-build/CreateCourse';
 import { readable } from '../review/model';
 import { LoadFailure } from '../review/parts';
-import { coursePath, proposalPath } from '../review/paths';
+import { coursePath, importPath, proposalPath } from '../review/paths';
 import { ReviewError } from '../review/reviewApi';
 import type { EntityRef, Inbox, ReviewFailure } from '../review/reviewApi';
 import { useInbox } from '../review/useInbox';
@@ -21,7 +21,8 @@ type InspectionState =
   | { status: 'ready'; inspection: ReleaseInspection }
   | { status: 'error'; reason: ReviewFailure; detail: string };
 
-function useInspection(contextId: string, release: EntityRef) {
+/** The inspection of an applied release, read again when the release changes. */
+export function useInspection(contextId: string, release: EntityRef) {
   const { api } = useBuildServices();
   const { reload: reloadSession } = useSession();
   const [state, setState] = useState<InspectionState>({ status: 'loading' });
@@ -129,7 +130,8 @@ function ReleaseContent({ contextId, inbox, inspection }: { contextId: string; i
       <Findings findings={report.findings} />
       {ready ? (
         <CreateCourse heading={t('release.delivery.heading')} intro={t('release.delivery.intro')}
-          submit={t('release.delivery.submit')} onCreated={(created) => void navigate(coursePath(created))} />
+          submit={t('release.delivery.submit')}
+          onCreated={(created) => void navigate(importPath(created, contextId, inspection.release))} />
       ) : null}
     </>
   );
