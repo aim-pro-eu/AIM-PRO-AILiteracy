@@ -206,7 +206,7 @@ describe('teacher view of the project, its release and a delivery import (S09c2 
     const view = teacherView([CONTEXT, release], [SOURCE, SYLLABUS, manifest(null, SELECTED)]);
     expect(view.kind).toBe('release');
     expect(view.release).toEqual({ parts: [{ kind: 'SOURCE', title: 'Source snapshot: LPO AI' },
-      { kind: 'SYLLABUS', title: 'Approved syllabus: LPO AI' }] });
+      { kind: 'SYLLABUS', title: 'Approved syllabus: LPO AI' }], resource: ref('Resource', 'release-1', 'r1') });
     expect(view.changes).toEqual([]);
   });
 

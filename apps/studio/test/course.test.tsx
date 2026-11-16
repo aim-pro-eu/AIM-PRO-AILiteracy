@@ -38,7 +38,9 @@ describe('course page', () => {
       .toBe('/studio/contexts/ctx/review');
     const contents = within(screen.getByRole('navigation', { name: en.course.contents }));
     expect(contents.getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
-      '#course-structure', '#course-outcomes', '#course-strategies', '#course-assessments', '#course-materials', '#course-history']);
+      '#course-structure', '#course-outcomes', '#course-strategies', '#course-assessments', '#course-materials',
+      '#course-releases', '#course-history']);
+    expect(within(screen.getByRole('region', { name: en.course.releases.heading })).getByText(en.course.releases.empty)).toBeTruthy();
     const structure = within(screen.getByRole('region', { name: en.course.structure.heading }));
     expect(structure.getByText('Prepare a prompt')).toBeTruthy();
     expect(structure.getByText('Complete the worksheet.')).toBeTruthy();

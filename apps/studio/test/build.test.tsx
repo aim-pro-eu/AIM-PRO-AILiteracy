@@ -477,7 +477,7 @@ describe('the review agent on the Evaluator, Teacher and Trainer drafts (S09c)',
   });
 });
 
-describe('the Evaluator, Teacher and Trainer forms and the completion rules (S09c2)', () => {
+describe('the Evaluator, Teacher and Trainer forms, the completion rules (S09c2) and the release (S10)', () => {
   const manifest = JSON.stringify({ format: 'authoring-project', project_id: 'main' });
   const context = (version: string) => entity('ExecutionContext', 'new-course',
     { status: 'DRAFT', mode: 'PREPARATION', models: [ref('DomainModel', 'p:model')], learningDesign: OUTLINE }, version);
@@ -573,6 +573,46 @@ describe('the Evaluator, Teacher and Trainer forms and the completion rules (S09
     const post = requests.find((request) => request.method === 'POST')!;
     expect(await post.json()).toEqual({ request_id: 'request-1', project: PROJECT,
       base_context: ref('ExecutionContext', 'new-course', '9') });
+  });
+
+  it('proposes the release on the exact project, its model in the course and the course version', async () => {
+    const MODEL = ref('DomainModel', 'authoring-project:main:model', 'm3');
+    const withModel = entity('ExecutionContext', 'new-course', { status: 'DRAFT', mode: 'PREPARATION',
+      models: [ref('DomainModel', 'p:model'), MODEL], learningDesign: OUTLINE }, '9');
+    const { requests } = await renderStudio({
+      ...opened('9', inspection([artifact('ASSESSMENT', ASSESSMENT), artifact('TRAINER_CONTENT', ref('Resource', 'trainer'))])),
+      'GET /contexts/new-course': [summary(withModel, records), summary(withModel, records)],
+      'POST /contexts/new-course/releases': [{ status: 200, body: { proposal: ref('ChangeProposal', 'p-release', '1'),
+        release: ref('Resource', 'authoring-release:x', 'r1'), catalogue: ref('DomainModel', 'authoring-release:x:catalogue', 'r1'),
+        manifest: {} } }],
+    }, '/studio/contexts/new-course/build');
+    const release = await section(en.build.release.heading);
+    expect(within(release.getByTestId('sent-refs')).getByText(MODEL.id).parentElement?.textContent)
+      .toBe(`${MODEL.id} (version m3)`);
+    fireEvent.click(release.getByRole('button', { name: en.build.release.submit }));
+    const link = await release.findByRole('link', { name: en.build.release.review });
+    expect(link.getAttribute('href')).toBe('/studio/contexts/new-course/review/p-release');
+    expect(release.getByText(en.build.release.proposed)).toBeTruthy();
+    const post = requests.find((request) => request.method === 'POST')!;
+    expect(post.headers.get('X-CSRF-Token')).toBe(SESSION.csrf_token);
+    expect(await post.json()).toEqual({ request_id: 'request-1', project: PROJECT, domain: MODEL,
+      base_context: ref('ExecutionContext', 'new-course', '9') });
+  });
+
+  it('names the parts a project still needs before its release, and what is missing for it', async () => {
+    await renderStudio(opened('9', { status: 200, body: { project: PROJECT, artifacts: [], stale_dependencies: [],
+      manifest: { artifacts: [artifact('SYLLABUS', ref('Resource', 'syllabus'))],
+        required_kinds: ['SYLLABUS', 'ASSESSMENT', 'TRAINER_CONTENT'] } } }), '/studio/contexts/new-course/build');
+    const release = await section(en.build.release.heading);
+    expect(release.getByText(en.build.release.needsParts.replace('{{kinds}}', 'Assessment, Trainer content'))).toBeTruthy();
+    expect(release.queryByRole('button')).toBeNull();
+  });
+
+  it('asks for the project to be applied when the course has no model of it', async () => {
+    await renderStudio(opened('9', inspection([artifact('ASSESSMENT', ASSESSMENT)])), '/studio/contexts/new-course/build');
+    const release = await section(en.build.release.heading);
+    expect(release.getByText(en.build.release.needsModel)).toBeTruthy();
+    expect(release.queryByRole('button')).toBeNull();
   });
 
   it('asks for content made from an earlier version to be generated again before the rules', async () => {

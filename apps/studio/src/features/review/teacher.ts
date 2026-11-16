@@ -1,4 +1,4 @@
-import type { Entity, Finding, JsonValue } from './reviewApi';
+import type { Entity, EntityRef, Finding, JsonValue } from './reviewApi';
 
 /**
  * What a proposal is, for its title and its view: generated assessments, teacher or
@@ -44,8 +44,8 @@ export interface TeacherView {
   otherRecords: number;
   /** For a project initialization: the parts it selects and the kinds the course still needs. */
   project: { id: string; selected: CoursePart[]; missing: string[] } | null;
-  /** For a release: the parts it freezes. */
-  release: { parts: CoursePart[] } | null;
+  /** For a release: the parts it freezes, and the release itself, which is inspected once applied. */
+  release: { parts: CoursePart[]; resource: EntityRef | null } | null;
   /** For a delivery import: its units, the resource each requirement uses, its agents and its source scopes. */
   delivery: { units: number; bindings: { need: string; resource: string }[]; agents: { role: string; name: string }[];
     scopes: string[] } | null;
@@ -266,7 +266,8 @@ function releaseOf(candidates: Entity[], applied: Entity[]): TeacherView['releas
     .flatMap((project) => records(project.artifacts)).map((artifact) => [refKey(artifact.resource), text(artifact.kind)]));
   const parts = (Array.isArray(manifest.artifacts) ? manifest.artifacts : []).map((artifact) => ({
     kind: kinds.get(refKey(artifact)) ?? '', title: titleOf(find(artifact), artifact) }));
-  return { parts };
+  const resource = candidates.find((entity) => entity.type === 'Resource' && contentObject(entity)?.format === 'authoring-release');
+  return { parts, resource: resource ? { type: resource.type, id: resource.id, version: resource.version } : null };
 }
 
 /** What a delivery import brings: its units, the resource each requirement uses, its agents and source scopes. */

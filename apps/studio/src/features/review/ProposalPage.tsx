@@ -16,7 +16,7 @@ import type {
 } from './reviewApi';
 import { useCsrfToken, useReviewServices } from './ReviewServices';
 import { RevisionStep } from './RevisionStep';
-import { coursePath, inboxPath, syllabusEditPath } from './paths';
+import { coursePath, inboxPath, releasePath, syllabusEditPath } from './paths';
 import { isSyllabusProposal } from './syllabus';
 import { SyllabusView } from './SyllabusView';
 import { KIND_TITLES, plainIssues, teacherView } from './teacher';
@@ -204,6 +204,9 @@ function ProposalBody({ inbox, proposal, pending, busy, onDecide, onApply }: {
       {!syllabus && content.status === 'loading' ? <StatusMessage>{t('review.proposal.loadingContent')}</StatusMessage> : null}
       {!syllabus && content.status === 'error' ? <StatusMessage tone="error">{t('review.proposal.contentFailed')}</StatusMessage> : null}
       {view ? <TeacherView view={view} issues={issues} /> : null}
+      {status === 'APPLIED' && view?.release?.resource ? (
+        <p><Link to={releasePath(inbox.context.id, view.release.resource)}>{t('review.teacher.release.inspect')}</Link></p>
+      ) : null}
       {syllabus ? <SyllabusContent inbox={inbox} proposal={proposal} issues={issues} /> : null}
       {pending ? <DecisionForm busy={busy} onDecide={(decision, reason) => onDecide(pending, decision, reason)} /> : null}
       <TechnicalDetails proposal={proposal} pending={pending} inbox={inbox} findings={findings} report={explanation.details} />

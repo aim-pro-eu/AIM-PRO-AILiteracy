@@ -9,3 +9,6 @@ export const coursePath = (contextId: string) => `/contexts/${encodeURIComponent
 export const buildPath = (contextId: string) => `/contexts/${encodeURIComponent(contextId)}/build`;
 
 export const syllabusEditPath = (contextId: string, proposalId: string) => `${proposalPath(contextId, proposalId)}/edit`;
+
+export const releasePath = (contextId: string, release: { id: string; version: string }) =>
+  `/contexts/${encodeURIComponent(contextId)}/releases/${encodeURIComponent(release.id)}/versions/${encodeURIComponent(release.version)}`;
