@@ -113,21 +113,24 @@ it.
 
 ## Findings (not changed in this PR)
 
-1. **After the import is applied, the preview is hard to reach.** The course is unavailable (404) until the preview is
+1. **The two copies of the preview differ in key order**: the import page shows the API's order, the teacher view and its
+   download the canonical copy of the proposal (sorted keys). Same policy; an operator comparing files as text sees a
+   difference.
+2. **After the import is applied, the preview is hard to reach.** The course is unavailable (404) until the preview is
    installed, so its teacher view is too; the CLI `show` needs the course's policy, which is the preview. The preview
    can be downloaded from the import page or the teacher view **before** the application, or read from the store's
    `PolicySet`. An operator path (for example a CLI command that prints the preview of an applied import with the
    previous policy) is not decided.
-2. **Requirements are numbered, not grouped by activity or unit**: the seed shows "Use the exact cited source evidence
+3. **Requirements are numbered, not grouped by activity or unit**: the seed shows "Use the exact cited source evidence
    for this authored item." three times. Extends the Chat 24 finding (import activities not grouped by unit).
-3. **A delivery course reaches its import only from the release page.** Creating it opens the import, but returning to
+4. **A delivery course reaches its import only from the release page.** Creating it opens the import, but returning to
    it later means opening the release again: the empty course page offers the build link only, and nothing records
    which release the course is for until the import is proposed (Chat 25 findings 1 and 2, narrowed).
-4. **Completion handlers**: the studio always sends `all_completed`; `answer_key_match` and `all_true` are not offered.
-5. **The CLI hides the import's refusal reasons** behind its generic message ("Operation not performed: …"); only the
+5. **Completion handlers**: the studio always sends `all_completed`; `answer_key_match` and `all_true` are not offered.
+6. **The CLI hides the import's refusal reasons** behind its generic message ("Operation not performed: …"); only the
    API shows them.
-6. **Who may use the delivery**: the import's scope grants the delivery course's participants, its creator only (D25).
-7. **Still open**: Chat 25 findings 3 and 4 (releases listed by number; titles of the latest revision), the Chat 24 and
+7. **Who may use the delivery**: the import's scope grants the delivery course's participants, its creator only (D25).
+8. **Still open**: Chat 25 findings 3 and 4 (releases listed by number; titles of the latest revision), the Chat 24 and
    Chat 23 findings, D28, and issue #125 (release views not readable; owner: later).
 
 ## Open decisions
@@ -191,4 +194,9 @@ until the owner has decided how D4 is lifted and the acceptance is written with 
 
 ## PR and CI
 
-Filled in after the PR is opened.
+PR [#126](https://github.com/thesis-fedfalco-2026/AIM-PRO-AILiteracy/pull/126). First CI on `46c94ec`, push run
+[43896391529](https://github.com/thesis-fedfalco-2026/AIM-PRO-AILiteracy/actions/runs/43896391529) and pull_request run
+[43896443684](https://github.com/thesis-fedfalco-2026/AIM-PRO-AILiteracy/actions/runs/43896443684): six jobs passed,
+`browser` failed in both: 18 tests passed, `delivery.spec.ts` failed at the teacher view's preview, which held the same
+policy with its keys sorted (the proposal's canonical copy) while the test compared it as text with the import page's
+copy (the API's key order). The test now compares the parsed policies. CI of the fix: see the PR.

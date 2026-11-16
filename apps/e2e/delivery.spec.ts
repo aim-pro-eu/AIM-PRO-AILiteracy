@@ -47,7 +47,9 @@ test('a release is imported into a new delivery course, and its activation is re
   await expect(page.locator('.alm-lead strong')).toHaveText(en.review.teacher.titleImport);
   await expect(section(page, en.review.teacher.delivery.heading).getByRole('listitem')
     .filter({ hasText: '→' })).toHaveCount(6);
-  await expect(page.getByTestId('policy-preview')).toHaveText(JSON.stringify(preview, null, 2));
+  // The same policy: the teacher view reads the proposal's canonical copy, whose keys are sorted.
+  await expect(page.getByTestId('policy-preview')).toBeVisible();
+  expect(JSON.parse(await page.getByTestId('policy-preview').textContent() ?? '')).toEqual(preview);
   await expectAccessible(page);
   await page.getByRole('radio', { name: en.review.decision.approve }).check();
   await page.getByLabel(en.review.decision.reason).fill('Synthetic review of the exact payload');
