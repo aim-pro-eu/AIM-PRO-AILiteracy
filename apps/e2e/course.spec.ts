@@ -14,8 +14,7 @@ test('the course page shows the whole seeded course and writes nothing', async (
   });
 
   await page.goto('/studio/');
-  await page.getByLabel(en.home.contextLabel).fill(seed.authoring_context);
-  await page.getByRole('button', { name: en.home.open }).click();
+  await page.getByTestId('course-list').getByRole('link', { name: seed.authoring_context, exact: true }).click();
   await expect(page).toHaveURL(`/studio/contexts/${seed.authoring_context}/course`);
   await expect(page.getByText('Synthetic business prompting syllabus', { exact: true })).toBeVisible();
 

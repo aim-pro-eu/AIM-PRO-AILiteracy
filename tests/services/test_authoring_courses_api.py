@@ -14,6 +14,8 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
+from fastapi.testclient import TestClient
+
 from learning.contracts import EntityRef
 from learning.policies import TrustedPolicy
 from learning.service import LearningService
@@ -168,6 +170,42 @@ class CoursesApiTest(ReviewApiCase):
             with self.subTest(context_id):
                 self.refused(self.create(context_id), 422, 'validation')
         self.assertEqual(self.files(), before)
+
+    def listed(self, client):
+        response = client.get('/contexts')
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.headers['cache-control'], 'no-store')
+        return [(entry['context_id'], entry['mode'], entry['status'], entry['roles'])
+                for entry in response.json()['contexts']]
+
+    def test_the_list_holds_the_contexts_the_subject_may_read(self):
+        staff = ['ADMINISTRATOR', 'CONTENT_RESPONSIBLE', 'ASSESSOR']
+        # The delivery context's policy is not installed: unavailable, so left out (D35).
+        self.assertEqual(self.listed(self.staff), [(AUTH, 'PREPARATION', 'DRAFT', staff),
+                                                   (DELIVERY_TWO, 'PREPARATION', 'DRAFT', staff)])
+        self.assertEqual(self.listed(self.learner), [(DELIVERY_TWO, 'PREPARATION', 'DRAFT', ['LEARNER'])])
+
+        # A new course is listed for its creator only.
+        self.created(self.create())
+        self.assertIn((COURSE, 'PREPARATION', 'DRAFT', ['ADMINISTRATOR', 'CONTENT_RESPONSIBLE']),
+                      self.listed(self.staff))
+        self.assertNotIn(COURSE, [entry[0] for entry in self.listed(self.learner)])
+
+    def test_the_list_needs_a_session_and_never_writes(self):
+        with LearningStore(self.location) as store:
+            digests = store.table_digests()
+        files = self.files()
+        anonymous = TestClient(self.app, base_url='https://testserver', raise_server_exceptions=False)
+        self.refused(anonymous.get('/contexts'), 401, 'unauthenticated')
+        self.listed(self.staff)
+        self.listed(self.learner)
+        with LearningStore(self.location) as store:
+            self.assertEqual(store.table_digests(), digests)
+        self.assertEqual(self.files(), files)
+
+    def test_an_invalid_policy_directory_refuses_the_list(self):
+        (self.policies / 'broken.json').write_text('{}', encoding='utf-8')
+        self.refused(self.staff.get('/contexts'), 500, 'internal')
 
 
 class CourseSettingsTest(unittest.TestCase):

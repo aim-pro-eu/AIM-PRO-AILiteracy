@@ -6,6 +6,7 @@ import type { EntityRef, ReviewFailure } from '../review/reviewApi';
 type Schemas = components['schemas'];
 
 export type CourseView = Schemas['CourseView'];
+export type CourseEntry = Schemas['ContextEntry'];
 export type ExportReport = Schemas['ExportReport'];
 export type JobView = Schemas['JobView'];
 export type JobStatus = JobView['status'];
@@ -72,6 +73,8 @@ export interface PreparationCommand {
 export interface BuildApi {
   /** A new course: a new context and policy for the signed-in creator; the same id again returns the same course. */
   createCourse(csrfToken: string, contextId: string): Promise<CourseView>;
+  /** The courses the signed-in subject may read, by id, with the subject's roles in each. */
+  listCourses(): Promise<CourseEntry[]>;
   /** Check the file and store it unchanged; a refused file is a `refused` error whose detail names the reason. */
   uploadExport(contextId: string, csrfToken: string, file: Blob, scenario: string, competencies: string): Promise<ExportReport>;
   /** Queue the Curator on an uploaded export; the same request id returns the same job. */
@@ -160,6 +163,11 @@ export function createBuildApi(client: AuthoringClient): BuildApi {
   return {
     async createCourse(csrfToken, contextId) {
       return settle(() => client.POST('/courses', { headers: writing(csrfToken), body: { context_id: contextId } }));
+    },
+
+    async listCourses() {
+      const listed = await settle(() => client.GET('/contexts'));
+      return listed.contexts;
     },
 
     async uploadExport(contextId, csrfToken, file, scenario, competencies) {

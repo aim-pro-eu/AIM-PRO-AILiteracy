@@ -8,10 +8,10 @@ test('the review inbox views pass the axe check', async ({ page, seed }) => {
   const inbox = `/studio/contexts/${seed.authoring_context}/review`;
 
   await page.goto('/studio/');
-  await expect(page.getByLabel(en.home.contextLabel)).toBeVisible();
+  await expect(page.getByTestId('course-list').getByRole('link', { name: seed.authoring_context, exact: true })).toBeVisible();
   await expectAccessible(page);
-  await page.getByRole('button', { name: en.home.open }).click();
-  await expect(page.getByText(en.home.contextRequired)).toBeVisible();
+  await page.getByRole('button', { name: en.home.create }).click();
+  await expect(page.getByText(en.home.courseRequired)).toBeVisible();
   await expectAccessible(page);
 
   await page.goto(inbox);

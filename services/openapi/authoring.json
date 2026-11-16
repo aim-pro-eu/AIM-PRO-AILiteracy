@@ -429,6 +429,60 @@
         "title": "CompletionRulesRequest",
         "type": "object"
       },
+      "ContextEntry": {
+        "additionalProperties": false,
+        "description": "A context the subject may read: its lifecycle and the subject's roles in its policy.",
+        "properties": {
+          "context_id": {
+            "minLength": 1,
+            "title": "Context Id",
+            "type": "string"
+          },
+          "mode": {
+            "minLength": 1,
+            "title": "Mode",
+            "type": "string"
+          },
+          "roles": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Roles",
+            "type": "array"
+          },
+          "status": {
+            "minLength": 1,
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "context_id",
+          "mode",
+          "status",
+          "roles"
+        ],
+        "title": "ContextEntry",
+        "type": "object"
+      },
+      "ContextList": {
+        "additionalProperties": false,
+        "properties": {
+          "contexts": {
+            "items": {
+              "$ref": "#/components/schemas/ContextEntry"
+            },
+            "title": "Contexts",
+            "type": "array"
+          }
+        },
+        "required": [
+          "contexts"
+        ],
+        "title": "ContextList",
+        "type": "object"
+      },
       "ContextSummary": {
         "additionalProperties": false,
         "description": "The context, the entities the subject may see and the snapshot findings.\n\nA learner-only subject sees only the context, its own participant record and\nits own learning records, never proposals, decisions or other participants.",
@@ -4812,6 +4866,47 @@
         "summary": "The signed-in subject and the CSRF token for writes",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/contexts": {
+      "get": {
+        "operationId": "context_list_contexts_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal error"
+          }
+        },
+        "summary": "The contexts the signed-in subject may read, by id",
+        "tags": [
+          "contexts"
         ]
       }
     },

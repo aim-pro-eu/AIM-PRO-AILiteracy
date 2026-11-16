@@ -41,6 +41,7 @@ class OpenApiSnapshotTest(unittest.TestCase):
         self.assertEqual({path: sorted(methods) for path, methods in schema['paths'].items()},
                          {'/health': ['get'], '/auth/login': ['get'], '/auth/callback': ['get'],
                           '/auth/session': ['get'], '/auth/logout': ['post'],
+                          '/contexts': ['get'],
                           '/contexts/{context_id}': ['get'], '/contexts/{context_id}/pending-proposals': ['get'],
                           '/contexts/{context_id}/proposals/{proposal_id}': ['get'],
                           '/contexts/{context_id}/decisions': ['post'], '/contexts/{context_id}/applications': ['post'],
