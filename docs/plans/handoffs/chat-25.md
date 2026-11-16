@@ -176,4 +176,8 @@ shown in full; activation is proposed and refused in words (RELEASE_RUNTIME_ROLE
 
 ## PR and CI
 
-Filled in after the PR is opened.
+PR [#124](https://github.com/thesis-fedfalco-2026/AIM-PRO-AILiteracy/pull/124). CI on `e618254`, push run
+[43820329913](https://github.com/thesis-fedfalco-2026/AIM-PRO-AILiteracy/actions/runs/43820329913) and pull_request
+run [43820338268](https://github.com/thesis-fedfalco-2026/AIM-PRO-AILiteracy/actions/runs/43820338268): all 7 jobs
+of each passed on the first run, `browser` included (`release.spec.ts`: the release proposed, applied and inspected,
+the delivery course created; axe).
