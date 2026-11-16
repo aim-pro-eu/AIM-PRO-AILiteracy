@@ -86,7 +86,10 @@ describe('the import of a release into a delivery course (S10, part 2)', () => {
       .toBe('/studio/contexts/delivery-1/review/import-proposal');
     const policy = within(screen.getByRole('region', { name: en.delivery.policy.heading }));
     expect(JSON.parse(policy.getByTestId('policy-preview').textContent ?? '')).toEqual(PREVIEW);
-    expect(policy.getByText(/course-delivery-1-v2\.json/)).toBeTruthy();
+    const download = policy.getByRole('link', { name: 'Download the preview as course-delivery-1-v2.json' });
+    expect(download.getAttribute('download')).toBe('course-delivery-1-v2.json');
+    expect(JSON.parse(decodeURIComponent(download.getAttribute('href')!.replace('data:application/json;charset=utf-8,', ''))))
+      .toEqual(PREVIEW);
   });
 
   it('says why the import cannot be proposed, and retries with the same request id', async () => {

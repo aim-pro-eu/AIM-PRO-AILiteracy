@@ -783,7 +783,8 @@
     "policy": {
       "heading": "Trusted policy preview",
       "intro": "Once the import is applied, the course uses this policy: it adds a source scope for the resources above, for this course only. The preview never replaces the course’s installed policy, and neither the studio nor approval installs it.",
-      "operator": "An operator installs it after the approval, as a new file in the policy directory (for example “{{file}}”), copied exactly. Until then, the applied course is unavailable."
+      "operator": "An operator installs it after the approval, as a new file in the policy directory (for example “{{file}}”), copied exactly. Until then, the applied course is unavailable.",
+      "download": "Download the preview as {{file}}"
     },
     "activation": {
       "heading": "Activation",

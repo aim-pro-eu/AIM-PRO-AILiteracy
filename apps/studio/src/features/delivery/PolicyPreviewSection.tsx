@@ -15,6 +15,11 @@ export function PolicyPreviewSection({ preview }: { preview: PolicyPreview }) {
       <h2 id={`${id}-heading`}>{t('delivery.policy.heading')}</h2>
       <p>{t('delivery.policy.intro')}</p>
       <p>{t('delivery.policy.operator', { file: preview.file })}</p>
+      <p>
+        <a href={`data:application/json;charset=utf-8,${encodeURIComponent(`${preview.json}\n`)}`} download={preview.file}>
+          {t('delivery.policy.download', { file: preview.file })}
+        </a>
+      </p>
       <pre className="alm-code" data-testid="policy-preview">{preview.json}</pre>
     </section>
   );

@@ -1166,7 +1166,8 @@ release pins, or none).
 5. **The policy preview is shown in full**, on the import page after the
    proposal and in the import's teacher view (read from the proposed
    `PolicySet`), with a file name for the operator
-   (`{policy id with - for :}-{version}.json`). Neither the studio nor approval
+   (`{policy id with - for :}-{version}.json`) and a link that downloads that
+   exact file. Neither the studio nor approval
    installs it, and it never replaces the installed file: an operator copies
    the exact reviewed preview into `ALM_POLICY_DIR` as a new file. Until then
    the applied course names a policy that is not installed and is unavailable
