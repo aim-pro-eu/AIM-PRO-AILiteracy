@@ -174,4 +174,5 @@ options for the owner and ask; do not pick one. Then, if the owner decides D25 a
 
 ## PR and CI
 
-Filled in after the PR is opened.
+PR [#130](https://github.com/thesis-fedfalco-2026/AIM-PRO-AILiteracy/pull/130), one documentation file;
+`git diff --check` exit 0. The CI result is reported in the PR conversation.
