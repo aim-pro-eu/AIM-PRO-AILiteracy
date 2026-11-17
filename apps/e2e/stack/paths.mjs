@@ -19,6 +19,7 @@ export const AIMPRO_EXPORT = `${ROOT}docs/resources/aimpro-megamodel-2026-11-02.
 export const PRISTINE = `${STATE}pristine.sqlite`;
 export const ADMIN_STATE = `${STATE}auth/admin.json`;
 export const LEARNER_STATE = `${STATE}auth/learner.json`;
+export const ASSESSOR_STATE = `${STATE}auth/assessor.json`;
 
 export const STUDIO_URL = 'http://127.0.0.1:58000';
 export const API_PORT = 58001;

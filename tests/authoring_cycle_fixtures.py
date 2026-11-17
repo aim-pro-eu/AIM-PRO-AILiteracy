@@ -308,6 +308,44 @@ class ProductionAuthoring(SimulatedAuthoring):
         return service.propose_delivery_import(context_id, 'admin', command, request_id=request_id)
 
 
+def evaluation_draft(evidence, *, criterion='clarity', level='clear', result=None):
+    """A synthetic response of the runtime assessor for the seeded rubric (one criterion, ``clarity``)."""
+    from learning.evaluation import EvaluationDraft
+    return EvaluationDraft(judgments=({'criterion_key': criterion, 'level_key': level,
+        'reason': 'The task, audience and tone are named.', 'evidence_refs': (evidence,)},),
+        result=result or 'Synthetic draft: the response meets the clarity criterion.')
+
+
+def synthetic_evaluation(prompt):
+    """A synthetic runtime assessor for any rubric: the highest level of each criterion, on the evidence given."""
+    from learning.evaluation import EvaluationDraft
+    data = json.loads(prompt.split('\nDATA\n', 1)[1])
+    evidence = data['evidence'][0]['ref']
+    criteria = data['rubric']['criteria'] if data['rubric'] else []
+    return EvaluationDraft(judgments=tuple({'criterion_key': c['key'], 'level_key': c['levels'][-1]['key'],
+        'reason': 'Synthetic judgment: the response meets this level descriptor.', 'evidence_refs': (evidence,)}
+        for c in criteria), result='Synthetic draft evaluation for the assessor to decide.')
+
+
+class SyntheticAssessor:
+    """The runtime assessor's model, answering with the given drafts in order; an exception is raised instead.
+
+    ``prompts`` records every prompt; ``factory`` stands for the production builder, called once per request.
+    """
+    def __init__(self, *drafts):
+        self.drafts, self.prompts = list(drafts), []
+
+    def factory(self):
+        return self.draft
+
+    def draft(self, prompt):
+        self.prompts.append(prompt)
+        answer = self.drafts.pop(0)
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+
 class SimulatedRuntimeAgents:
     """Use the real Flow, authorization and worker guards with no model clients."""
     def __init__(self, service, authoring=None):
@@ -326,14 +364,14 @@ class SimulatedRuntimeAgents:
                 'criterionKey': 'clarity', 'levelKey': 'clear', 'evidenceRefs': [ref(evidence)],
                 'reason': 'The supplied fictional text names a task, audience and tone.'}]})
 
-    def assessor_proposal(self, evidence, request_id):
-        """Simulate the future assessment adapter under an authorized assessor."""
-        context = self.service._context(DELIVERY, 'admin')
-        observed = context.snapshot.get(evidence.ref)
-        self.events.append('simulated-assessor-evaluator')
-        candidate = self.evaluation_candidate(context, observed, request_id)
-        return self.service.propose(DELIVERY, 'admin', (context.snapshot.context.ref,), (candidate,),
-            'Authorized assessor requests review of a simulated formative observation against pinned evidence/criteria.')
+    def assessor_draft(self, evidence, request_id, mode='FORMATIVE'):
+        """The production runtime assessor (S11) on an observed attempt, for an assessor; only the model is synthetic."""
+        assessor = SyntheticAssessor(evaluation_draft(evidence.ref))
+        result = self.service.propose_evaluation(DELIVERY, 'admin', {'evidence': evidence.ref, 'mode': mode},
+                                                 request_id=request_id, assessor_factory=assessor.factory)
+        assert result.kind == 'PROPOSAL', result
+        self.events.append('learner-response-evaluator')
+        return self.service.store.read(result.proposal_refs[0], owner=DELIVERY)
 
     def engine(self, request):
         import main  # Apply the repository's vendor-telemetry privacy configuration.

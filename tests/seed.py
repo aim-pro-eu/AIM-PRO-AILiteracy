@@ -18,6 +18,13 @@ it holds no real learner or organisation data.
   ``policies/``;
 - ``seed.json``: the contexts, subjects and exact references below.
 
+    python -m tests.seed --output DIR --attempt [--db LOCATION]
+
+records the learner's synthetic attempt at the assessment of the seed's
+delivery, through ``submit`` (S11). An attempt is learner history, which
+activation refuses: it is a separate step, once an operator has installed the
+delivery's policy and the delivery is active. The same attempt is recorded once.
+
 State: the authoring context holds an approved and applied syllabus, project,
 assessment, teacher and trainer content, completion rules and release, plus a
 pending Evaluator revision. The delivery context holds the applied import of
@@ -40,6 +47,9 @@ from learning.contracts import EntityRef, Record, Text
 SEED_FORMAT = 1
 STAFF, LEARNER = 'admin', 'learner'
 POLICY_DIR, PREVIEW_DIR, MANIFEST, DATABASE = 'policies', 'policy-previews', 'seed.json', 'alm.sqlite'
+ATTEMPT_REQUEST = 'seed-attempt-1'
+SYNTHETIC_ATTEMPT = ('Synthetic attempt: write a polite reminder to fictional Alex about EXAMPLE-01. '
+                     'The fictional audience supplies context; the polite tone constrains the response.')
 # The seed runs no model, but the generators import agent code: vendor telemetry stays off.
 TELEMETRY_OFF = {'LANGFUSE_ENABLED': 'false', 'CREWAI_DISABLE_TELEMETRY': 'true', 'CREWAI_TRACING_ENABLED': 'false'}
 
@@ -115,11 +125,50 @@ def build_seed(output: Path, store_location: Path | str | None = None) -> SeedMa
     return manifest
 
 
+def record_attempt(output: Path, store_location: Path | str | None = None) -> EntityRef:
+    """The learner's synthetic attempt at the delivery's assessment, recorded through ``submit``; its evidence."""
+    for name, value in TELEMETRY_OFF.items():
+        os.environ.setdefault(name, value)
+    from unittest.mock import Mock
+    from learning.metamodel import load_contract
+    from learning.service import LearningService
+    from learning.store import LearningStore
+    from services.api_common.contexts import PolicyDirectory
+
+    output = Path(output)
+    manifest = SeedManifest.model_validate_json((output / MANIFEST).read_bytes())
+    if store_location is None and manifest.store is None:
+        raise ValueError('Name the store of this seed')
+    database = output / manifest.store if store_location is None else store_location
+    agents = Mock(side_effect=AssertionError('The seed never builds agents'))
+    with LearningStore(database) as store:
+        root = store.read_context(manifest.delivery_context)
+        policy = PolicyDirectory(output / manifest.policy_dir).find(EntityRef.model_validate(root.fields['policies']))
+        if policy is None:
+            raise ValueError('The delivery policy is not installed')
+        service = LearningService(store, load_contract(), policy, agents)
+        context = service._context(manifest.delivery_context, manifest.learner)
+        activity = next(e for e in context.snapshot.active_domain()
+                        if e.type == 'ActivityDefinition' and e.fields['intent'] == 'ASSESS')
+        return service.submit(manifest.delivery_context, manifest.learner, activity.ref, SYNTHETIC_ATTEMPT,
+                              ATTEMPT_REQUEST).ref
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description='Build the dev-only synthetic ALM seed (D15)')
     parser.add_argument('--output', type=Path, required=True, help='New or empty directory')
     parser.add_argument('--db', help='Store location instead of OUTPUT/alm.sqlite: a new SQLite file or a postgresql:// URL')
+    parser.add_argument('--attempt', action='store_true',
+                        help="Record the learner's synthetic attempt in OUTPUT, an existing seed whose delivery is active")
     args = parser.parse_args(argv)
+    if args.attempt:
+        try:
+            evidence = record_attempt(args.output, args.db)
+        except (ValueError, OSError) as error:
+            print('Attempt not recorded: ' + str(error), file=sys.stderr)
+            return 2
+        print(json.dumps({'evidence': evidence.model_dump()}))
+        return 0
     try:
         build_seed(args.output, args.db)
     except (ValueError, OSError) as error:

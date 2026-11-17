@@ -28,9 +28,6 @@ from tests.authoring_cycle_fixtures import (AUTH, DELIVERY, DELIVERY_TWO, Produc
 from tests.store_backends import block_network, new_store_location, on_both_backends
 
 
-SIMULATED_ASSESSOR = {'EVALUATOR': 'learner-response-evaluator'}
-
-
 class ReleaseTest(unittest.TestCase):
     def setUp(self):
         block_network(self, 'Release tests must not use the network or models',
@@ -277,7 +274,8 @@ class DeliveryImportTest(ReleaseTest):
         self.assertEqual(scope.contexts, [DELIVERY])
         self.assertEqual(tuple(scope.resources), result.preview.resource_keys)
         self.assertEqual(tuple(scope.activities), result.preview.activities)
-        self.assertEqual(set(result.preview.workers), {'lesson-explainer', 'guided-practice-coach'})
+        self.assertEqual(set(result.preview.workers),
+                         {'lesson-explainer', 'guided-practice-coach', 'learner-response-evaluator'})
         self.assertIn('R08', {f.code for f in result.preview.readiness_findings})
         proposal = self.store.read(result.proposal, owner=DELIVERY)
         for receipt in ('"release"', '"project"', '"artifacts"', 'proposal-', 'decision-', 'change-'):
@@ -417,9 +415,8 @@ class SeparatePolicyImportTest(ReleaseTest):
         self.assertEqual(root.fields['learningDesign'], result.design.model_dump())
         self.assertEqual(self.store.read_context(AUTH), authoring)
         # The installed preview is the course's policy from then on; activation reads no other context.
-        with self.assertRaises(ActivationRefused) as refused:
-            self.activation(self.install(result), COURSE)
-        self.assertEqual({f.code for f in refused.exception.findings}, {'RELEASE_RUNTIME_ROLE'})
+        activation = self.activation(self.install(result), COURSE)
+        self.assertEqual(activation.policy, result.policy_preview.policy_ref)
 
     def test_import_is_refused_when_either_policy_does_not_authorize_the_subject(self):
         release = self.released()
@@ -507,28 +504,25 @@ class ActivationTest(ReleaseTest):
             self.activation(delivery)
         findings = refused.exception.findings
         codes = {f.code for f in findings}
-        self.assertTrue({'R08', 'RELEASE_COMPLETION_HANDLER', 'RELEASE_RUNTIME_ROLE'} <= codes, codes)
-        self.assertNotIn('RELEASE_POLICY_NOT_INSTALLED', codes)
-        assess = {a.id for a in delivery._context(DELIVERY, 'admin').snapshot.active_domain()
-                  if a.type == 'ActivityDefinition' and a.fields['intent'] == 'ASSESS'}
-        roles = {f.target for f in findings if f.code == 'RELEASE_RUNTIME_ROLE'}
-        self.assertEqual(roles, assess)
-        self.assertTrue(all('D4' in f.reason for f in findings if f.code == 'RELEASE_RUNTIME_ROLE'))
+        self.assertTrue({'R08', 'RELEASE_COMPLETION_HANDLER'} <= codes, codes)
+        self.assertFalse({'RELEASE_POLICY_NOT_INSTALLED', 'RELEASE_RUNTIME_ROLE'} & codes, codes)
         self.assertEqual(self.store.read_context(DELIVERY), root)
         self.assertIsNone(self.store.db.execute("SELECT 1 FROM requests WHERE owner=? AND id='activate'",
                                                 (DELIVERY,)).fetchone())
 
-    def test_assess_activities_keep_activation_refused_without_a_runtime_role(self):
+    def test_an_activity_intent_without_a_runtime_worker_keeps_activation_refused(self):
         release = self.released()
-        _, delivery = self.imported(release)
+        # An import that configures no EVALUATOR worker leaves the ASSESS activities without a runtime role.
+        with patch.dict('learning.releases.RUNTIME_WORKERS', {'TEACHER': 'lesson-explainer',
+                                                              'TRAINER': 'guided-practice-coach'}, clear=True):
+            _, delivery = self.imported(release)
         with self.assertRaises(ActivationRefused) as refused:
             self.activation(delivery)
         self.assertEqual({f.code for f in refused.exception.findings}, {'RELEASE_RUNTIME_ROLE'})
 
     def test_activation_proposes_learning_active_only_and_generic_activation_is_reserved(self):
         release = self.released()
-        with patch.dict('learning.releases.RUNTIME_WORKERS', SIMULATED_ASSESSOR):
-            _, delivery = self.imported(release)
+        _, delivery = self.imported(release)
         root = self.store.read_context(DELIVERY)
         active = entity('ExecutionContext', DELIVERY, {**root.fields, 'mode': 'LEARNING', 'status': 'ACTIVE'}, 'generic')
         with self.assertRaisesRegex(ValueError, 'dedicated commands'):
@@ -559,8 +553,7 @@ class ActivationTest(ReleaseTest):
 
     def test_learner_history_blocks_activation_at_proposal_and_application(self):
         release = self.released()
-        with patch.dict('learning.releases.RUNTIME_WORKERS', SIMULATED_ASSESSOR):
-            _, delivery = self.imported(release)
+        _, delivery = self.imported(release)
         proposal = self.store.read(self.activation(delivery).proposal, owner=DELIVERY)
         delivery.decide(DELIVERY, 'admin', proposal.ref, 'APPROVE', 'Synthetic activation review')
         self.seed_history(DELIVERY)
@@ -675,7 +668,7 @@ class ReleaseCliTest(ReleaseTest):
             self.assertIn('RELEASE_POLICY_NOT_INSTALLED', errors)
             policy = preview
             _, errors = cli(DELIVERY, 'propose-activation', '--base-context', base, '--request-id', 'cli-activate', code=2)
-            self.assertIn('RELEASE_RUNTIME_ROLE', errors)
+            self.assertNotIn('RELEASE_RUNTIME_ROLE', errors)
             self.assertIn('RELEASE_COMPLETION_HANDLER', errors)
 
 

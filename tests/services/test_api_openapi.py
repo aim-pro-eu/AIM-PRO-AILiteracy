@@ -79,7 +79,7 @@ class OpenApiSnapshotTest(unittest.TestCase):
         self.assertEqual(sorted(commands['discriminator']['mapping']),
                          ['discover-aimpro-syllabus-sources', 'generate-aimpro-syllabus', 'generate-project-assessments',
                           'generate-project-teacher', 'generate-project-trainer', 'prepare-aimpro-syllabus-sources',
-                          'revise-aimpro-syllabus'])
+                          'propose-evaluation', 'revise-aimpro-syllabus'])
         self.assertEqual(schema['components']['schemas']['JobView']['properties']['status']['enum'],
                          ['QUEUED', 'RUNNING', 'PROPOSED', 'REJECTED', 'FAILED', 'ABANDONED', 'COMPLETED',
                           'AWAITING_CHOICE', 'ACCEPTED', 'DECLINED'])

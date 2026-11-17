@@ -62,6 +62,11 @@ def parse_args(argv=None):
         generator = commands.add_parser(name, help='Generate a typed pending authoring proposal from exact approved project inputs')
         generator.add_argument('bundle', type=Path, help='GenerationCommand JSON: project, base_context, assessments, shared_content, requirements')
         generator.add_argument('--request-id', required=True)
+    evaluation = commands.add_parser('propose-evaluation',
+        help="Ask the runtime assessor for an evaluation draft of one observed attempt, as a pending proposal")
+    evaluation.add_argument('--evidence', required=True, help='Exact observed LearningEvidence EntityRef JSON')
+    evaluation.add_argument('--mode', required=True, choices=['FORMATIVE', 'FORMAL'])
+    evaluation.add_argument('--request-id', required=True)
     propose = commands.add_parser('propose')
     propose.add_argument('bundle', type=Path, help='JSON: targets, candidates, explanation')
     decide = commands.add_parser('decide')
@@ -171,6 +176,13 @@ def _aimpro_search_client():
     return DocumentSearchClient(build_document_search_params(base_dir, os.environ, unlimited_text=True))
 
 
+def _runtime_assessor():
+    from main import build_runtime_assessor
+    from crewai.events.utils.console_formatter import set_suppress_console_output
+    set_suppress_console_output(True)
+    return build_runtime_assessor()
+
+
 def _aimpro_authoring():
     from main import build_aimpro_authoring
     from crewai.events.utils.console_formatter import set_suppress_console_output
@@ -237,6 +249,10 @@ def main(argv=None):
                 method = getattr(service, command.replace('-', '_'))
                 result = method(args.context, args.subject, json.loads(args.bundle.read_text()),
                     request_id=args.request_id, authoring_factory=_aimpro_authoring).model_dump(mode='json')
+            elif command == 'propose-evaluation':
+                result = service.propose_evaluation(args.context, args.subject,
+                    {'evidence': EntityRef.model_validate_json(args.evidence), 'mode': args.mode},
+                    request_id=args.request_id, assessor_factory=_runtime_assessor).model_dump(mode='json')
             elif command == 'propose':
                 bundle = json.loads(args.bundle.read_text())
                 if not isinstance(bundle, dict) or any(

@@ -13,7 +13,8 @@ const releasePath = (context: string, release: { id: string; version: string }) 
 // Acceptance (S10 part 2, issue #123): in a delivery course created from the studio, the import of the seeded release
 // proposes a resource for each requirement, the teacher changes one, and the exact selection is sent; the import is
 // read in its teacher view and approved; the policy preview is shown in full and installed by the operator, never by
-// the browser; activation is proposed and refused in words (RELEASE_RUNTIME_ROLE, D4).
+// the browser; activation is proposed and refused in words: the requirement left without a resource (R08). The
+// assessment no longer refuses it: the import configures the runtime assessor (S11).
 test('a release is imported into a new delivery course, and its activation is refused in words', async ({ page, seed }) => {
   await page.goto(releasePath(seed.authoring_context, seed.release));
   await expect(page.getByTestId('release-verdict')).toHaveText(en.release.ready);
@@ -69,8 +70,8 @@ test('a release is imported into a new delivery course, and its activation is re
   const activation = section(page, en.delivery.activation.heading);
   await activation.getByRole('button', { name: en.delivery.activation.submit }).click();
   const refusals = activation.getByTestId('activation-refusals');
-  await expect(refusals).toContainText('is an assessment, and no assessor is configured for students yet (decision D4)');
   await expect(refusals).toContainText('(R08)');
+  await expect(refusals).not.toContainText('RELEASE_RUNTIME_ROLE');
   await expectAccessible(page);
 
   // Nothing was recorded: the course is still in preparation, with the six bindings sent.

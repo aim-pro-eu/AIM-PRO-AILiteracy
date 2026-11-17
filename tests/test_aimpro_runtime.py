@@ -35,6 +35,24 @@ class AimproRuntimeTest(unittest.TestCase):
         self.assertIn('CATEGORY curator', calls[1]['backstory'])
         self.assertIsNone(budget)
 
+    def test_runtime_assessor_builder_drafts_one_typed_evaluation_without_tools(self):
+        from learning.evaluation import EVALUATOR, EvaluationDraft
+        catalog = load_model_catalog(main.BASE_DIR / 'model.properties')
+        draft = EvaluationDraft(judgments=(), result='Synthetic result.')
+        calls, answers = [], [draft, SimpleNamespace(result='not a draft')]
+        def factory(**kwargs):
+            calls.append(kwargs)
+            return SimpleNamespace(kickoff=lambda prompt, response_format: SimpleNamespace(pydantic=answers.pop(0)))
+        with patch.object(main, 'DocumentSearchClient', side_effect=AssertionError('The assessor searches nothing')):
+            assessor = main.build_runtime_assessor(model_catalog=catalog, environ={'OPENROUTER_API_KEY': 'test'},
+                client_factory=lambda **kwargs: kwargs, agent_factory=factory)
+        self.assertEqual(calls, [])
+        self.assertEqual(assessor('Assigned rubric and evidence'), draft)
+        with self.assertRaisesRegex(ValueError, 'structured evaluation draft'):
+            assessor('Assigned rubric and evidence')
+        self.assertEqual([c['role'] for c in calls], [EVALUATOR, EVALUATOR])
+        self.assertTrue(all(c['tools'] == [] and not c['allow_delegation'] for c in calls))
+
     def test_builder_uses_configured_lead_without_search_or_workers(self):
         catalog = load_model_catalog(main.BASE_DIR / "model.properties")
         calls = []

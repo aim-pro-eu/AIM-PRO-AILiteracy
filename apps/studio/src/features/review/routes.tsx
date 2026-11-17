@@ -1,6 +1,7 @@
 import type { RouteObject } from 'react-router';
 import { useParams, useSearchParams } from 'react-router';
 
+import { AssessmentsPage } from '../assessments/AssessmentsPage';
 import { BuildPage } from '../course-build/BuildPage';
 import { CoursePage } from '../course/CoursePage';
 import { ImportPage } from '../delivery/ImportPage';
@@ -29,6 +30,11 @@ function BuildRoute() {
 function MembersRoute() {
   const { contextId = '' } = useParams();
   return <MembersPage key={contextId} contextId={contextId} />;
+}
+
+function AssessmentsRoute() {
+  const { contextId = '' } = useParams();
+  return <AssessmentsPage key={contextId} contextId={contextId} />;
 }
 
 function ProposalRoute() {
@@ -65,4 +71,5 @@ export const reviewRoutes: RouteObject[] = [
   { path: 'contexts/:contextId/releases/:releaseId/versions/:version', element: <ReleaseRoute /> },
   { path: 'contexts/:contextId/import', element: <ImportRoute /> },
   { path: 'contexts/:contextId/members', element: <MembersRoute /> },
+  { path: 'contexts/:contextId/assessments', element: <AssessmentsRoute /> },
 ];

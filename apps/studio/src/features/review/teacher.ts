@@ -5,17 +5,19 @@ import type { Entity, EntityRef, Finding, JsonValue } from './reviewApi';
 /**
  * What a proposal is, for its title and its view: generated assessments, teacher or
  * trainer content (the role of its generated package), completion rules, the
- * initialization of the authoring project, a release, a delivery import, a new member, or another change.
+ * initialization of the authoring project, a release, a delivery import, a new member,
+ * the evaluation of a student's attempt, or another change.
  */
-export type ProposalKind =
-  'assessment' | 'teacher' | 'trainer' | 'completion' | 'initialization' | 'release' | 'import' | 'membership' | 'other';
+export type ProposalKind = 'assessment' | 'teacher' | 'trainer' | 'completion' | 'initialization' | 'release' | 'import'
+  | 'membership' | 'evaluation' | 'other';
 
 /** The title of a proposal of each kind, a catalogue key. */
 export const KIND_TITLES = {
   assessment: 'review.teacher.titleAssessment', teacher: 'review.teacher.titleTeacher', trainer: 'review.teacher.titleTrainer',
   completion: 'review.teacher.titleCompletion', initialization: 'review.teacher.titleInitialization',
   release: 'review.teacher.titleRelease', import: 'review.teacher.titleImport',
-  membership: 'review.teacher.titleMembership', other: 'review.teacher.titleOther',
+  membership: 'review.teacher.titleMembership', evaluation: 'review.teacher.titleEvaluation',
+  other: 'review.teacher.titleOther',
 } as const satisfies Record<ProposalKind, string>;
 
 /** A part of the course a project selects or a release freezes: its kind in the project and its title. */
@@ -54,10 +56,26 @@ export interface TeacherView {
     scopes: string[]; policy: PolicyPreview | null } | null;
   /** For a new member (D25): who joins and with which role. */
   membership: { subject: string; roles: string[] } | null;
+  /** For the evaluation of an attempt (S11): what the student did, each criterion's judgment and who drafted it. */
+  evaluation: EvaluationView | null;
   /** The review agent's assessment of generated content it did not accept (model text), or null. */
   notAccepted: string | null;
   /** Whether `changes` compares the proposal with the course: only while it can still be decided or applied. */
   compared: boolean;
+}
+
+/** An evaluation in words: its mode, the agent that drafted it, the attempt, the judgment of each criterion, the result. */
+export interface EvaluationView {
+  mode: string;
+  /** The registry name of the agent that assisted, or null for an evaluation written by a person. */
+  agent: string | null;
+  /** The first line of the assessment's instruction. */
+  activity: string;
+  learner: string;
+  response: string;
+  /** Each criterion's description, the level given (null: not determined) with its descriptor, and the reason. */
+  judgments: { criterion: string; level: string | null; descriptor: string | null; reason: string }[];
+  result: string;
 }
 
 export interface Criterion {
@@ -119,6 +137,8 @@ function contents(candidates: Entity[], format: string): Record<string, JsonValu
 
 /** The kind of a proposal, from its candidates. A delivery import carries completion rules and generated content too. */
 function kindOf(candidates: Entity[]): ProposalKind {
+  // An evaluation of a student's attempt, drafted by the runtime assessor or written by a person (S11).
+  if (candidates.some((candidate) => candidate.type === 'Evaluation')) return 'evaluation';
   // A new member brings a participant record and the policy version that grants it (D25).
   if (candidates.some((candidate) => candidate.type === 'Participant')) return 'membership';
   if (candidates.some((candidate) => DELIVERY.has(candidate.type))) return 'import';
@@ -302,8 +322,34 @@ function notAcceptedOf(candidates: Entity[]): string | null {
   return null;
 }
 
+/** The evaluation among the candidates in words, read with the course's records (`applied`). */
+function evaluationOf(candidates: Entity[], applied: Entity[]): EvaluationView | null {
+  const evaluation = candidates.find((candidate) => candidate.type === 'Evaluation');
+  if (!evaluation) return null;
+  const find = exact([...candidates, ...applied]);
+  const { fields } = evaluation;
+  const evidence = find(Array.isArray(fields.evidence) ? fields.evidence[0] : undefined);
+  const rubric = find(find(fields.specification)?.fields.rubric);
+  const criteria = rubric ? records(rubric.fields.criteria) : [];
+  return {
+    mode: text(fields.mode),
+    agent: text(find(fields.assistedBy)?.fields.registryName) || null,
+    activity: text(find(evidence?.fields.activity)?.fields.instruction).split('\n')[0] ?? '',
+    learner: text(find(evidence?.fields.learner)?.fields.subjectKey),
+    response: text(evidence?.fields.contentOrLocator),
+    judgments: records(fields.criterionJudgments).map((judgment) => {
+      const criterion = criteria.find((item) => text(item.key) === text(judgment.criterionKey));
+      const level = text(judgment.levelKey) || null;
+      const described = level === null ? undefined : records(criterion?.levels).find((item) => text(item.key) === level);
+      return { criterion: text(criterion?.description) || text(judgment.criterionKey), level,
+        descriptor: described ? text(described.descriptor) : null, reason: text(judgment.reason) };
+    }),
+    result: text(fields.result),
+  };
+}
+
 /** Proposals that bring no teaching change of their own: what they carry is described instead. */
-const DESCRIBED = new Set<ProposalKind>(['initialization', 'release', 'import', 'membership']);
+const DESCRIBED = new Set<ProposalKind>(['initialization', 'release', 'import', 'membership', 'evaluation']);
 
 /**
  * The teacher view of `candidates`, compared with `applied` (the context's current records). Without `compare`
@@ -337,6 +383,7 @@ export function teacherView(candidates: Entity[], applied: Entity[], compare = t
     delivery: kind === 'import' ? deliveryOf(candidates, applied) : null,
     membership: kind === 'membership' ? candidates.filter((candidate) => candidate.type === 'Participant')
       .map(({ fields }) => ({ subject: text(fields.subjectKey), roles: texts(fields.roles) }))[0] ?? null : null,
+    evaluation: kind === 'evaluation' ? evaluationOf(candidates, applied) : null,
     notAccepted: notAcceptedOf(candidates),
     compared: compare && !DESCRIBED.has(kind),
   };

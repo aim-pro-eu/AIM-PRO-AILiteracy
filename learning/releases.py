@@ -34,9 +34,10 @@ POLICY_PREVIEW = 'Proposed trusted local policy configuration: '
 HISTORY = ('ActivityOccurrence', 'LearningEvidence', 'LearningState', 'Evaluation')
 DELIVERY_FIELDS = ('models', 'learningDesign', 'policies', 'resourceBindings', 'mode', 'status')
 COMMANDS = ('PROPOSE_RELEASE', 'PROPOSE_DELIVERY_IMPORT', 'PROPOSE_ACTIVATION', 'PROPOSE_MEMBERSHIP')
-# Runtime roles an import may configure. ASSESS has none until an assessor-facing
-# evaluation adapter exists (G7), so activation stays refused (owner decision D4).
-RUNTIME_WORKERS = {'TEACHER': 'lesson-explainer', 'TRAINER': 'guided-practice-coach'}
+# Runtime roles an import may configure. The EVALUATOR drafts the evaluations an assessor requests
+# (learning/evaluation.py; G7, S11), which lifts D4.
+RUNTIME_WORKERS = {'TEACHER': 'lesson-explainer', 'TRAINER': 'guided-practice-coach',
+                   'EVALUATOR': 'learner-response-evaluator'}
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -544,12 +545,9 @@ def activation_findings(store, context):
     roles = {snapshot.get(r).fields['role'] for r in runtime.fields['definitions'] if r['type'] == 'AgentSpecialization'}
     for activity in activities:
         if _role(activity.fields['intent']) not in roles:
-            assess = activity.fields['intent'] == 'ASSESS'
             findings.append(Finding(code='RELEASE_RUNTIME_ROLE', target=activity.id,
-                reason=('This ASSESS activity has no configured runtime assessor role; activation stays refused '
-                        'until a later explicit decision (D4).') if assess else
-                       'This activity intent has no configured runtime role in the delivery.',
-                resolution='Keep the delivery in PREPARATION.' if assess else 'Correct the delivery configuration.'))
+                reason='This activity intent has no configured runtime role in the delivery.',
+                resolution='Correct the delivery configuration.'))
     return release, tuple(findings)
 
 

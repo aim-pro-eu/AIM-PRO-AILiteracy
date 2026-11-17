@@ -19,3 +19,6 @@ export const importPath = (contextId: string, authoringId: string, release: { id
 
 /** The members of a course, for its administrators (D25). */
 export const membersPath = (contextId: string) => `/contexts/${encodeURIComponent(contextId)}/members`;
+
+/** The submitted attempts of an active delivery course, for its assessors (S11). */
+export const assessmentsPath = (contextId: string) => `/contexts/${encodeURIComponent(contextId)}/assessments`;

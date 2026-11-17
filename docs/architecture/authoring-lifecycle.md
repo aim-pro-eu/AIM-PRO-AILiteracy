@@ -207,8 +207,10 @@ Authoring approval does not confer permission to use a resource with a
 new learner/audience. Activation is a separate proposal (`propose-activation`)
 after existing readiness checks pass. Completion rules must be authored in the
 reviewed design, and their handlers explicitly bound in the installed policy.
-Following owner decision D4, activation stays refused while an imported ASSESS
-activity has no configured runtime role.
+Activation stays refused while an imported activity has no configured runtime
+role; the import configures Teacher, Trainer and, for ASSESS activities, the
+EVALUATOR runtime worker `learner-response-evaluator` (S11, owner decision of 16
+November 2026, which lifted D4).
 
 For the first slice, an active delivery remains on its imported release. A new
 release supports a new delivery; upgrading an existing one needs a separately
@@ -225,11 +227,16 @@ rules preserves IN_PROGRESS/UNVERIFIED learning state.
 
 The existing LearningService checks `propose` permission against the requesting
 subject when persisting worker proposals. A learner-only request therefore cannot
-save an Evaluator's change proposal. The reference cycle keeps that restriction
-and routes proposed evaluation through an explicitly authorized assessor using
-the existing generic proposal service. A production assessor-facing evaluation
-adapter remains necessary. Broadening learner permissions to make this test pass
-would violate the boundary rather than complete the workflow.
+save an Evaluator's change proposal, and the learner's permissions are not
+broadened. Evaluation goes through the runtime assessor instead (S11,
+`learning/evaluation.py`, `propose-evaluation`): a subject who may `propose` and
+holds `ASSESSOR` starts a draft on one observed attempt and chooses FORMATIVE or
+FORMAL; `learner-response-evaluator` supplies only the judgment of each rubric
+criterion and the result text; control builds the `Evaluation` (with
+`assistedBy`), checks it with `validate_evaluation`, retries a failing draft with
+the fixed reason (at most three drafts) and records it as a proposal under the
+assessor. A person with assessment authority, the requester included, decides
+and applies it. See [the release guide](releases.md#runtime-assessor-s11).
 
 ## Executable acceptance and its limits
 
@@ -246,11 +253,11 @@ It does not touch the existing SCN01 demo or approve the real pending syllabus.
 | --- | --- |
 | AIM-PRO source preparation, typed Curator checks and candidate mapping | Curator output, Lead verdict and corpus search response |
 | Production project initialization/revisions, stable syllabus resolution, dedicated #9/#10 services, registry dispatch, candidate mapping, dependency contracts and receipts | Model responses |
-| Production `propose-release`, `show-release`, `propose-delivery-import` and `propose-activation`, with reserved rules rechecked at application | One EVALUATOR runtime worker patched into the import, standing in for the future assessor role (G7) that D4 requires |
+| Production `propose-release`, `show-release`, `propose-delivery-import` and `propose-activation`, with reserved rules rechecked at application, the import configuring the EVALUATOR runtime worker | No simulated boundary beyond the model responses |
 | Explicit completion rules authored through a reviewed project revision | The operator bundle that supplies them (generators never infer them) |
 | LearningService proposals, exact human-review payloads, decisions and application | Test operator explicitly records synthetic decisions |
 | CrewAI Flow, registry authorization, TaskDispatcher, output guards and SQLite request results | Lead plans/reviews/synthesis and Teacher/Trainer outputs; an Evaluator worker is also simulated for the learner-permission rejection case |
-| Evaluation validation and reviewed application under actual assessor permissions | Future assessor-facing adapter generates the typed formative Evaluation candidate |
+| The production runtime assessor (`propose-evaluation`), evaluation validation and reviewed application under actual assessor permissions | The runtime assessor's model response (one judgment per rubric criterion) |
 | Readiness, binding approval, explicit activation, observed attempts and evaluation validation | Lexical retrieval response containing a synthetic exact-version resource |
 | Historical domain refs and read-only ALM execution-trace export | No external provider or external persistence service |
 
@@ -278,8 +285,8 @@ The acceptance covers:
 This exercises production project, generator and release/import operations with
 synthetic model responses. It does not establish a semantic-quality benchmark or a
 complete observed activity-completion workflow. The existing ALM engine performs
-authoritative state transitions; an assessor-facing evaluation adapter remains to
-be implemented. Explicit synthetic completion rules are authored in a reviewed
+authoritative state transitions; the runtime assessor (S11) drafts evaluations
+for a person to decide. Explicit synthetic completion rules are authored in a reviewed
 project revision before release, separately from generation. The dedicated
 release acceptance is in `tests/test_releases.py`. No issue closure follows
 merely from tests.

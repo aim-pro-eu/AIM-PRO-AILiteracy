@@ -27,6 +27,11 @@ blocks written so far from its content-free ``block`` events.
 Source jobs (S09a2, D22) propose nothing. A source preparation awaits the
 choice of the teacher who prepared it: accepted or declined, once. A Curator
 job naming prepared sources is refused unless that teacher accepted them.
+
+An evaluation job (S11) asks the runtime assessor for a draft evaluation of one
+observed attempt; it is queued only by a subject with the ``ASSESSOR`` role
+(403 otherwise), and the draft is a pending proposal for a person with
+assessment authority to decide.
 """
 
 from __future__ import annotations
@@ -45,7 +50,7 @@ from services.api_common.auth import Principal
 from services.api_common.contexts import READ_ERRORS, WRITE_ERRORS, context_reader, context_writer, open_context
 from services.api_common.errors import stream_error_responses
 from services.api_common.registry import ApiModule
-from services.jobs.kinds import AssessmentJob, JobCommand, TeacherJob, TrainerJob, unaccepted_sources
+from services.jobs.kinds import AssessmentJob, EvaluationJob, JobCommand, TeacherJob, TrainerJob, unaccepted_sources
 from services.jobs.store import ENDED, JobRecord, JobStatus, JobStore, StatusEvent
 
 
@@ -139,6 +144,8 @@ router = APIRouter(tags=['jobs'])
 def queue(context_id: str, body: JobRequest, request: Request, principal: Principal = Depends(context_writer)):
     with open_context(request, context_id) as service:
         service.authorize_jobs(context_id, principal.subject_key)
+        if isinstance(body.job, EvaluationJob):
+            service.authorize_evaluation(context_id, principal.subject_key)
         current = service.store.read_context(context_id).ref
     with _jobs(request) as jobs:
         refused = unaccepted_sources(jobs, context_id, principal.subject_key, body.job)

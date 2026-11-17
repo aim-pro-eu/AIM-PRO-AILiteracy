@@ -1104,6 +1104,69 @@
         "title": "ErrorBody",
         "type": "object"
       },
+      "EvaluationCommand": {
+        "additionalProperties": false,
+        "description": "``propose-evaluation``: one observed attempt and the mode the assessor chose.",
+        "properties": {
+          "evidence": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "mode": {
+            "enum": [
+              "FORMATIVE",
+              "FORMAL"
+            ],
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "evidence",
+          "mode"
+        ],
+        "title": "EvaluationCommand",
+        "type": "object"
+      },
+      "EvaluationJob-Input": {
+        "additionalProperties": false,
+        "description": "The runtime assessor: ``learning propose-evaluation``, on one observed attempt (S11).",
+        "properties": {
+          "command": {
+            "$ref": "#/components/schemas/EvaluationCommand"
+          },
+          "kind": {
+            "const": "propose-evaluation",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "command"
+        ],
+        "title": "EvaluationJob",
+        "type": "object"
+      },
+      "EvaluationJob-Output": {
+        "additionalProperties": false,
+        "description": "The runtime assessor: ``learning propose-evaluation``, on one observed attempt (S11).",
+        "properties": {
+          "command": {
+            "$ref": "#/components/schemas/EvaluationCommand"
+          },
+          "kind": {
+            "const": "propose-evaluation",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "command"
+        ],
+        "title": "EvaluationJob",
+        "type": "object"
+      },
       "ExportObject": {
         "additionalProperties": false,
         "description": "An object of the export with the texts a coverage requirement may quote.",
@@ -1751,6 +1814,7 @@
                 "generate-project-teacher": "#/components/schemas/TeacherJob-Input",
                 "generate-project-trainer": "#/components/schemas/TrainerJob-Input",
                 "prepare-aimpro-syllabus-sources": "#/components/schemas/PreparationJob-Input",
+                "propose-evaluation": "#/components/schemas/EvaluationJob-Input",
                 "revise-aimpro-syllabus": "#/components/schemas/RevisionJob"
               },
               "propertyName": "kind"
@@ -1776,6 +1840,9 @@
               },
               {
                 "$ref": "#/components/schemas/PreparationJob-Input"
+              },
+              {
+                "$ref": "#/components/schemas/EvaluationJob-Input"
               }
             ],
             "title": "Job"
@@ -1838,6 +1905,7 @@
                 "generate-project-teacher": "#/components/schemas/TeacherJob-Output",
                 "generate-project-trainer": "#/components/schemas/TrainerJob-Output",
                 "prepare-aimpro-syllabus-sources": "#/components/schemas/PreparationJob-Output",
+                "propose-evaluation": "#/components/schemas/EvaluationJob-Output",
                 "revise-aimpro-syllabus": "#/components/schemas/RevisionJob"
               },
               "propertyName": "kind"
@@ -1863,6 +1931,9 @@
               },
               {
                 "$ref": "#/components/schemas/PreparationJob-Output"
+              },
+              {
+                "$ref": "#/components/schemas/EvaluationJob-Output"
               }
             ],
             "title": "Job"

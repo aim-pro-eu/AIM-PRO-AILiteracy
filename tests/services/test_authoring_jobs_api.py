@@ -20,9 +20,9 @@ from services.jobs.store import JobStore, StatusEvent
 from agent_system.events import Event
 from tests.authoring_cycle_fixtures import AUTH, DELIVERY_TWO
 from tests.generator_fixtures import GENERATION_REJECTION
-from tests.seed import build_seed
-from tests.services.job_fixtures import (REQUIREMENT, SyntheticAgents, evaluator_command, evaluator_job,
-                                         export_directory, worker)
+from tests.seed import build_seed, record_attempt
+from tests.services.job_fixtures import (REQUIREMENT, SyntheticAgents, activate_delivery, evaluation_job,
+                                         evaluator_command, evaluator_job, export_directory, worker)
 from tests.services.course_fixtures import module_settings
 from tests.services.oidc_fixtures import ISSUER, MAPPED_SUBJECT, NO_NETWORK, FakeProvider, auth_settings, write_identity_map
 from tests.services.test_authoring_review_api import LEARNER_SUBJECT, ReviewApiCase
@@ -153,6 +153,27 @@ class JobsApiTest(ReviewApiCase):
         self.assertEqual(self.digests(), before)
         # The job already queued under its request id is still returned: a retry is not a new command.
         self.assertEqual(self.job(self.queue('job-1', stale))['request_id'], queued['request_id'])
+
+    # Acceptance (S11): an assessor queues an evaluation draft of an observed attempt; a learner cannot.
+    def test_an_evaluation_job_is_queued_by_an_assessor_and_ends_as_a_pending_proposal(self):
+        delivery = self.seed.delivery_context
+        activate_delivery(self.root / 'seed', self.location, self.seed)
+        job = evaluation_job(record_attempt(self.root / 'seed', self.location))
+        self.refused(self.queue('draft-1', job, client=self.learner, context_id=delivery), 403, 'forbidden')
+        self.job(self.queue('draft-1', job, context_id=delivery), 'QUEUED')
+        self.assertEqual(self.agents.built, [])
+        self.worker.run_once()
+        done = self.job(self.staff.get(f'/contexts/{delivery}/jobs/draft-1'), 'PROPOSED')
+        pending = [Entity.model_validate(item['proposal']).ref
+                   for item in self.staff.get(f'/contexts/{delivery}/pending-proposals').json()['proposals']]
+        self.assertEqual(pending, [EntityRef.model_validate(done['proposal_refs'][0])])
+        # Without the ASSESSOR role, the job is refused when it is queued.
+        installed = self.policies / Path(self.seed.delivery_policy_preview).name
+        policy = json.loads(installed.read_text(encoding='utf-8'))
+        policy['subjects']['admin']['roles'] = ['ADMINISTRATOR', 'CONTENT_RESPONSIBLE']
+        installed.write_text(json.dumps(policy), encoding='utf-8')
+        self.refused(self.queue('draft-2', job, context_id=delivery), 403, 'forbidden')
+        self.assertIsNone(self.jobs.get(delivery, 'draft-2'))
 
     def test_queuing_needs_csrf_and_the_authority_to_propose(self):
         self.refused(self.queue('job-1', csrf=False), 403, 'forbidden')

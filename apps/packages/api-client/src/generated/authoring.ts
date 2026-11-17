@@ -1023,6 +1023,42 @@ export interface components {
             request_id: string;
         };
         /**
+         * EvaluationCommand
+         * @description ``propose-evaluation``: one observed attempt and the mode the assessor chose.
+         */
+        EvaluationCommand: {
+            evidence: components["schemas"]["EntityRef"];
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "FORMATIVE" | "FORMAL";
+        };
+        /**
+         * EvaluationJob
+         * @description The runtime assessor: ``learning propose-evaluation``, on one observed attempt (S11).
+         */
+        "EvaluationJob-Input": {
+            command: components["schemas"]["EvaluationCommand"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "propose-evaluation";
+        };
+        /**
+         * EvaluationJob
+         * @description The runtime assessor: ``learning propose-evaluation``, on one observed attempt (S11).
+         */
+        "EvaluationJob-Output": {
+            command: components["schemas"]["EvaluationCommand"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "propose-evaluation";
+        };
+        /**
          * ExportObject
          * @description An object of the export with the texts a coverage requirement may quote.
          */
@@ -1292,7 +1328,7 @@ export interface components {
          */
         JobRequest: {
             /** Job */
-            job: components["schemas"]["AssessmentJob-Input"] | components["schemas"]["TeacherJob-Input"] | components["schemas"]["TrainerJob-Input"] | components["schemas"]["SyllabusJob"] | components["schemas"]["RevisionJob"] | components["schemas"]["DiscoveryJob-Input"] | components["schemas"]["PreparationJob-Input"];
+            job: components["schemas"]["AssessmentJob-Input"] | components["schemas"]["TeacherJob-Input"] | components["schemas"]["TrainerJob-Input"] | components["schemas"]["SyllabusJob"] | components["schemas"]["RevisionJob"] | components["schemas"]["DiscoveryJob-Input"] | components["schemas"]["PreparationJob-Input"] | components["schemas"]["EvaluationJob-Input"];
             /** Request Id */
             request_id: string;
         };
@@ -1309,7 +1345,7 @@ export interface components {
             /** Detail */
             detail?: string | null;
             /** Job */
-            job: components["schemas"]["AssessmentJob-Output"] | components["schemas"]["TeacherJob-Output"] | components["schemas"]["TrainerJob-Output"] | components["schemas"]["SyllabusJob"] | components["schemas"]["RevisionJob"] | components["schemas"]["DiscoveryJob-Output"] | components["schemas"]["PreparationJob-Output"];
+            job: components["schemas"]["AssessmentJob-Output"] | components["schemas"]["TeacherJob-Output"] | components["schemas"]["TrainerJob-Output"] | components["schemas"]["SyllabusJob"] | components["schemas"]["RevisionJob"] | components["schemas"]["DiscoveryJob-Output"] | components["schemas"]["PreparationJob-Output"] | components["schemas"]["EvaluationJob-Output"];
             /** Proposal Refs */
             proposal_refs: components["schemas"]["EntityRef"][];
             /** Request Id */

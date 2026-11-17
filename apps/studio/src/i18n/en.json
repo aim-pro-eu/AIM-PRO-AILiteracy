@@ -292,6 +292,23 @@
         "heading": "New member",
         "joins": "{{subject}} joins this course as {{roles}}.",
         "policy": "The course’s new trusted policy that grants this role is already installed, as a new file; the course uses it only once this proposal is approved and applied. Until then, nothing changes for this person."
+      },
+      "titleEvaluation": "Evaluate a student’s attempt",
+      "evaluation": {
+        "heading": "Draft evaluation",
+        "drafted": "Drafted by the assessor agent {{agent}}, as a {{mode}} evaluation. It counts for the student only once it is approved and applied.",
+        "written": "A {{mode}} evaluation. It counts for the student only once it is approved and applied.",
+        "mode": {
+          "FORMATIVE": "formative",
+          "FORMAL": "formal"
+        },
+        "attempt": "The attempt",
+        "activity": "Assessment: {{activity}}",
+        "learner": "Student: {{learner}}",
+        "criteria": "Each criterion of the rubric",
+        "judged": "{{criterion}} — level “{{level}}”: {{descriptor}} Reason: {{reason}}",
+        "undetermined": "{{criterion}} — not determined. Reason: {{reason}}",
+        "result": "Result"
       }
     },
     "syllabus": {
@@ -449,7 +466,8 @@
       "inspect": "Release {{number}}: inspect it"
     },
     "delivery": "This is a delivery course: it holds a frozen release, which is not built further here. Students get nothing until the course is activated.",
-    "members": "Members of this course"
+    "members": "Members of this course",
+    "assess": "Evaluate the students’ submitted attempts"
   },
   "build": {
     "title": "Build the course",
@@ -486,7 +504,8 @@
         "teacher": "Teacher content",
         "trainer": "Trainer content",
         "other": "Agent job",
-        "revision": "Curator syllabus revision"
+        "revision": "Curator syllabus revision",
+        "evaluation": "Draft evaluation"
       },
       "status": {
         "QUEUED": "waiting for the agent worker",
@@ -819,7 +838,6 @@
       "review": "Review the activation",
       "refused_one": "Activation cannot be proposed: {{count}} reason. Nothing was recorded; the course stays in preparation.",
       "refused_other": "Activation cannot be proposed: {{count}} reasons. Nothing was recorded; the course stays in preparation.",
-      "assessor": "“{{activity}}” is an assessment, and no assessor is configured for students yet (decision D4): the course stays in preparation.",
       "other": "{{reason}} What to do: {{resolution}} ({{code}})",
       "refusedDetail": "Activation cannot be proposed: {{detail}}",
       "forbidden": "You are not allowed to activate this course.",
@@ -859,5 +877,35 @@
       "conflict": "The course changed meanwhile. Reload the page and try again.",
       "failed": "The member could not be proposed. Try again: the retry repeats the same request."
     }
+  },
+  "assess": {
+    "title": "Attempts to evaluate",
+    "back": "Back to the course",
+    "loading": "Loading the attempts…",
+    "intro": "The attempts students submitted at the course’s assessments. For an attempt, choose the kind of evaluation and ask the assessor agent for a draft: it judges each criterion of the assessment’s rubric. You read the draft in the review inbox, then decide and apply it; nothing counts for the student before.",
+    "none": "No student has submitted an attempt at an assessment yet.",
+    "notAssessor": "Only an assessor of this course evaluates its attempts.",
+    "attempt": {
+      "heading": "{{learner}}: {{activity}}",
+      "submitted": "Submitted {{at}}",
+      "evaluated": "Already evaluated: {{mode}}, applied."
+    },
+    "mode": {
+      "legend": "Kind of evaluation",
+      "FORMATIVE": "Formative: feedback for learning",
+      "FORMAL": "Formal: can verify the outcome, when the course has a verification rule"
+    },
+    "submit": "Ask the assessor agent for a draft",
+    "status": {
+      "queued": "The request waits for the agent worker.",
+      "running": "The assessor agent is drafting the evaluation…",
+      "proposed": "The draft evaluation is ready. It awaits your decision in the review inbox.",
+      "ended": "No draft was proposed: {{detail}}"
+    },
+    "review": "Read the draft evaluation",
+    "refused": "The draft cannot be requested: {{detail}}",
+    "forbidden": "Only an assessor of this course may ask for a draft evaluation.",
+    "conflict": "This request was already sent with another choice. Reload the page and try again.",
+    "failed": "The draft could not be requested. Try again: the retry repeats the same request."
   }
 }

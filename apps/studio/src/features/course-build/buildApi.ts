@@ -41,6 +41,9 @@ export const DISCOVERY = 'discover-aimpro-syllabus-sources';
 export const PREPARATION = 'prepare-aimpro-syllabus-sources';
 export const CURATOR = 'generate-aimpro-syllabus';
 export const REVISION = 'revise-aimpro-syllabus';
+/** The runtime assessor's job: a draft evaluation of one observed attempt (S11). */
+export const EVALUATION = 'propose-evaluation';
+export type EvaluationMode = 'FORMATIVE' | 'FORMAL';
 /** The Evaluator, Teacher and Trainer job kinds, whose drafts the review agent judges (S09c). */
 export const GENERATORS: readonly string[] = [
   'generate-project-assessments', 'generate-project-teacher', 'generate-project-trainer',
@@ -135,6 +138,10 @@ export interface BuildApi {
   proposeMembership(contextId: string, csrfToken: string, command: {
     requestId: string; baseContext: EntityRef; subject: string; role: MemberRole;
   }): Promise<MembershipProposal>;
+  /** Ask the runtime assessor for a draft evaluation of one observed attempt; the same request id returns the same job. */
+  queueEvaluation(contextId: string, csrfToken: string, requestId: string, command: {
+    evidence: EntityRef; mode: EvaluationMode;
+  }): Promise<JobView>;
 }
 
 /** What a delivery import sends: the release, its course, the exact resource of each bound requirement, the handlers. */
@@ -371,6 +378,14 @@ export function createBuildApi(client: AuthoringClient): BuildApi {
         params: { path: { context_id: contextId } },
         headers: writing(csrfToken),
         body: { request_id: requestId, base_context: baseContext, subject, role },
+      }));
+    },
+
+    async queueEvaluation(contextId, csrfToken, requestId, { evidence, mode }) {
+      return settle(() => client.POST('/contexts/{context_id}/jobs', {
+        params: { path: { context_id: contextId } },
+        headers: writing(csrfToken),
+        body: { request_id: requestId, job: { kind: EVALUATION, command: { evidence, mode } } },
       }));
     },
   };

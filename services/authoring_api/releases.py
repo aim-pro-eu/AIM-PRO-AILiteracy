@@ -9,7 +9,7 @@ course with that course's own installed policy (D10): the subject must be
 authorized by both. Its result carries the trusted-policy preview, which the
 API never installs: an operator copies the reviewed preview into the policy
 directory, and until then the delivery course is unavailable. Activation
-answers with a proposal or with the findings that refuse it (D4), recording
+answers with a proposal or with the findings that refuse it, recording
 nothing when refused.
 """
 

@@ -56,6 +56,16 @@
       "credentials": [{"type": "password", "value": "${ALM_KEYCLOAK_DEV_PASSWORD}", "temporary": false}]
     },
     {
+      "id": "726af9c7-0f64-41dc-8372-05b123af3d53",
+      "username": "dev-assessor",
+      "enabled": true,
+      "email": "dev-assessor@example.org",
+      "emailVerified": true,
+      "firstName": "Synthetic",
+      "lastName": "Assessor",
+      "credentials": [{"type": "password", "value": "${ALM_KEYCLOAK_DEV_PASSWORD}", "temporary": false}]
+    },
+    {
       "id": "4b8a1440-fcbb-4291-9d8e-3452a70952b5",
       "username": "dev-unmapped",
       "enabled": true,

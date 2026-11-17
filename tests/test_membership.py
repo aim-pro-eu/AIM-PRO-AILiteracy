@@ -9,7 +9,7 @@ PostgreSQL test schema only; no network and no model.
 
 from tempfile import TemporaryDirectory
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 from pydantic import ValidationError
 
@@ -22,7 +22,6 @@ from learning.service import LearningService
 from learning.store import LearningStore, StateConflict, canonical
 from tests.authoring_cycle_fixtures import AUTH, DELIVERY, ProductionAuthoring, entity, trusted_policy
 from tests.store_backends import block_network, new_store_location, on_both_backends
-from tests.test_releases import SIMULATED_ASSESSOR
 
 
 class MembershipTest(unittest.TestCase):
@@ -186,9 +185,8 @@ class DeliveryMembershipTest(MembershipTest):
             author.review_and_apply(AUTH, author.generate(kind), 'approve-' + kind)
         author.configure_completion()
         _, release = author.release(approve=True)
-        with patch.dict('learning.releases.RUNTIME_WORKERS', SIMULATED_ASSESSOR):
-            result = author.delivery_import(release)
-            author.review_and_apply(DELIVERY, self.store.read(result.proposal, owner=DELIVERY), 'import-1')
+        result = author.delivery_import(release)
+        author.review_and_apply(DELIVERY, self.store.read(result.proposal, owner=DELIVERY), 'import-1')
         self.install(result.policy_preview)
         return result, self.serve(result.policy_preview)
 

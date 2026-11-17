@@ -16,6 +16,7 @@ or the network.
 | `show-release` | authoring | receipts, exact frozen closure and findings; no writes |
 | `propose-delivery-import` | a separate, empty destination in PREPARATION/DRAFT | pending proposal: frozen definitions, runtime model, bindings, policy revision; plus a trusted-policy preview |
 | `propose-activation` | the destination after an applied import | pending proposal that changes only mode/status to LEARNING/ACTIVE |
+| `propose-evaluation` | an active delivery, by an assessor | pending proposal of one `Evaluation` of an observed attempt, drafted by the runtime assessor (S11) |
 
 ## Owner decisions applied
 
@@ -28,9 +29,10 @@ The owner decided D1–D5 on 8 November 2026 (#71).
   installs the exact approved file before activation.
 - **D4 = option a.** An import keeps the ASSESS activities of the frozen design.
   `propose-activation` is refused with the finding `RELEASE_RUNTIME_ROLE` while
-  any ASSESS activity has no configured runtime role. R1 configures none, so the
-  refusal holds until a later explicit decision, for example with the
-  assessor-facing evaluation adapter (G7).
+  any activity has no configured runtime role. The owner lifted the ASSESS case
+  on 16 November 2026 (S11, #129, option A): an import configures the EVALUATOR
+  runtime worker `learner-response-evaluator`, which drafts the evaluations an
+  assessor requests (see "Runtime assessor" below).
 
 ## Identities
 
@@ -158,8 +160,11 @@ The proposal holds:
 - the frozen closure, unchanged (the store also refuses a different payload for
   an existing id and version);
 - the release Resource and a runtime DomainModel that pins it;
-- Teacher and Trainer worker specializations for the EXPLAIN and PRACTICE
-  activities of the design, limited to the new scope;
+- Teacher, Trainer and Evaluator worker specializations (`lesson-explainer`,
+  `guided-practice-coach`, `learner-response-evaluator`) for the EXPLAIN,
+  PRACTICE and ASSESS activities of the design, limited to the new scope; each
+  agent file must still match the runtime profile (category, `search_documents`
+  only, no skill);
 - one ResourceBinding per selection, with a pending review key;
 - a PolicySet revision that embeds the full policy preview;
 - the destination context, pinned to the frozen domain and design and still
@@ -192,7 +197,7 @@ finding and refuses (`ActivationRefused`) unless none remains:
 | `RELEASE_POLICY_NOT_INSTALLED` | the installed policy differs from the reviewed preview |
 | readiness `R05`–`R08` | `advance` readiness fails, e.g. a missing or unapproved binding or a missing completion rule |
 | `RELEASE_COMPLETION_HANDLER` | a completion rule has no handler in the installed policy |
-| `RELEASE_RUNTIME_ROLE` | an activity intent has no runtime role; for ASSESS this is the D4 refusal |
+| `RELEASE_RUNTIME_ROLE` | an activity intent has no runtime role in the delivery (an import configures Teacher, Trainer and Evaluator) |
 
 A refused request reserves nothing. A successful one proposes only
 LEARNING/ACTIVE; the human decision and the application stay separate.
@@ -214,6 +219,47 @@ rechecked: release receipts and the current project selection; import receipts,
 the unchanged frozen definitions and the empty learner history; or the full set of
 activation findings. The context compare-and-swap still refuses any changed base.
 
+## Runtime assessor (S11)
+
+Owner decisions of 16 November 2026 (#129). A subject who may `propose` and
+holds `ASSESSOR` (in the policy and in its participant record) starts a draft on
+one observed attempt (`LearningEvidence`) of an ASSESS activity of an ACTIVE
+delivery, choosing FORMATIVE or FORMAL:
+
+```bash
+python -m learning --db alm.sqlite --policy delivery-policy.json --subject assessor --context delivery \
+  propose-evaluation --evidence '<LearningEvidence EntityRef JSON>' --mode FORMATIVE --request-id draft-1
+```
+
+The API runs the same command as the agent job `propose-evaluation` (module
+`jobs`); a subject without `ASSESSOR` is refused when the job is queued.
+
+1. One write transaction holds authorization, the input checks and the request
+   reservation, before any model client is built. An identical request replays
+   its recorded result without a model call; another command under the same
+   request id is a `StateConflict`.
+2. `learner-response-evaluator` (`learning/evaluation.py`, built by
+   `main.build_runtime_assessor` with no tool) receives the activity, the
+   outcomes, the assessment and its rubric, and the learner's response; never
+   the learner's identity. Its answer, `EvaluationDraft`, is untrusted data: one
+   judgment per rubric criterion (a level key, or none for an explicit unknown,
+   a reason and evidence refs) and the result text, nothing else.
+3. Control builds the `Evaluation`: context, evidence, specification, mode,
+   `assistedBy` (the delivery's EVALUATOR specialization) and review key come
+   from the request. `validate_evaluation` checks it. A draft that fails, or a
+   response that is not a draft, goes back to the agent with the fixed reason, at
+   most three drafts; then the request fails in fixed words, never with model
+   text.
+4. A second write transaction rechecks the reservation, the authority and the
+   inputs, and records the evaluation as a proposal under the requester's
+   subject.
+
+A person with assessment authority (`ASSESSOR` or `ADMINISTRATOR`) decides and
+applies it, the requester included. A learning state follows only from the
+applied evaluation, as `derive_learning_state` defines: FORMAL reaches VERIFIED
+only with the outcome's verification rule. A learner cannot start a draft, and a
+learner request still cannot persist an `Evaluation`.
+
 ## Completion rules and SCN01
 
 The dedicated generators never infer completion rules. A frozen release can only
@@ -222,8 +268,9 @@ design. The acceptance tests author such rules this way before releasing.
 
 A read-only check on a copy of the applied SCN01 database (8 November) found the
 approved design with 5 process nodes, none with a completion rule, and 4 ASSESS
-activities. An SCN01 delivery would therefore stay refused for two reasons: the
-missing completion rules and D4. Nothing in R1 changes that design.
+activities. An SCN01 delivery would then have been refused for two reasons: the
+missing completion rules and D4. S11 lifted D4; the missing completion rules
+remain. Nothing in R1 changes that design.
 
 ## Verification
 
@@ -236,14 +283,15 @@ LANGFUSE_ENABLED=false CREWAI_DISABLE_TELEMETRY=true CREWAI_TRACING_ENABLED=fals
 `tests/test_releases.py` uses temporary SQLite. It blocks sockets, DNS, `crewai.LLM`
 and `LLMFactory` calls, and makes agent construction fail. Its synthetic project
 comes from the production generators with synthetic model responses. The
-acceptance cycle in `tests/test_authoring_cycle.py` now runs release, import and
-activation through these commands. Its runtime scenarios simulate one boundary:
-they patch an EVALUATOR runtime worker into the import, standing in for the future
-G7 assessor role that D4 requires before activation.
+acceptance cycle in `tests/test_authoring_cycle.py` runs release, import,
+activation and the assessor's evaluation draft through these commands; only the
+model responses are synthetic. `tests/test_runtime_assessor.py` covers the
+runtime assessor.
 
 ## Not covered
 
-R1 does no AIM-PRO or jjodel export, learner enrolment, runtime assessor adapter,
-migration of an active delivery or web review surface. No real SCN01 release,
+R1 does no AIM-PRO or jjodel export, learner enrolment, migration of an active
+delivery or web review surface (the runtime assessor came with S11, course
+membership with D25, the studio views with S10 and S11). No real SCN01 release,
 import, binding or activation is part of it; each needs its own owner decision
 (D7).

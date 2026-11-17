@@ -200,6 +200,37 @@ function Membership({ membership }: { membership: NonNullable<View['membership']
   );
 }
 
+const MODES = { FORMATIVE: 'review.teacher.evaluation.mode.FORMATIVE', FORMAL: 'review.teacher.evaluation.mode.FORMAL' } as const;
+
+/** The evaluation of a student's attempt (S11): what the student did, each criterion's judgment, the result, who drafted it. */
+function Evaluation({ evaluation }: { evaluation: NonNullable<View['evaluation']> }) {
+  const { t } = useTranslation();
+  const mode = Object.hasOwn(MODES, evaluation.mode) ? t(MODES[evaluation.mode as keyof typeof MODES]) : evaluation.mode;
+  return (
+    <section aria-labelledby="teacher-evaluation">
+      <h2 id="teacher-evaluation">{t('review.teacher.evaluation.heading')}</h2>
+      <p data-testid="evaluation-intro">{evaluation.agent
+        ? t('review.teacher.evaluation.drafted', { agent: evaluation.agent, mode })
+        : t('review.teacher.evaluation.written', { mode })}</p>
+      <h3>{t('review.teacher.evaluation.attempt')}</h3>
+      <p>{t('review.teacher.evaluation.activity', { activity: evaluation.activity })}</p>
+      <p>{t('review.teacher.evaluation.learner', { learner: evaluation.learner })}</p>
+      <p className="alm-text" data-testid="evaluation-response">{evaluation.response}</p>
+      <h3>{t('review.teacher.evaluation.criteria')}</h3>
+      <ul data-testid="evaluation-judgments">
+        {evaluation.judgments.map((judgment, index) => (
+          <li key={index}>{judgment.level === null
+            ? t('review.teacher.evaluation.undetermined', { criterion: judgment.criterion, reason: judgment.reason })
+            : t('review.teacher.evaluation.judged', { criterion: judgment.criterion, level: judgment.level,
+              descriptor: judgment.descriptor ?? '', reason: judgment.reason })}</li>
+        ))}
+      </ul>
+      <h3>{t('review.teacher.evaluation.result')}</h3>
+      <p className="alm-text" data-testid="evaluation-result">{evaluation.result}</p>
+    </section>
+  );
+}
+
 /** What a teacher needs to decide: the changes, the teaching content, and what to check, in plain words. */
 export function TeacherView({ view, issues }: { view: View; issues: PlainIssues }) {
   const { t } = useTranslation();
@@ -207,6 +238,7 @@ export function TeacherView({ view, issues }: { view: View; issues: PlainIssues 
   if (view.project) return <><Project project={view.project} /><Issues issues={issues} /></>;
   if (view.release) return <><Release release={view.release} /><Issues issues={issues} /></>;
   if (view.membership) return <><Membership membership={view.membership} /><Issues issues={issues} /></>;
+  if (view.evaluation) return <><Evaluation evaluation={view.evaluation} /><Issues issues={issues} /></>;
   return (
     <>
       {view.notAccepted !== null

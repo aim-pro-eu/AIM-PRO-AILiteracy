@@ -25,8 +25,10 @@ class DevIdentityTest(unittest.TestCase):
         users = {user['id']: user['username'] for user in self.realm['users']}
         subjects = json.loads(POLICY.read_text(encoding='utf-8'))['subjects']
         self.assertEqual({(e.issuer, users.get(e.subject), e.subject_key) for e in self.identities.identities},
-                         {(ISSUER, 'dev-admin', 'admin'), (ISSUER, 'dev-learner', 'learner')})
-        self.assertLessEqual({e.subject_key for e in self.identities.identities}, set(subjects))
+                         {(ISSUER, 'dev-admin', 'admin'), (ISSUER, 'dev-learner', 'learner'),
+                          (ISSUER, 'dev-assessor', 'assessor')})
+        # The assessor is in no installed policy: a course administrator adds them as a member (D25, S11).
+        self.assertEqual({e.subject_key for e in self.identities.identities} - set(subjects), {'assessor'})
         self.assertIn('dev-unmapped', users.values())
 
     def test_realm_holds_placeholders_instead_of_secrets(self):
