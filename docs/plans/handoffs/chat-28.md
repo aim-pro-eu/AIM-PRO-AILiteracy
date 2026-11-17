@@ -3,7 +3,7 @@
 Date: 16 November 2026. Base: `main` at `96b7a0a` (PR #130 merged).
 Step: **S11** of the [prototype roadmap](../prototype-roadmap.md), part 1 of at least 2.
 Issue: [#129](https://github.com/thesis-fedfalco-2026/AIM-PRO-AILiteracy/issues/129).
-Branch `feat/s11-membership-assessor`; draft PR: see the end of this file.
+Branch `feat/s11-membership-assessor`, draft PR [#131](https://github.com/thesis-fedfalco-2026/AIM-PRO-AILiteracy/pull/131).
 
 This chat wrote the D25 options for the owner, recorded the owner's decisions and the confirmed S11 acceptance on
 #129, and implemented the membership part of S11 (D25). The runtime assessor part (lifting D4) is not started. The
@@ -158,4 +158,4 @@ feat/s11-membership-assessor and its draft PR (one PR for the whole of S11, owne
 
 ## PR and CI
 
-Draft PR: added after it is opened.
+Draft PR [#131](https://github.com/thesis-fedfalco-2026/AIM-PRO-AILiteracy/pull/131), commit `fe0ec15` (part 1). The CI result is reported in the PR conversation.
