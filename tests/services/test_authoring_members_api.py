@@ -1,9 +1,10 @@
-"""Course membership from the studio (D25, option A; S11, #129).
+"""Course membership from the studio (D25, option A; S11, #129; batch, D36, S11b, #138).
 
-The administrator of a course adds a subject of the identity map with one role.
-The API writes the new trusted policy version as a new file, never changing an
-installed one, and answers with the pending proposal; the member can act only
-after the proposal is decided and applied through the review endpoints.
+The administrator of a course adds one or more subjects of the identity map,
+each with one role. The API writes the new trusted policy version as a new file,
+never changing an installed one, and answers with the pending proposal; the
+members can act only after the proposal is decided and applied through the
+review endpoints.
 """
 
 import hashlib
@@ -53,10 +54,10 @@ class MembersApiTest(ReviewApiCase):
     def base(self):
         return self.staff.get(f'/contexts/{COURSE}').json()['context']
 
-    def add(self, subject='assessor', role='ASSESSOR', request_id='member-1', client=None, csrf=True):
+    def add(self, subject='assessor', role='ASSESSOR', request_id='member-1', client=None, csrf=True, members=None):
         context = self.base()
         return self.post(client or self.staff, f'/contexts/{COURSE}/members', {
-            'request_id': request_id, 'subject': subject, 'role': role,
+            'request_id': request_id, 'members': members or [{'subject': subject, 'role': role}],
             'base_context': {'type': 'ExecutionContext', 'id': COURSE, 'version': context['version']}}, csrf=csrf)
 
     def files(self):
@@ -112,6 +113,48 @@ class MembersApiTest(ReviewApiCase):
         self.refused(self.add(role='ADMINISTRATOR'), 422, 'validation')
         self.refused(self.add(subject='admin'), 422, 'validation')
         self.assertEqual(self.files(), before)
+
+    def test_one_proposal_adds_several_members_in_one_new_file(self):
+        before = self.files()
+        members = [{'subject': 'assessor', 'role': 'ASSESSOR'}, {'subject': 'learner', 'role': 'LEARNER'}]
+        response = self.add(members=members)
+        self.assertEqual(response.status_code, 200, response.text)
+        body = response.json()
+        self.assertEqual(len(body['participants']), 2)
+        policy = TrustedPolicy.model_validate(body['policy'])
+        self.assertEqual(len(self.files()), len(before) + 1)
+        self.assertEqual({k: policy.subjects[k].roles for k in ('assessor', 'learner')},
+                         {'assessor': ['ASSESSOR'], 'learner': ['LEARNER']})
+        self.assertEqual(self.add(members=members).json(), body)
+        self.refused(self.add(members=members[:1]), 409, 'conflict')
+        self.review(body)
+        listed = self.staff.get(f'/contexts/{COURSE}/members').json()
+        self.assertEqual([m['subject'] for m in listed['members']], ['admin', 'assessor', 'learner'])
+        self.assertEqual(listed['addable'], [])
+
+    def test_every_member_of_a_batch_must_be_mapped_new_and_named_once(self):
+        before = self.files()
+        detail = self.refused(self.add(members=[{'subject': 'assessor', 'role': 'ASSESSOR'},
+                                                {'subject': 'stranger', 'role': 'LEARNER'}]), 422, 'validation')
+        self.assertIn('stranger', detail)
+        self.assertIn('identity map', detail)
+        self.refused(self.add(members=[{'subject': 'learner', 'role': 'LEARNER'},
+                                       {'subject': 'learner', 'role': 'OBSERVER'}]), 422, 'validation')
+        detail = self.refused(self.add(members=[{'subject': 'learner', 'role': 'LEARNER'},
+                                                {'subject': 'admin', 'role': 'OBSERVER'}]), 422, 'validation')
+        self.assertIn('admin is already a member', detail)
+        self.refused(self.post(self.staff, f'/contexts/{COURSE}/members', {
+            'request_id': 'empty', 'members': [], 'base_context': {
+                'type': 'ExecutionContext', 'id': COURSE, 'version': self.base()['version']}}), 422, 'validation')
+        self.assertEqual(self.files(), before)
+
+    def test_a_pending_membership_does_not_refuse_another(self):
+        first = self.add(subject='assessor', role='ASSESSOR', request_id='member-1')
+        second = self.add(subject='learner', role='LEARNER', request_id='member-2')
+        self.assertEqual((first.status_code, second.status_code), (200, 200), second.text)
+        pending = self.staff.get(f'/contexts/{COURSE}/pending-proposals').json()['proposals']
+        self.assertEqual({p['proposal']['id'] for p in pending},
+                         {first.json()['proposal']['id'], second.json()['proposal']['id']})
 
     def test_only_an_administrator_of_the_course_adds_members_with_the_csrf_token(self):
         before = self.files()

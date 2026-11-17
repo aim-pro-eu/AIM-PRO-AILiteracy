@@ -13,10 +13,12 @@ const COURSE_ID = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/;
 
 /**
  * Create a course: a new context in preparation, administered by the signed-in creator. The home page and an
- * applied release (for its delivery course) name the form; `onCreated` receives the new course id.
+ * applied release (for its delivery course) name the form; `onCreated` receives the course id. The API returns a
+ * course the creator already has under that id (D23): with `existing`, such a course is refused in these words
+ * and the form stays open (#132); without it, the existing course is opened.
  */
-export function CreateCourse({ heading, intro, submit, onCreated }: {
-  heading: string; intro: string; submit: string; onCreated(contextId: string): void;
+export function CreateCourse({ heading, intro, submit, existing, onCreated }: {
+  heading: string; intro: string; submit: string; existing?: string; onCreated(contextId: string): void;
 }) {
   const { t } = useTranslation();
   const id = useId();
@@ -38,6 +40,11 @@ export function CreateCourse({ heading, intro, submit, onCreated }: {
     setBusy(true);
     try {
       const course = await api.createCourse(csrfToken, value);
+      if (existing && !course.created) {
+        setInvalid(existing);
+        setBusy(false);
+        return;
+      }
       onCreated(course.context_id);
     } catch (error) {
       const reason = error instanceof ReviewError ? error.reason : 'failed';

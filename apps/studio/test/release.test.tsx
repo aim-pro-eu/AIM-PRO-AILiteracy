@@ -52,7 +52,9 @@ describe('an applied release (S10)', () => {
   it('says who approved each part and what it freezes, and creates its delivery course', async () => {
     const { requests, router } = await renderStudio({
       ...opened({ status: 200, body: inspection() }),
-      'POST /courses': [{ status: 200, body: { context_id: 'delivery-1', policy_ref: ref('PolicySet', 'course:delivery-1', '1') } }],
+      'POST /courses': [
+        { status: 200, body: { context_id: 'ctx', policy_ref: ref('PolicySet', 'course:ctx', '1'), created: false } },
+        { status: 200, body: { context_id: 'delivery-1', policy_ref: ref('PolicySet', 'course:delivery-1', '1'), created: true } }],
     }, PATH);
     expect((await screen.findByTestId('release-verdict')).textContent).toBe(en.release.ready);
     const approvals = region(en.release.approvals.heading);
@@ -70,15 +72,21 @@ describe('an applied release (S10)', () => {
     expect(region(en.release.findings.heading).getByText(en.release.findings.none)).toBeTruthy();
 
     const delivery = region(en.release.delivery.heading);
+    // A course the teacher already has is refused in the form, in words; nothing navigates (#132).
+    fireEvent.change(delivery.getByLabelText(en.home.courseLabel), { target: { value: 'ctx' } });
+    fireEvent.click(delivery.getByRole('button', { name: en.release.delivery.submit }));
+    expect(await delivery.findByText(en.release.delivery.exists)).toBeTruthy();
+    expect(delivery.getByLabelText(en.home.courseLabel).getAttribute('aria-invalid')).toBe('true');
+    expect(router.state.location.pathname).not.toContain('/import');
     fireEvent.change(delivery.getByLabelText(en.home.courseLabel), { target: { value: 'delivery-1' } });
     fireEvent.click(delivery.getByRole('button', { name: en.release.delivery.submit }));
     // The delivery course opens on the import of this release.
     await waitFor(() => expect(router.state.location.pathname).toBe('/studio/contexts/delivery-1/import'));
     expect(Object.fromEntries(new URLSearchParams(router.state.location.search)))
       .toEqual({ from: 'ctx', release: RELEASE.id, version: RELEASE.version });
-    const post = requests.find((request) => request.method === 'POST')!;
-    expect(post.headers.get('X-CSRF-Token')).toBe(SESSION.csrf_token);
-    expect(await post.json()).toEqual({ context_id: 'delivery-1' });
+    const posts = requests.filter((request) => request.method === 'POST');
+    expect(posts[0]!.headers.get('X-CSRF-Token')).toBe(SESSION.csrf_token);
+    expect(await Promise.all(posts.map((post) => post.json()))).toEqual([{ context_id: 'ctx' }, { context_id: 'delivery-1' }]);
   });
 
   it('lists what stands in the way of delivering it, and offers no delivery course', async () => {

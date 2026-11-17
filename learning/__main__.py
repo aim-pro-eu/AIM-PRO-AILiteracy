@@ -62,6 +62,14 @@ def parse_args(argv=None):
         generator = commands.add_parser(name, help='Generate a typed pending authoring proposal from exact approved project inputs')
         generator.add_argument('bundle', type=Path, help='GenerationCommand JSON: project, base_context, assessments, shared_content, requirements')
         generator.add_argument('--request-id', required=True)
+    membership = commands.add_parser('propose-membership',
+        help='Propose one or more members of this course in one new trusted policy version (D25, D36)')
+    membership.add_argument('--base-context', required=True, help='Exact base ExecutionContext EntityRef JSON')
+    membership.add_argument('--member', action='append', required=True, type=_member, metavar='SUBJECT:ROLE',
+        help='A subject and one of CONTENT_RESPONSIBLE, ASSESSOR, LEARNER, OBSERVER; repeatable')
+    membership.add_argument('--request-id', required=True)
+    membership.add_argument('--policy-file', type=Path, required=True,
+        help='New file for the new policy version; pass it with --other-policy to apply the proposal')
     evaluation = commands.add_parser('propose-evaluation',
         help="Ask the runtime assessor for an evaluation draft of one observed attempt, as a pending proposal")
     evaluation.add_argument('--evidence', required=True, help='Exact observed LearningEvidence EntityRef JSON')
@@ -141,6 +149,12 @@ def parse_args(argv=None):
     setup.add_argument('--learning-scope')
     setup.add_argument('--policy-preview', type=Path, required=True, help='New file for the proposed trusted policy; does not replace the current policy')
     return parser.parse_args(argv)
+
+
+def _member(value):
+    # Without a colon the subject is empty, and the command refuses it as any invalid member.
+    subject, _, role = value.rpartition(':')
+    return {'subject': subject, 'role': role}
 
 
 def _orchestrator():
@@ -249,6 +263,15 @@ def main(argv=None):
                 method = getattr(service, command.replace('-', '_'))
                 result = method(args.context, args.subject, json.loads(args.bundle.read_text()),
                     request_id=args.request_id, authoring_factory=_aimpro_authoring).model_dump(mode='json')
+            elif command == 'propose-membership':
+                if args.policy_file.exists() or not args.policy_file.parent.is_dir():
+                    raise ValueError('Choose a new policy file in an existing directory')
+                def install(member_policy):
+                    with args.policy_file.open('x', encoding='utf-8') as written:
+                        written.write(member_policy.model_dump_json(indent=2) + '\n')
+                result = service.propose_membership(args.context, args.subject, {
+                    'base_context': EntityRef.model_validate_json(args.base_context), 'members': args.member},
+                    request_id=args.request_id, install=install).model_dump(mode='json')
             elif command == 'propose-evaluation':
                 result = service.propose_evaluation(args.context, args.subject,
                     {'evidence': EntityRef.model_validate_json(args.evidence), 'mode': args.mode},

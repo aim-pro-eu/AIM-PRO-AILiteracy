@@ -354,7 +354,7 @@ export interface paths {
         /** The members of this course and the subjects who may join it; for its administrators */
         get: operations["members_contexts__context_id__members_get"];
         put?: never;
-        /** Propose a new member: a new trusted policy version and the member's participant record */
+        /** Propose new members: a new trusted policy version and a participant record for each */
         post: operations["propose_membership_contexts__context_id__members_post"];
         delete?: never;
         options?: never;
@@ -869,6 +869,11 @@ export interface components {
         CourseView: {
             /** Context Id */
             context_id: string;
+            /**
+             * Created
+             * @description Whether this request created the course; false when it returns an existing one
+             */
+            created: boolean;
             policy_ref: components["schemas"]["EntityRef"];
         };
         /** CoverageRequirement */
@@ -1420,18 +1425,24 @@ export interface components {
         };
         /** MembershipProposal */
         MembershipProposal: {
-            participant: components["schemas"]["EntityRef"];
+            /** Participants */
+            participants: components["schemas"]["EntityRef"][];
             policy: components["schemas"]["TrustedPolicy"];
             proposal: components["schemas"]["EntityRef"];
         };
         /**
          * MembershipRequest
-         * @description ``propose-membership``: the subject, its role and the base context, with the ALM request id.
+         * @description ``propose-membership``: one or more subjects with their roles and the base context, with the ALM request id.
          */
         MembershipRequest: {
             base_context: components["schemas"]["EntityRef"];
+            /** Members */
+            members: components["schemas"]["NewMember"][];
             /** Request Id */
             request_id: string;
+        };
+        /** NewMember */
+        NewMember: {
             /**
              * Role
              * @enum {string}

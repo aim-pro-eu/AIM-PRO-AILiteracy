@@ -574,8 +574,9 @@ browser recorded.
 | `teacher-views.spec.ts`: every proposal kind in words (S09c2, part 2) | on the seed, every proposal of the authoring context and the delivery imports of both delivery contexts, pending or decided, opened by URL: each has its title (syllabus, project initialization, assessments, teacher and trainer content, completion rules, release, delivery import; never "Proposed change"), the initialization says what it creates, the release lists its parts by kind, the import names its resources and agents, a decided proposal shows no comparison; axe on each; the course page links decided proposals with "Read this proposal" |
 | `cycle.spec.ts`: the rest of the authoring cycle (S09c2) | a new course: upload, Curator, approve and apply the syllabus, initialize and apply the project; the Evaluator form shows the project and course version it sends (read back through the API), the Teacher form says it needs the assessments; axe; another author applies an Evaluator proposal through the API, so the form's job is refused at queue time (409): the form says the course changed and shows the new course version; the Evaluator queued again, its proposal read in its teacher view (rubric; axe), approved and applied; the Teacher form shows the applied assessment it sends; the Teacher and Trainer proposals read with their material texts (axe), approved and applied; the completion rules proposed from the build page, read part by part (axe), approved and applied; the project inspection lists the five artifacts with their receipts and no stale dependency, and every node of the design has a rule |
 | `release.spec.ts`: a release and its delivery course (S10, part 1) | on the seed's authoring context, the build page's release step shows the project model it sends; the release proposed from it, read in its teacher view (its parts; axe), approved and applied; "Inspect this release": nothing stands in the way, seven approvals (the release, its project and five parts), what it freezes, no problem; axe; a delivery course created from the release page opens on the import of that release, its policy file names the creator on that course only, and it is in PREPARATION/DRAFT without a model; axe; the course page lists both releases, and the seeded one inspects with nothing in the way |
-| `delivery.spec.ts`: a release imported and its activation refused (S10, part 2) | from the seeded release page, a delivery course created; the import form proposes, for each of the seven requirements, the resource the release pins; axe; the first set to "No resource": "6 of 7"; the import proposed with six resources and its policy preview shown in full, naming the new course; no policy file installed; its teacher view lists six resources and the same preview; axe; approved and applied: the course is unavailable and no policy file was written; the test, as operator, installs the preview; on the course page, activation proposed and refused in words (the unbound requirement, R08; no runtime-role refusal since S11); axe; the course is still PREPARATION/DRAFT with six bindings |
-| `assessment.spec.ts`: an assessor evaluates the seeded attempt (S11) | the test, as operator, installs the seeded delivery's preview; `dev-admin` adds `assessor` as Assessor from the members page, reads the proposal as a new member, approves and applies it; proposes activation, approves and applies it (LEARNING/ACTIVE); the seed records the learner's synthetic attempt (`--attempt`); `dev-assessor`, in their own session, follows "Evaluate the students' submitted attempts" to the one attempt (axe), chooses Formative and asks for a draft; the synthetic worker's runtime assessor proposes it; the draft read in words (the agent `learner-response-evaluator`, the response, one criterion, the result; axe); no learning state before; approved and applied by the assessor: one learning state, one formative evaluation with its human decision |
+| `assessment.spec.ts`: two members in one proposal (S11b) | a new course; `assessor` as Assessor and `learner` as Student proposed together; the review names both (axe); approved and applied: both members, nothing pending, nobody left to add |
+| `delivery.spec.ts`: a release imported and its activation refused (S10, part 2) | a course created from the home page; on the seeded release page its id is refused as the delivery course, in words, and the page stays (#132); a delivery course created; the import form proposes, for each of the seven requirements, the resource the release pins; axe; the first set to "No resource": "6 of 7"; the import proposed with six resources and its policy preview shown in full, naming the new course; no policy file installed; its teacher view lists six resources and the same preview; axe; approved and applied: the course is unavailable and no policy file was written; the test, as operator, installs the preview; on the course page, activation proposed and refused in words (the unbound requirement, R08; no runtime-role refusal since S11); axe; the course is still PREPARATION/DRAFT with six bindings |
+| `assessment.spec.ts`: an assessor evaluates the seeded attempt (S11) | the test, as operator, installs the seeded delivery's preview; `dev-admin` proposes `assessor` as Observer from the members page, then, while it is pending, as Assessor: both listed under the warning (axe); reads the second as a new member, approves and applies it; the members page lists the first as made on an earlier version; proposes activation; after a reload the course page shows the pending activation with its link and no button; approves and applies it (LEARNING/ACTIVE); the seed records the learner's synthetic attempt (`--attempt`); `dev-assessor`, in their own session, follows "Evaluate the students' submitted attempts" to the one attempt (axe), chooses Formative and asks for a draft; the synthetic worker's runtime assessor proposes it; the draft read in words (the agent `learner-response-evaluator`, the response, one criterion, the result; axe); no learning state before; approved and applied by the assessor: one learning state, one formative evaluation with its human decision |
 | `build.spec.ts`: a syllabus not accepted (issue #112) | upload; the Curator by a query holding the synthetic reviewer's `REJECT_EVERY` marker ends with a proposal; the job list shows the fixed notice; axe; the syllabus view says the review agent accepted no draft, with its reason as model text; axe; approve and apply; the course shows the structure |
 | `build.spec.ts`: an invalid file | a text file is refused with "The file is not UTF-8 JSON"; no report; the export directory and the database file are unchanged; axe |
 | `accessibility.spec.ts` | axe on the home page (also with its validation error), the inbox with and without pending proposals, the proposal page with every disclosure open, its validation errors, the apply step, a refused application, and an unavailable context |
@@ -620,46 +621,77 @@ own. The course template (`ALM_COURSE_TEMPLATE`) is installed by an operator:
   already under the course's file name is a 409 and stays as it is.
 - The same request again returns the same `CourseView` (`context_id`,
   `policy_ref`) and writes nothing; it also completes a creation that stopped
-  after the policy file was written.
+  after the policy file was written. `created` tells the two apart: `true` when
+  this request created the course, `false` when it returns an existing one
+  (S11b, #132). The release page refuses an existing course as the delivery
+  course, in words ("You already have a course with this id. A delivery course
+  needs a new id."), and does not navigate; the home page opens it, as before.
 - Not in S09a: adding other teachers or learners (since S11, "Course members"
   below), and changing or revoking a course policy from the studio.
 
-### Course members: module `members` (D25, S11)
+### Course members: module `members` (D25, S11; batch, D36, S11b)
 
 The owner decided D25 on 16 November 2026 (issue #129): a member joins a course
-through a new version of its trusted policy written by the API.
+through a new version of its trusted policy written by the API. The owner decided
+D36 on 17 November 2026 (issue #133): one proposal may add several members, and
+a pending membership proposal does not refuse another; the studio shows the
+pending ones and warns (S11b, issue #138).
 
 - `GET /contexts/{context_id}/members`, for an administrator of the course only
   (403 otherwise): the members (`subject`, their `roles` in this course, from
   the context's `Participant` records), the subject keys of the identity map
   that are not members yet (`addable`), and the roles that may be granted.
-- `POST /contexts/{context_id}/members` with `request_id`, `base_context`,
-  `subject` and `role`, by an administrator of the course with the CSRF token.
-  The subject must be in the identity map (422 otherwise); the role is one of
-  `CONTENT_RESPONSIBLE`, `ASSESSOR` (both: `read`, `propose`, `decide`, `apply`,
-  `interact`), `LEARNER` (`read`, `interact`, `submit`) or `OBSERVER` (`read`);
-  `ADMINISTRATOR` cannot be granted. A subject who already takes part is refused.
-- The command (`learning/membership.py`, CLI-free) copies the installed policy as
-  a new version: the member's grant for this context (a subject that the policy
-  already names in other contexts keeps those grants), and the member added to
+- `POST /contexts/{context_id}/members` with `request_id`, `base_context` and
+  `members`, one or more `{subject, role}`, by an administrator of the course
+  with the CSRF token. Every subject must be in the identity map (422 naming the
+  others); the role is one of `CONTENT_RESPONSIBLE`, `ASSESSOR` (both: `read`,
+  `propose`, `decide`, `apply`, `interact`), `LEARNER` (`read`, `interact`,
+  `submit`) or `OBSERVER` (`read`); `ADMINISTRATOR` cannot be granted. A subject
+  named twice, or one who already takes part, refuses the whole proposal (422).
+  The answer names the proposal, each member's `Participant` (`participants`)
+  and the new policy. API version 0.16.0 (S11b; the request held one `subject`
+  and `role` before).
+- The command (`learning/membership.py`) copies the installed policy as one new
+  version: each member's grant for this context (a subject that the policy
+  already names in other contexts keeps those grants), and each member added to
   every scope of this context alone, so a learner of an imported delivery reads
   its bound resources. The API installs it as `<policy id>-<version>.json`
-  before the proposal is recorded; a failure leaves at most an unused file.
-- The proposal holds the member's `Participant`, the new `PolicySet` version
+  before the proposal is recorded; a failure leaves at most an unused file. The
+  CLI `propose-membership --base-context REF --member SUBJECT:ROLE ...
+  --request-id ID --policy-file NEW` writes it to a new file instead; the
+  proposal is applied with that file passed as `--other-policy`. A membership
+  recorded before S11b, with one `subject` and `role`, reads as one member.
+- The proposal holds each member's `Participant`, the new `PolicySet` version
   (its permissions end with the canonical new policy) and the context with only
   `participants` and `policies` changed. An administrator decides and applies
-  it; until then the member has no authority. Application rechecks that exactly
+  it; until then no member has authority. Application rechecks that exactly
   that policy is installed. The same request id returns the same proposal; a
-  different command under it is a 409.
+  different command under it (other members, or the same in another order) is
+  a 409.
+- Every membership proposal starts from the installed policy and the course
+  version of its time: once one is applied, the others pending in the course
+  are refused as stale when applied, and nothing is lost (D36). The core does
+  not refuse a proposal while another is pending.
 - A generic proposal cannot record a membership policy (a `PolicySet` with a new
   membership entry), and in an imported delivery it still cannot move
   `policies`. In an imported delivery the command works in PREPARATION and
   ACTIVE, and activation accepts a membership version derived from the reviewed
   import preview.
 - Studio: the course page of an administrator links "Members of this course"
-  (`/contexts/{context_id}/members`): the members with their roles in words, and
-  a person and role to propose. The review page describes the proposal as a new
-  member. Removing a member is not offered.
+  (`/contexts/{context_id}/members`): the members with their roles in words; the
+  membership proposals not applied yet (awaiting a decision, with their members,
+  or approved), each with its link and whether it was made on an earlier
+  version of the course, under the warning that one is applied at a time; and a
+  role to choose for each person who may join, all proposed in one proposal.
+  The review page describes the proposal as its new members. Removing a member
+  is not offered.
+- Studio, activation (#133): the activation section of a delivery course in
+  preparation shows an activation proposal not applied yet (awaiting a decision,
+  or approved) made on the course as it is now, with its link, instead of
+  "Propose activation"; one made on an earlier version can no longer be
+  applied, so activation is offered again. The studio reads both from the
+  course summary's `ChangeProposal` records (`candidateDefinitions`,
+  `baseContextVersion`) and the pending proposals.
 
 ### Uploading the model: module `exports`
 

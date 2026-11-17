@@ -11,9 +11,12 @@ import { proposalPath } from '../review/paths';
 import { ReviewError } from '../review/reviewApi';
 import type { Inbox } from '../review/reviewApi';
 import { useCsrfToken } from '../review/ReviewServices';
-import { refusals } from './delivery';
+import { pendingActivation, refusals } from './delivery';
 
-/** Propose activating an imported delivery course: a proposal to review, or the reasons it is refused, in words. */
+/**
+ * Propose activating an imported delivery course: a proposal to review, or the reasons it is refused, in words. An
+ * activation already proposed and not applied is shown with its link instead (#133).
+ */
 export function ActivationSection({ inbox }: { inbox: Inbox }) {
   const { t } = useTranslation();
   const { api, newRequestId } = useBuildServices();
@@ -45,11 +48,17 @@ export function ActivationSection({ inbox }: { inbox: Inbox }) {
     setBusy(false);
   };
 
+  const pending = outcome ? null : pendingActivation(inbox);
   return (
     <section aria-labelledby="course-activation">
       <h2 id="course-activation">{t('delivery.activation.heading')}</h2>
       <p>{t('delivery.activation.intro')}</p>
-      <Button busy={busy} onClick={() => void propose()}>{t('delivery.activation.submit')}</Button>
+      {pending ? (
+        <>
+          <StatusMessage>{pending.records ? t('delivery.activation.pending') : t('delivery.activation.approved')}</StatusMessage>
+          <p><Link to={proposalPath(contextId, pending.proposal.id)}>{t('delivery.activation.review')}</Link></p>
+        </>
+      ) : <Button busy={busy} onClick={() => void propose()}>{t('delivery.activation.submit')}</Button>}
       {failure ? <StatusMessage tone="error">{failure}</StatusMessage> : null}
       {outcome?.proposal ? (
         <>

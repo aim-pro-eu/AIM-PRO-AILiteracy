@@ -89,6 +89,7 @@ Facts in this table are a snapshot. Every chat re-verifies the ones it uses.
 | D20 | A learner sees everything needed to follow and learn from the course: syllabus, material, activities, exercises and the rest of the learning content. What the learner sees comes from the validated course, never from drafts or other learners' records; the exact projection (for example rubrics and assessment criteria) is defined in S12 with the owner | 9 Nov 2026 |
 | D25 | Course membership, option A: the administrator of a course adds a member (any subject of the identity map, as `CONTENT_RESPONSIBLE`, `ASSESSOR`, `LEARNER` or `OBSERVER`; never `ADMINISTRATOR`); the API writes a new trusted policy file (an installed file is never changed or removed, as D23) and records a proposal that adds the member's `Participant` and changes the context's `policies` reference; the member's authority starts when a person applies it (Chat 28, #129) | 16 Nov 2026 |
 | G7 / D4 | D4 is lifted by an assessor-requested evaluation draft (option A): a person with the `ASSESSOR` role asks the runtime evaluator `learner-response-evaluator` for a draft on one observed attempt; control builds the `Evaluation`, checks it with `validate_evaluation` (at most three drafts) and records it as a proposal that a person decides and applies; FORMATIVE and FORMAL; the import configures the EVALUATOR worker (Chat 28–29, #129, PR #131) | 16 Nov 2026 |
+| D36 | Membership proposals made together (#133): the studio shows the pending membership proposals and warns that one is applied at a time; one membership proposal may add several members (batch); the core does not refuse a proposal while another is pending (options B + batch, S11b) | 17 Nov 2026 |
 | Earlier | Socratic option b; live model runs only with owner authorization; never edit AIM-PRO/jjodel exports | see `docs/architecture/agentic-network-decisions.md` |
 
 ## Proposed defaults to confirm when this roadmap is reviewed
@@ -115,7 +116,6 @@ Open decisions that block later steps, not decided here:
 | D19 | How a learner's courses are listed: the contexts where the learner is a participant (an API that lists the subject's own contexts, allowed by D35), or an enrolment record. The owner could not try the learner side yet (9 Nov 2026): no learner app exists before S13 | S12 |
 | D21 | The trainer's role once a course is validated, beyond authoring trainer content. Owner direction (9 Nov 2026), to be clarified: the trainer is used to give learners practice, a kind of Socratic agent that hands out exercises with a method. Open points: whether the trainer is a person, an agent or both, and how it relates to the Socratic coach of S13 | after S13 |
 | D28 | A Curator revision of the syllabus in use. Today an applied syllabus can be edited by the teacher but not revised by the Curator: a revision needs a revision request, and a decision on an applied proposal is not one. Options: a revision job that carries its own reason, or a new decision kind (Chat 19 finding 2) | when a course is refined after it is applied |
-| D36 | Membership proposals made together (#133): every membership proposal is built on the installed policy, so only the first one applied succeeds and the others go stale. Options: the core refuses a membership proposal while another is pending in the same course (a new rule), or the studio only shows the pending ones and warns (SE-AI case study, 17 Nov 2026) | S11b |
 | D29 | The form of the optional agent review of a teacher's edit (D27): a job that records a new proposal with the review agent's verdict, or a review record beside the edited proposal. Needs a model call (Chat 19 finding 3) | before the review of an edit is offered |
 | D31 | Whether a citation that is true but only loosely relevant to its unit may stand when the draft declares the transfer to the audience as a gap. Since D30 the review agent accepts it and the teacher judges its relevance from the gaps and the excerpts in the syllabus view; the alternative is a further calibration that asks for relevance to the unit's purpose (Chat 20 finding 5) | before the syllabus review is relied on without a teacher reading the gaps |
 | D32 | Details of the review loop (D30): whether the drafts the review agent refused are kept beside their verdicts (up to three syllabi per request), and whether an administrator's abandonment stops the loop between drafts instead of at the final write (Chat 20 findings 2 and 3) | none; when the review of a draft is audited, or long jobs are abandoned |
@@ -185,7 +185,7 @@ metamodel.
 | S09d | 4 | Generation by blocks of units: a 48-unit course gets its assessments and content with the configured model (owner, 11 Nov 2026; before S09c2 part 2) | S09c, D34 |
 | S10 | 8 | Course validation: release and delivery views — **milestone M2: authoring to delivery** | S09c |
 | S11 | — | Runtime assessor role and evaluation adapter (G7); course membership (D25) (done: PR #131) | S10, D25, G7 / D4 |
-| S11b | — | Studio flow fixes from the SE-AI case study: an existing course id as delivery course (#132), pending activation and membership proposals (#133) | S11, D36 |
+| S11b | — | Studio flow fixes from the SE-AI case study: an existing course id as delivery course (#132), pending activation and membership proposals (#133); batch membership (D36) | S11, D36 (decided) |
 | S12 | 5 | Learner API, including the learner's own courses | S11, D19, D20 |
 | S13 | 5 | Learner app: my courses, course view, practice — **milestone M3: learner practice end to end** | S12 |
 | S13b | — | Review and release readability for the teacher: release views (#125), the next action on long review pages (#134) | S13, the layout owner |
@@ -527,16 +527,21 @@ on how D4 is lifted before implementation.
 ### S11b — Studio flow fixes from the SE-AI case study
 
 **Goal.** The delivery flow does not lead a teacher into refused or stale
-proposals.
+proposals, and a class is enrolled in one propose–decide–apply cycle.
 
-**Scope.** #132 and #133, labels and data only. The core rule of #133 follows
-D36; until D36 is decided the studio only shows and warns.
+**Scope.** #132 and #133, and batch membership (D36): labels and data for #132
+and the pending warnings; core, CLI, API and studio for batch membership.
+The core does not refuse a membership proposal while another is pending (D36).
+Issue #138; acceptance proposed in `docs/plans/handoffs/chat-30.md`, started by
+the owner on 17 November 2026.
 
 **Acceptance.**
 
 - [ ] Creating a delivery course with an existing id is refused in the form, in words; nothing navigates (#132).
-- [ ] The course page shows a pending activation proposal instead of "Propose activation"; the members page lists pending membership proposals and says that one membership is applied at a time (#133).
-- [ ] Studio tests for each state; the S10 and S11 browser tests cover them.
+- [ ] The course page shows a pending activation proposal with its link instead of "Propose activation" (#133).
+- [ ] The members page lists the pending membership proposals with their links and says that one membership is applied at a time; once one is applied the others go stale and are proposed again (#133, D36).
+- [ ] One membership proposal adds one or more members (a mapped subject with one of `CONTENT_RESPONSIBLE`, `ASSESSOR`, `LEARNER`, `OBSERVER`; never `ADMINISTRATOR`; no subject twice; none already a member) in one new policy version, through the core, the CLI, the API and the members page; replay and conflicting request ids behave as for one member; application rechecks the installed policy as today.
+- [ ] Studio tests for each state; the S10 and S11 browser tests cover them (the S11 test proposes a second member while one is pending, and adds two members in one proposal).
 
 ### S12 — Learner API
 

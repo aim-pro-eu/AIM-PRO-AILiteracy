@@ -1,4 +1,4 @@
-import type { Entity, JsonValue } from './reviewApi';
+import type { Entity, EntityRef, Inbox, JsonValue } from './reviewApi';
 
 /**
  * A proposal explanation: a sentence, optionally followed by one JSON object of
@@ -93,6 +93,35 @@ export function latestProposals(entities: Entity[]): Entity[] {
 }
 
 export const proposalStatus = (proposal: Entity) => String(proposal.fields.status ?? '');
+
+/** A proposal of the course not applied yet: it awaits a decision or, approved, its application (S11b, #133). */
+export interface OpenProposal {
+  proposal: Entity;
+  /** The types and ids of the records it proposes. */
+  candidates: EntityRef[];
+  /** The records it proposes, for a proposal awaiting a decision (they come with the inbox); null once approved. */
+  records: Entity[] | null;
+  /**
+   * Whether it was made on the course as it is now. Applying any proposal gives the course a new version, and the
+   * core refuses a proposal made on an earlier one as stale: it is proposed again.
+   */
+  current: boolean;
+}
+
+const refs = (value: JsonValue | undefined): EntityRef[] => (Array.isArray(value) ? value : [])
+  .filter((item): item is Record<string, JsonValue> => isObject(item))
+  .map((item) => ({ type: String(item.type ?? ''), id: String(item.id ?? ''), version: String(item.version ?? '') }));
+
+/** The proposals of the course that await a decision or, approved, their application; those awaiting a decision first. */
+export function openProposals(inbox: Inbox): OpenProposal[] {
+  const records = new Map(inbox.pending.map((pending) => [pending.proposal.id, pending.candidates]));
+  const open = latestProposals(inbox.entities).filter((proposal) => ['AWAITING_DECISION', 'APPROVED']
+    .includes(proposalStatus(proposal)));
+  return [...inbox.pending.map((pending) => pending.proposal), ...open.filter((proposal) => !records.has(proposal.id))]
+    .map((proposal) => ({
+      proposal, candidates: refs(proposal.fields.candidateDefinitions), records: records.get(proposal.id) ?? null,
+      current: proposal.fields.baseContextVersion === inbox.context.version }));
+}
 
 export const proposalExplanation = (proposal: Entity) => parseExplanation(String(proposal.fields.proposedChange ?? ''));
 

@@ -96,7 +96,7 @@ class RuntimeAssessorTest(unittest.TestCase):
     def admit(self, delivery, subject, role, request_id):
         """An administrator adds a member (D25); the API would install the new policy version."""
         result = delivery.propose_membership(DELIVERY, 'admin', MembershipCommand(
-            base_context=self.store.read_context(DELIVERY).ref, subject=subject, role=role),
+            base_context=self.store.read_context(DELIVERY).ref, members=[{'subject': subject, 'role': role}]),
             request_id=request_id, install=lambda policy: self.installed.__setitem__(policy.policy_ref, policy))
         delivery.decide(DELIVERY, 'admin', result.proposal, 'APPROVE', 'Synthetic membership review')
         delivery.apply(DELIVERY, 'admin', result.proposal, request_id)

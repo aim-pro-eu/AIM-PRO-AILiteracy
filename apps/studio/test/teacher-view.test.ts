@@ -32,9 +32,17 @@ describe('teacher view', () => {
       { subjectKey: 'assessor', roles: ['ASSESSOR'], learningNeeds: [] }),
     entity('PolicySet', 'course:ctx', 'p2', { sourceScopes: ['wp3'], permissions: [] })], []);
     expect(view.kind).toBe('membership');
-    expect(view.membership).toEqual({ subject: 'assessor', roles: ['ASSESSOR'] });
+    expect(view.membership).toEqual([{ subject: 'assessor', roles: ['ASSESSOR'] }]);
     expect(view.delivery).toBeNull();
     expect(view.changes).toEqual([]);
+  });
+
+  it('describes every member of one membership proposal (D36)', () => {
+    const view = teacherView([CONTEXT, ...([['assessor', 'ASSESSOR'], ['learner', 'LEARNER']] as const).map(([subject, role]) =>
+      entity('Participant', `ctx:participant:${subject}`, 'p2', { subjectKey: subject, roles: [role], learningNeeds: [] })),
+    entity('PolicySet', 'course:ctx', 'p2', { sourceScopes: ['wp3'], permissions: [] })], []);
+    expect(view.kind).toBe('membership');
+    expect(view.membership).toEqual([{ subject: 'assessor', roles: ['ASSESSOR'] }, { subject: 'learner', roles: ['LEARNER'] }]);
   });
 
   it('reads an evaluation draft in plain words: the attempt, each criterion, the result and the agent (S11)', () => {

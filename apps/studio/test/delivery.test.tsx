@@ -154,6 +154,38 @@ describe('the activation of an imported delivery course (S10, part 2)', () => {
     expect(await post.json()).toEqual({ request_id: 'request-1', base_context: ref('ExecutionContext', 'delivery-1', '2') });
   });
 
+  it('shows an activation already proposed or approved instead of proposing another (#133)', async () => {
+    const activation = (id: string, status: string, base: string) => entity('ChangeProposal', id, '1', { status,
+      baseContextVersion: base, findings: [], proposedChange: 'Activate the applied delivery import as LEARNING/ACTIVE.',
+      candidateDefinitions: [ref('ExecutionContext', 'delivery-1', `${id}-next`)] });
+    const awaiting = activation('activation-1', 'AWAITING_DECISION', '2');
+    const candidate = { ...IMPORTED, version: 'activation-1-next', fields: { ...IMPORTED.fields, mode: 'LEARNING', status: 'ACTIVE' } };
+    const page = (entities: unknown[], pending: unknown[]) => ({
+      'GET /auth/session': [signedIn],
+      'GET /contexts/delivery-1': summary(IMPORTED, [...RECORDS, ...entities]),
+      'GET /contexts/delivery-1/pending-proposals': [{ status: 200, body: { proposals: pending } } as Reply],
+    });
+    const shown = async (message: string, id: string) => {
+      const section = within(await screen.findByRole('region', { name: en.delivery.activation.heading }));
+      expect(section.getByText(message)).toBeTruthy();
+      expect(section.getByRole('link', { name: en.delivery.activation.review }).getAttribute('href'))
+        .toBe(`/studio/contexts/delivery-1/review/${id}`);
+      expect(section.queryByRole('button', { name: en.delivery.activation.submit })).toBeNull();
+    };
+    await renderStudio(page([awaiting], [{ proposal: awaiting, candidates: [candidate], review_payload_key: 'k' }]),
+      '/studio/contexts/delivery-1/course');
+    await shown(en.delivery.activation.pending, 'activation-1');
+    cleanup();
+    await renderStudio(page([activation('activation-2', 'APPROVED', '2')], []), '/studio/contexts/delivery-1/course');
+    await shown(en.delivery.activation.approved, 'activation-2');
+    cleanup();
+    // Made on an earlier version of the course, it can no longer be applied: activation is offered again.
+    await renderStudio(page([activation('activation-3', 'APPROVED', '1')], []), '/studio/contexts/delivery-1/course');
+    const section = within(await screen.findByRole('region', { name: en.delivery.activation.heading }));
+    expect(section.getByRole('button', { name: en.delivery.activation.submit })).toBeTruthy();
+    expect(section.queryByRole('link', { name: en.delivery.activation.review })).toBeNull();
+  });
+
   it('links to the activation proposal when it is proposed', async () => {
     await renderStudio(course({ status: 200, body: { findings: [], proposal: {
       proposal: ref('ChangeProposal', 'activation-1', '1'), release: RELEASE, policy: PREVIEW.policy_ref } } }),

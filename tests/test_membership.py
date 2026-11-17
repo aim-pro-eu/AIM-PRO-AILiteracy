@@ -1,12 +1,16 @@
-"""Course membership (D25, option A; S11, #129).
+"""Course membership (D25, option A; S11, #129; batch, D36, S11b, #138).
 
-An administrator of a course adds a member: the command writes a new version of
-the trusted policy through the host's installer and proposes the member's
-``Participant`` with the context's new ``policies`` reference. A person decides
-and applies it; the member has no authority before. Temporary SQLite file or
+An administrator of a course adds one or more members: the command writes a new
+version of the trusted policy through the host's installer and proposes each
+member's ``Participant`` with the context's new ``policies`` reference. A person
+decides and applies it; no member has authority before. Temporary SQLite file or
 PostgreSQL test schema only; no network and no model.
 """
 
+from contextlib import redirect_stderr, redirect_stdout
+from io import StringIO
+import json
+from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import Mock
@@ -14,9 +18,9 @@ from unittest.mock import Mock
 from pydantic import ValidationError
 
 from learning.decisions import create_proposal, proposal_candidates, save_proposal
-from learning.membership import MEMBER_ACTIONS, MEMBERSHIP_POLICY, MembershipCommand
+from learning.membership import MEMBER_ACTIONS, MEMBERSHIP_POLICY, MembershipCommand, MembershipProposal
 from learning.metamodel import load_contract
-from learning.policies import AuthorizationError
+from learning.policies import AuthorizationError, TrustedPolicy
 from learning.releases import ActivationRefused, activation_findings
 from learning.service import LearningService
 from learning.store import LearningStore, StateConflict, canonical
@@ -30,7 +34,8 @@ class MembershipTest(unittest.TestCase):
                       'crewai.LLM', 'agent_system.runtime.LLMFactory.__call__')
         self.temp = TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.store = LearningStore(new_store_location(self, self.temp.name, 'membership.sqlite'))
+        self.location = new_store_location(self, self.temp.name, 'membership.sqlite')
+        self.store = LearningStore(self.location)
         self.addCleanup(self.store.close)
         self.installed = {}
         policy = trusted_policy()
@@ -47,11 +52,16 @@ class MembershipTest(unittest.TestCase):
     def install(self, policy):
         self.installed[policy.policy_ref] = policy
 
-    def command(self, context_id, subject, role):
-        return MembershipCommand(base_context=self.store.read_context(context_id).ref, subject=subject, role=role)
+    def command(self, context_id, *members):
+        """``members`` as (subject, role) pairs."""
+        return MembershipCommand(base_context=self.store.read_context(context_id).ref,
+                                 members=[{'subject': subject, 'role': role} for subject, role in members])
 
     def propose(self, service, context_id, subject, role, request_id='member-1', install=None):
-        return service.propose_membership(context_id, 'admin', self.command(context_id, subject, role),
+        return self.propose_all(service, context_id, (subject, role), request_id=request_id, install=install)
+
+    def propose_all(self, service, context_id, *members, request_id='member-1', install=None):
+        return service.propose_membership(context_id, 'admin', self.command(context_id, *members),
                                           request_id=request_id, install=install or self.install)
 
     def admit(self, service, context_id, subject, role, request_id='member-1'):
@@ -81,7 +91,7 @@ class MembershipCommandTest(MembershipTest):
         proposal = self.store.read(result.proposal, owner=AUTH)
         candidates = {c.type: c for c in proposal_candidates(self.store, proposal)}
         self.assertEqual(set(candidates), {'Participant', 'PolicySet', 'ExecutionContext'})
-        self.assertEqual(candidates['Participant'].ref, result.participant)
+        self.assertEqual((candidates['Participant'].ref,), result.participants)
         self.assertEqual(candidates['Participant'].fields['roles'], ['CONTENT_RESPONSIBLE'])
         self.assertEqual(candidates['PolicySet'].fields['permissions'][-1],
                          MEMBERSHIP_POLICY + canonical(policy.model_dump(mode='json')))
@@ -100,7 +110,7 @@ class MembershipCommandTest(MembershipTest):
 
     def test_only_an_administrator_may_propose_a_membership(self):
         result, service = self.admit(self.service, AUTH, 'teacher-2', 'CONTENT_RESPONSIBLE')
-        command = self.command(AUTH, 'observer-1', 'OBSERVER')
+        command = self.command(AUTH, ('observer-1', 'OBSERVER'))
         with self.assertRaisesRegex(ValueError, 'administrative authority'):
             service.propose_membership(AUTH, 'teacher-2', command, request_id='by-teacher', install=self.install)
         with self.assertRaises(ValueError):
@@ -120,7 +130,7 @@ class MembershipCommandTest(MembershipTest):
     def test_administrator_cannot_be_granted_and_existing_members_are_refused(self):
         for role in ('ADMINISTRATOR', 'TEACHER', ''):
             with self.assertRaises(ValidationError):
-                self.command(AUTH, 'someone', role)
+                self.command(AUTH, ('someone', role))
         with self.assertRaisesRegex(ValueError, 'already a member'):
             self.propose(self.service, AUTH, 'admin', 'ASSESSOR')
         with self.assertRaisesRegex(ValueError, 'already a member'):
@@ -174,6 +184,129 @@ class MembershipCommandTest(MembershipTest):
         self.service.decide(AUTH, 'admin', bypass.ref, 'APPROVE', 'Synthetic review of a bypass')
         with self.assertRaisesRegex(ValueError, 'dedicated commands'):
             self.service.apply(AUTH, 'admin', bypass.ref, 'bypass')
+
+
+@on_both_backends
+class BatchMembershipTest(MembershipTest):
+    """One proposal adds several members in one policy version (D36, S11b)."""
+
+    MEMBERS = (('teacher-2', 'CONTENT_RESPONSIBLE'), ('assessor-1', 'ASSESSOR'), ('learner', 'OBSERVER'))
+
+    def test_one_proposal_adds_several_members_in_one_policy_version(self):
+        install = Mock(side_effect=self.install)
+        result = self.propose_all(self.service, AUTH, *self.MEMBERS, install=install)
+        install.assert_called_once_with(result.policy)
+        policy = result.policy
+        for subject, role in self.MEMBERS:
+            self.assertIn(role, policy.subjects[subject].roles)
+            self.assertEqual(policy.subjects[subject].actions[AUTH], MEMBER_ACTIONS[role])
+            self.assertIn(subject, policy.scopes['wp3'].subjects)
+        self.assertEqual(policy.subjects['learner'].actions[DELIVERY], trusted_policy().subjects['learner'].actions[DELIVERY])
+        proposal = self.store.read(result.proposal, owner=AUTH)
+        candidates = proposal_candidates(self.store, proposal)
+        participants = [c for c in candidates if c.type == 'Participant']
+        self.assertEqual({p.ref for p in participants}, set(result.participants))
+        self.assertEqual([r.id for r in result.participants], [f'{AUTH}:participant:{s}' for s, _ in self.MEMBERS])
+        self.assertEqual({p.fields['subjectKey']: p.fields['roles'] for p in participants},
+                         {subject: [role] for subject, role in self.MEMBERS})
+        self.assertEqual(sorted(c.type for c in candidates),
+                         ['ExecutionContext', 'Participant', 'Participant', 'Participant', 'PolicySet'])
+        for subject, _ in self.MEMBERS:
+            self.assertIn(subject, proposal.fields['proposedChange'])
+        self.service.decide(AUTH, 'admin', result.proposal, 'APPROVE', 'Synthetic membership review')
+        self.service.apply(AUTH, 'admin', result.proposal, 'member-1')
+        members = self.serve(policy)
+        self.assertEqual([m.subject for m in members.members(AUTH, 'admin')], ['admin', *(s for s, _ in self.MEMBERS)])
+        for subject, role in self.MEMBERS:
+            self.assertEqual(members._context(AUTH, subject).participant.fields['roles'], [role])
+
+    def test_a_subject_twice_an_existing_member_or_no_member_refuses_the_whole_proposal(self):
+        with self.assertRaisesRegex(ValidationError, 'more than once'):
+            self.command(AUTH, ('teacher-2', 'ASSESSOR'), ('teacher-2', 'OBSERVER'))
+        with self.assertRaises(ValidationError):
+            self.command(AUTH)
+        with self.assertRaises(ValidationError):
+            self.command(AUTH, ('teacher-2', 'ASSESSOR'), ('assessor-1', 'ADMINISTRATOR'))
+        with self.assertRaisesRegex(ValueError, 'admin is already a member'):
+            self.propose_all(self.service, AUTH, ('teacher-2', 'ASSESSOR'), ('admin', 'OBSERVER'))
+        self.assertEqual(len(self.installed), 1)
+        self.assertEqual(self.store.owned(AUTH, 'ChangeProposal'), ())
+
+    def test_the_same_batch_replays_and_another_batch_with_its_request_id_is_refused(self):
+        install = Mock(side_effect=self.install)
+        first = self.propose_all(self.service, AUTH, *self.MEMBERS, install=install)
+        self.assertEqual(self.propose_all(self.service, AUTH, *self.MEMBERS, install=install), first)
+        install.assert_called_once_with(first.policy)
+        with self.assertRaises(StateConflict):
+            self.propose_all(self.service, AUTH, *self.MEMBERS[:2], install=install)
+        with self.assertRaises(StateConflict):
+            self.propose_all(self.service, AUTH, *reversed(self.MEMBERS), install=install)
+
+    def test_a_pending_membership_does_not_refuse_another_which_goes_stale_once_the_first_is_applied(self):
+        first = self.propose(self.service, AUTH, 'assessor-1', 'ASSESSOR', request_id='member-1')
+        second = self.propose(self.service, AUTH, 'teacher-2', 'CONTENT_RESPONSIBLE', request_id='member-2')
+        for result in (first, second):
+            self.service.decide(AUTH, 'admin', result.proposal, 'APPROVE', 'Synthetic membership review')
+        self.service.apply(AUTH, 'admin', first.proposal, 'member-1')
+        with self.assertRaisesRegex(StateConflict, 'stale'):
+            self.serve(first.policy).apply(AUTH, 'admin', second.proposal, 'member-2')
+        # Proposed again on the course as it is now, the second member keeps the first.
+        again = self.propose(self.serve(first.policy), AUTH, 'teacher-2', 'CONTENT_RESPONSIBLE', request_id='member-3')
+        self.assertEqual(set(again.policy.subjects), {'admin', 'learner', 'assessor-1', 'teacher-2'})
+
+    def test_a_membership_recorded_before_batches_reads_as_one_member(self):
+        base = self.store.read_context(AUTH).ref
+        legacy = MembershipCommand.model_validate(
+            {'base_context': base.model_dump(), 'subject': 'teacher-2', 'role': 'ASSESSOR'})
+        self.assertEqual(legacy, self.command(AUTH, ('teacher-2', 'ASSESSOR')))
+        result = self.propose(self.service, AUTH, 'teacher-2', 'ASSESSOR')
+        recorded = {**result.model_dump(mode='json', exclude={'participants'}),
+                    'participant': result.participants[0].model_dump()}
+        self.assertEqual(MembershipProposal.model_validate(recorded), result)
+        with self.assertRaises(ValidationError):
+            MembershipCommand.model_validate({'base_context': base.model_dump(), 'subject': 'teacher-2',
+                                              'role': 'ASSESSOR', 'members': []})
+
+
+@on_both_backends
+class MembershipCommandLineTest(MembershipTest):
+    def run_cli(self, *arguments, policy=None):
+        path = Path(self.temp.name) / 'policy.json'
+        path.write_text((policy or trusted_policy()).model_dump_json())
+        output, errors = StringIO(), StringIO()
+        from learning.__main__ import main
+        with redirect_stdout(output), redirect_stderr(errors):
+            code = main(['--db', str(self.location), '--policy', str(path), '--subject', 'admin', '--context', AUTH,
+                         *arguments])
+        return code, output.getvalue(), errors.getvalue()
+
+    def test_the_cli_proposes_several_members_and_writes_the_new_policy_to_a_new_file(self):
+        target = Path(self.temp.name) / 'course-policy-2.json'
+        base = self.store.read_context(AUTH).ref.model_dump_json()
+        arguments = ('propose-membership', '--base-context', base, '--member', 'teacher-2:CONTENT_RESPONSIBLE',
+                     '--member', 'learner:OBSERVER', '--request-id', 'cli-member', '--policy-file', str(target))
+        code, output, errors = self.run_cli(*arguments)
+        self.assertEqual(code, 0, errors)
+        result = MembershipProposal.model_validate(json.loads(output))
+        self.assertEqual(TrustedPolicy.model_validate_json(target.read_bytes()), result.policy)
+        self.assertEqual(len(result.participants), 2)
+        self.assertEqual(self.store.read(result.proposal, owner=AUTH).fields['status'], 'AWAITING_DECISION')
+        # An existing file is never replaced; nothing new is recorded.
+        before = target.read_bytes()
+        code, _, errors = self.run_cli(*arguments[:-1], str(target))
+        self.assertEqual(code, 2)
+        self.assertIn('Operation not performed', errors)
+        self.assertEqual(target.read_bytes(), before)
+        self.assertEqual(len(self.store.owned(AUTH, 'ChangeProposal')), 1)
+
+    def test_the_cli_refuses_a_member_without_a_role(self):
+        target = Path(self.temp.name) / 'course-policy-2.json'
+        base = self.store.read_context(AUTH).ref.model_dump_json()
+        code, _, _ = self.run_cli('propose-membership', '--base-context', base, '--member', 'teacher-2',
+                                  '--request-id', 'cli-member', '--policy-file', str(target))
+        self.assertEqual(code, 2)
+        self.assertFalse(target.exists())
+        self.assertEqual(self.store.owned(AUTH, 'ChangeProposal'), ())
 
 
 @on_both_backends

@@ -1,13 +1,14 @@
-"""Module ``members``: the administrator of a course adds a member (D25, option A; S11).
+"""Module ``members``: the administrator of a course adds members (D25, option A; S11; batch, D36, S11b).
 
 A member is a subject of the identity map (D9) with one role among
-``CONTENT_RESPONSIBLE``, ``ASSESSOR``, ``LEARNER`` and ``OBSERVER``. The API
-writes the course's new trusted policy version as a new file in
-``ALM_POLICY_DIR``, never changing an installed file, and answers with the
-pending proposal: the member's ``Participant`` and the context's new
-``policies`` reference. The member can act only after a person with
-administrative authority decides and applies it through the review endpoints.
-Removing a member is not offered.
+``CONTENT_RESPONSIBLE``, ``ASSESSOR``, ``LEARNER`` and ``OBSERVER``; one
+proposal may add several. The API writes the course's new trusted policy
+version as a new file in ``ALM_POLICY_DIR``, never changing an installed file,
+and answers with the pending proposal: each member's ``Participant`` and the
+context's new ``policies`` reference. The members can act only after a person
+with administrative authority decides and applies it through the review
+endpoints. A pending membership proposal does not refuse another; once one is
+applied, the others go stale (D36). Removing a member is not offered.
 """
 
 from __future__ import annotations
@@ -31,7 +32,7 @@ class MemberList(Record):
 
 
 class MembershipRequest(MembershipCommand):
-    """``propose-membership``: the subject, its role and the base context, with the ALM request id."""
+    """``propose-membership``: one or more subjects with their roles and the base context, with the ALM request id."""
     request_id: Text
 
 
@@ -56,11 +57,13 @@ def members(context_id: str, request: Request, principal: Principal = Depends(co
 
 
 @router.post('/contexts/{context_id}/members', response_model=MembershipProposal, responses=WRITE_ERRORS,
-             summary='Propose a new member: a new trusted policy version and the member\'s participant record')
+             summary='Propose new members: a new trusted policy version and a participant record for each')
 def propose_membership(context_id: str, body: MembershipRequest, request: Request,
                        principal: Principal = Depends(context_writer)):
-    if body.subject not in _mapped(request):
-        raise ValueError('The subject is not in the identity map')
+    mapped = _mapped(request)
+    unmapped = [member.subject for member in body.members if member.subject not in mapped]
+    if unmapped:
+        raise ValueError(f'Not in the identity map: {", ".join(unmapped)}')
     contexts = request.app.state.contexts
     with open_context(request, context_id) as service:
         return service.propose_membership(context_id, principal.subject_key, body.model_dump(exclude={'request_id'}),

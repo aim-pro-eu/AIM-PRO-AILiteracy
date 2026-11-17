@@ -1,5 +1,7 @@
 import type { ActivationOutcome, ReleaseInspection } from '../course-build/buildApi';
-import type { Entity, EntityRef, JsonValue } from '../review/reviewApi';
+import { openProposals } from '../review/model';
+import type { OpenProposal } from '../review/model';
+import type { Entity, EntityRef, Inbox, JsonValue } from '../review/reviewApi';
 
 /**
  * A delivery course (S10, part 2): the import of an applied release, its trusted
@@ -66,6 +68,18 @@ export function proposedPolicy(candidates: Entity[]): PolicyPreview | null {
 export function isImportedDelivery(context: Entity): boolean {
   const models = Array.isArray(context.fields.models) ? context.fields.models : [];
   return models.some((model) => isObject(model) && text(model.id).startsWith(DELIVERY_PREFIX));
+}
+
+/**
+ * The activation proposal of the course that is not applied yet and was made on the course as it is now, or null
+ * (#133). An activation proposes the course record alone, in LEARNING/ACTIVE; one made on an earlier version is
+ * refused as stale when applied, so another may be proposed.
+ */
+export function pendingActivation(inbox: Inbox): OpenProposal | null {
+  return openProposals(inbox).find(({ candidates, records, current }) => current && candidates.length === 1
+    && candidates[0]!.type === 'ExecutionContext' && candidates[0]!.id === inbox.context.id
+    && (records === null || records.some(({ fields }) => fields.mode === 'LEARNING' && fields.status === 'ACTIVE')))
+    ?? null;
 }
 
 /** One reason activation is refused, in words: its reason, what to do and its code. */

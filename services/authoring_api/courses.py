@@ -8,8 +8,9 @@ policy as a new file in ``ALM_POLICY_DIR``: the creator, alone, administers
 that context and nothing else. An installed policy file is never changed.
 
 The same request again returns the same course, and completes a creation
-interrupted after its policy file was written. An id that a context or an
-installed policy already uses is a 409.
+interrupted after its policy file was written; ``created`` tells a new course
+from a returned one, so that a delivery course is never an existing one (#132).
+An id that a context or an installed policy already uses is a 409.
 """
 
 from __future__ import annotations
@@ -48,6 +49,7 @@ class CourseRequest(Record):
 class CourseView(Record):
     context_id: Text
     policy_ref: EntityRef
+    created: bool = Field(description='Whether this request created the course; false when it returns an existing one')
 
 
 def load_template(path: Path) -> CourseTemplate:
@@ -92,7 +94,8 @@ def create(body: CourseRequest, request: Request, principal: Principal = Depends
     contexts = request.app.state.contexts
     policy = course_policy(template, body.context_id, principal.subject_key)
     current = contexts.policy_of(body.context_id)
-    if current is None:
+    created = current is None
+    if created:
         others = [p for p in contexts.policies.installed()
                   if p != policy and (p.policy_ref == policy.policy_ref or _names(p, body.context_id))]
         if others:
@@ -104,9 +107,10 @@ def create(body: CourseRequest, request: Request, principal: Principal = Depends
             # The same request, running at the same time, created the context first.
             if contexts.policy_of(body.context_id) != policy.policy_ref:
                 raise
+            created = False
     elif current != policy.policy_ref or contexts.policies.find(current) != policy:
         raise HTTPException(409, TAKEN)
-    return CourseView(context_id=body.context_id, policy_ref=policy.policy_ref)
+    return CourseView(context_id=body.context_id, policy_ref=policy.policy_ref, created=created)
 
 
 MODULE = ApiModule('courses', router)

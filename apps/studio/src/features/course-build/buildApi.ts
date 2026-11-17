@@ -16,7 +16,7 @@ export type ReleaseProposal = Schemas['ReleaseProposal'];
 export type ReleaseInspection = Schemas['ReleaseInspection'];
 export type ImportProposal = Schemas['ImportProposal'];
 export type MemberList = Schemas['MemberList'];
-export type MemberRole = Schemas['MembershipRequest']['role'];
+export type MemberRole = Schemas['NewMember']['role'];
 export type MembershipProposal = Schemas['MembershipProposal'];
 export type ActivationOutcome = Schemas['ActivationOutcome'];
 export type SourceDiscovery = Schemas['SourceDiscoveryView'];
@@ -134,9 +134,9 @@ export interface BuildApi {
   }): Promise<ActivationOutcome>;
   /** The course's members, the mapped people who may still join and the roles; for its administrators (D25). */
   members(contextId: string): Promise<MemberList>;
-  /** Propose a new member: a new policy version and a participant to review; the same request id replays. */
+  /** Propose new members: one new policy version and a participant each, to review; the same request id replays. */
   proposeMembership(contextId: string, csrfToken: string, command: {
-    requestId: string; baseContext: EntityRef; subject: string; role: MemberRole;
+    requestId: string; baseContext: EntityRef; members: { subject: string; role: MemberRole }[];
   }): Promise<MembershipProposal>;
   /** Ask the runtime assessor for a draft evaluation of one observed attempt; the same request id returns the same job. */
   queueEvaluation(contextId: string, csrfToken: string, requestId: string, command: {
@@ -373,11 +373,11 @@ export function createBuildApi(client: AuthoringClient): BuildApi {
       return settle(() => client.GET('/contexts/{context_id}/members', { params: { path: { context_id: contextId } } }));
     },
 
-    async proposeMembership(contextId, csrfToken, { requestId, baseContext, subject, role }) {
+    async proposeMembership(contextId, csrfToken, { requestId, baseContext, members }) {
       return settle(() => client.POST('/contexts/{context_id}/members', {
         params: { path: { context_id: contextId } },
         headers: writing(csrfToken),
-        body: { request_id: requestId, base_context: baseContext, subject, role },
+        body: { request_id: requestId, base_context: baseContext, members },
       }));
     },
 

@@ -77,7 +77,7 @@ class CoursesApiTest(ReviewApiCase):
         before = self.files()
         body = self.created(self.create())
         policy_ref = EntityRef(type='PolicySet', id='course:' + COURSE, version='1')
-        self.assertEqual(body, {'context_id': COURSE, 'policy_ref': policy_ref.model_dump()})
+        self.assertEqual(body, {'context_id': COURSE, 'policy_ref': policy_ref.model_dump(), 'created': True})
 
         # One new file; every installed file keeps its exact bytes.
         written = self.policies / f'course-{COURSE}-1.json'
@@ -101,12 +101,13 @@ class CoursesApiTest(ReviewApiCase):
         self.assertEqual([p['fields']['subjectKey'] for p in participants], ['admin'])
         self.assertEqual(self.learner.get(f'/contexts/{COURSE}').status_code, 403)
 
-    def test_the_same_request_again_returns_the_same_course(self):
+    def test_the_same_request_again_returns_the_same_course_and_says_it_is_not_new(self):
         first = self.created(self.create())
         files = self.files()
         with LearningStore(self.location) as store:
             digests = store.table_digests()
-        self.assertEqual(self.created(self.create()), first)
+        # The studio refuses an existing course where it needs a new one (#132).
+        self.assertEqual(self.created(self.create()), {**first, 'created': False})
         self.assertEqual(self.files(), files)
         with LearningStore(self.location) as store:
             self.assertEqual(store.table_digests(), digests)
@@ -119,7 +120,7 @@ class CoursesApiTest(ReviewApiCase):
         with LearningStore(self.location) as store:
             self.assertFalse(store.has_context(COURSE))
         files = self.files()
-        self.assertEqual(self.created(self.create())['context_id'], COURSE)
+        self.assertEqual(self.created(self.create())['created'], True)
         self.assertEqual(self.files(), files)
         with LearningStore(self.location) as store:
             self.assertTrue(store.has_context(COURSE))
