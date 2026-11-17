@@ -1,0 +1,14 @@
+{
+  "status": "PASS",
+  "scope": "Native record graph, every semantic instance and value, enum encoding, containment fathers, compressed serialization round trip",
+  "models": 4,
+  "metamodels": 5,
+  "objects": 68,
+  "values": 436,
+  "native_records": 840,
+  "source_template_sha256": "88f79493ec1e3d924e8c64bd0cf7118e87609f6ff303aa8a12d969ad2be940f3",
+  "semantic_source_sha256": "9205855b992806bde4cb145a0bef1601ef7d13161b7876f1657402ea2a92be77",
+  "native_sha256": "08948811153e684c1d5bcb55eb661bae6c68c6cb65d32e8bb6eb3b572bd83d1d",
+  "user_records": 0,
+  "limitation": "No live UI import/export was executed. The importer duplicates IDs; use stable names and competency ID attributes to identify imported records. Annex pointer IDs describe the delivered package before importer duplication."
+}

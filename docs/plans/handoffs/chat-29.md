@@ -150,24 +150,52 @@ Proposed for the owner to record in the roadmap:
 
 Still open: D19, D21, D28, D29, D31–D33.
 
+## SE-AI case study (17 November 2026)
+
+After this handoff the owner asked for a case study covering everything built so far, sized for an hour, and
+authorized live model calls for it (Anthropic for every agent, 8 units, the owner driving the studio, sources from the
+WP3 corpus). The package is `examples/se-ai/` (PR of this addendum): a Software Engineering course with AI literacy
+support written against the unchanged 4 November 2026 metamodels (4 modules, 8 learning targets, 16 activities,
+10 competencies, 4 rubric tasks; audit and strict conformance clean), its native jjodel project `SE-AI.jjodel`, a
+worker with every agent on the `anthropic` profile in its own process only (`live_worker.py`), a stack script, a
+dev-only stand-in for the learner's submission (`attempt.py`) and the step-by-step script.
+
+The owner merged #131 (`287cfff`) and ran the script on `main`. Every step passed, from the upload to an applied
+formative evaluation; model time about 20 minutes (Curator 3 min 09 s, Evaluator 5 min 31 s, Teacher 5 min 23 s,
+Trainer 5 min 20 s, runtime assessor 15 s); no job failed or was rejected. The assessor's draft on a deliberately
+middling answer gave levels 3, 2 and 0, and named the personal-data issue the answer missed. Details and the
+requirements used: `examples/se-ai/README.md`, "First run".
+
+Studio findings, filed and planned (roadmap, "Planned order"):
+
+- #132: an existing course id as delivery course opens an import that is refused → S11b;
+- #133: pending activation and membership proposals are not shown; memberships proposed together go stale (proposed
+  owner decision **D36**) → S11b;
+- #134: the next action is hard to find on long review pages; with #125 → S13b, with the layout owner.
+
+Fixed in the package itself: `stack.sh` did not create the empty learning store (the API and the worker refuse to
+create one); the script's labels now match the studio.
+
 ## Next step
 
-**D19 — the learner's own courses**, as the decision S12 waits for (options for the owner, not decided by a chat),
-then **S12** (Learner API). The owner may also choose issue #125 (release views) first.
+**Chat 30: D19 and D36**, the decisions S12 and S11b wait for (options for the owner, not decided by a chat), then the
+S12 specification. Then S11b, S12, S13, S13b (roadmap, "Planned order").
 
 ### Prompt for Chat 30
 
 ```text
 You are Chat 30 of the ALM prototype (repo thesis-fedfalco-2026/AIM-PRO-AILiteracy, checkout
-~/development/py-prototype). Your step is **D19 — the learner's own courses**, the open decision S12 (Learner API)
-waits for: write the options for the owner and ask; do not pick one. Then, if the owner decides D19 and confirms the
-S12 acceptance, specify S12 on a new issue and hand it off.
+~/development/py-prototype). Your step is **D19 and D36**, the open decisions S12 (Learner API) and S11b (studio
+flow fixes) wait for: write the options for the owner and ask; do not pick one. Then, if the owner decides and
+confirms the S12 acceptance, specify S12 on a new issue and hand it off. No code in this chat.
 
 ## Where things stand
 
-- S11 is in PR #131 (membership, D25 = A; the runtime assessor, D4 lifted): read docs/plans/handoffs/chat-28.md,
-  docs/plans/handoffs/chat-29.md and issue #129. If #131 is not merged, ask the owner before starting.
-- Issue #125 (release views) is deferred by the owner; do not start it unless the owner says so.
+- S11 is merged (PR #131, 287cfff; issue #129 closed): membership (D25 = A) and the runtime assessor (D4 lifted).
+  Read docs/plans/handoffs/chat-28.md and docs/plans/handoffs/chat-29.md, including "SE-AI case study".
+- The owner ran the SE-AI case study live on 17 November 2026 (examples/se-ai/README.md, "First run"); its studio
+  findings are #132, #133 (D36) and #134, planned in the roadmap ("Planned order"): S11b after this chat.
+- Issue #125 (release views) belongs to S13b; do not start it.
 
 ## Protocol
 
@@ -176,14 +204,16 @@ S12 acceptance, specify S12 on a new issue and hand it off.
    CREWAI_TRACING_ENABLED=false), python -m aimpro.generate --check, python -m services.api_common.openapi --check,
    python -m evaluation --check, and in apps/ npm run check:client, typecheck, test. Report any difference from the
    Chat 29 handoff.
-2. Read AGENTS.md, the roadmap (working protocol, D19, D20, S12, S13), learning/membership.py, the D35 course list
-   (services/authoring_api/context_summary.py, PolicyDirectory.readable), learning/service.py (show, the learner-only
-   redaction), learning/evaluation.py and the Chat 29 findings 3 and 6.
+2. Read AGENTS.md, the roadmap (working protocol, D19, D20, D36, S11b, S12, S13), learning/membership.py, the D35
+   course list (services/authoring_api/context_summary.py, PolicyDirectory.readable), learning/service.py (show, the
+   learner-only redaction), learning/evaluation.py, the Chat 29 findings 3 and 6, and issue #133.
 3. Write for the owner the options for D19 (how a learner's courses are found: the contexts whose installed policy
-   names them, as D25 = A allows; a separate enrolment record; another), with their consequences for S12, S13 and
-   the redaction of LEARNING views. Ask the owner; do not pick one. Record the answer on a new S12 issue with the
-   acceptance agreed with the owner.
-4. Write docs/plans/handoffs/chat-30.md, open one focused PR, wait for CI and report.
+   names them, as D25 = A allows; a separate enrolment record; another), with their consequences for S12, S13 and the
+   redaction of LEARNING views; and for D36 (the core refuses a membership proposal while another is pending, or the
+   studio only shows and warns), with their consequences for S11b and for enrolling many learners. Ask the owner;
+   do not pick. Record the answers in the handoff and on #133, and the S12 acceptance agreed with the owner on a new
+   S12 issue (consider Chat 29 finding 3: an evaluation goes stale when the learner submits again).
+4. Write docs/plans/handoffs/chat-30.md, with the roadmap rows to change, open one focused PR, wait for CI and report.
 
 ## Constraints
 
@@ -192,8 +222,9 @@ S12 acceptance, specify S12 on a new issue and hand it off.
 - Layout and visual design are owned by someone else: change labels and data, not styling.
 - Leave the others' uncommitted changes (README.md, docs/architecture/system-overview.md,
   docs/plans/handoffs/chat-01.md, docs/plans/sequential-chat-plan.md, examples/lpo-ai/) alone and out of PRs.
-- The owner's demo stack (ports 58000/58001, /tmp/alm-demo): never stop or restart it; read its stores read-only.
-- Do not decide D19, D21, D28, D29, D31–D33. Propose roadmap changes in the handoff.
+- The owner's stacks (ports 58000/58001; /tmp/alm-demo and /tmp/alm-se-ai): never stop or restart them; read their
+  stores read-only.
+- Do not decide D19, D21, D28, D29, D31–D33, D36. Propose roadmap changes in the handoff.
 ```
 
 ## PR and CI
