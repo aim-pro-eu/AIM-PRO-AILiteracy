@@ -87,6 +87,8 @@ Facts in this table are a snapshot. Every chat re-verifies the ones it uses.
 | D34 | Generation by blocks of units (S09d, issue #118, refines D30 for the generators). The Evaluator, Teacher (unstructured) and Trainer write a request in blocks of 12 target units; the generator of a block receives the whole input (the whole syllabus included), its units and the accepted drafts of the earlier blocks, as untrusted data. Each block is judged by the review agent on its own, with the full input and that block only, up to three drafts per block; the assembled draft is judged once at the end, also for one block. One proposal per job. A flow ends with something for the teacher to decide (13 November 2026, changes D30 for these generators): a block the review agent does not accept keeps its last checked draft, and a final review that is not `ACCEPT` is proposed with its verdict and a fixed notice; a block whose drafts all fail the checks is written in two halves, and only a one-unit block failing them fails the job. Accepted blocks are kept and reused, without a model call, by a new job over the same exact inputs. The structured Teacher and the Curator keep one response. A block whose response does not fit (a call past its deadline, or a response cut at its output length limit) is written in two halves, down to one unit, so the approach does not depend on the model; only a one-unit block that does not fit stops the request, with a fixed text, never the provider's message; the deadline of a model call is 1200 s (was 600); block progress is a content-free event shown in the studio job list. A draft that does not cover its units is refused in words the author can read, naming the units by their position in the syllabus; the retry receives the unit keys as data (Chat 23, 12–13 November 2026) | 13 Nov 2026 |
 | D35 | Responses may reveal which contexts exist: the rule "a response never reveals which contexts exist" (D10, S05) is removed, so the API may list the contexts of the signed-in subject, for the studio home (in place of the context id field) and for the learner's courses (D19, S12). A missing context and an uninstalled policy still both answer 404 `context_unavailable` | 16 Nov 2026 |
 | D20 | A learner sees everything needed to follow and learn from the course: syllabus, material, activities, exercises and the rest of the learning content. What the learner sees comes from the validated course, never from drafts or other learners' records; the exact projection (for example rubrics and assessment criteria) is defined in S12 with the owner | 9 Nov 2026 |
+| D25 | Course membership, option A: the administrator of a course adds a member (any subject of the identity map, as `CONTENT_RESPONSIBLE`, `ASSESSOR`, `LEARNER` or `OBSERVER`; never `ADMINISTRATOR`); the API writes a new trusted policy file (an installed file is never changed or removed, as D23) and records a proposal that adds the member's `Participant` and changes the context's `policies` reference; the member's authority starts when a person applies it (Chat 28, #129) | 16 Nov 2026 |
+| G7 / D4 | D4 is lifted by an assessor-requested evaluation draft (option A): a person with the `ASSESSOR` role asks the runtime evaluator `learner-response-evaluator` for a draft on one observed attempt; control builds the `Evaluation`, checks it with `validate_evaluation` (at most three drafts) and records it as a proposal that a person decides and applies; FORMATIVE and FORMAL; the import configures the EVALUATOR worker (Chat 28–29, #129, PR #131) | 16 Nov 2026 |
 | Earlier | Socratic option b; live model runs only with owner authorization; never edit AIM-PRO/jjodel exports | see `docs/architecture/agentic-network-decisions.md` |
 
 ## Proposed defaults to confirm when this roadmap is reviewed
@@ -109,12 +111,11 @@ Open decisions that block later steps, not decided here:
 
 | Id | Decision | Blocks |
 | --- | --- | --- |
-| G7 / D4 lift | Runtime assessor role and evaluation adapter, and the explicit decision that lets activation proceed when it exists | S11 and every learner step |
 | D16 | Scenario input independent of the AIM-PRO export (today the Curator reads the AIM-PRO project export) | nothing before S13; needed when scenarios change |
 | D19 | How a learner's courses are listed: the contexts where the learner is a participant (an API that lists the subject's own contexts, allowed by D35), or an enrolment record. The owner could not try the learner side yet (9 Nov 2026): no learner app exists before S13 | S12 |
 | D21 | The trainer's role once a course is validated, beyond authoring trainer content. Owner direction (9 Nov 2026), to be clarified: the trainer is used to give learners practice, a kind of Socratic agent that hands out exercises with a method. Open points: whether the trainer is a person, an agent or both, and how it relates to the Socratic coach of S13 | after S13 |
-| D25 | Course membership: how other teachers, trainers and learners join a course created from the studio (D23 gives its policy one subject, the creator). Options include new policy versions written by the API, a change of a context's `policies` reference, or an enrolment record (related to D19) | S10 for learners in delivery; any course with more than one author |
 | D28 | A Curator revision of the syllabus in use. Today an applied syllabus can be edited by the teacher but not revised by the Curator: a revision needs a revision request, and a decision on an applied proposal is not one. Options: a revision job that carries its own reason, or a new decision kind (Chat 19 finding 2) | when a course is refined after it is applied |
+| D36 | Membership proposals made together (#133): every membership proposal is built on the installed policy, so only the first one applied succeeds and the others go stale. Options: the core refuses a membership proposal while another is pending in the same course (a new rule), or the studio only shows the pending ones and warns (SE-AI case study, 17 Nov 2026) | S11b |
 | D29 | The form of the optional agent review of a teacher's edit (D27): a job that records a new proposal with the review agent's verdict, or a review record beside the edited proposal. Needs a model call (Chat 19 finding 3) | before the review of an edit is offered |
 | D31 | Whether a citation that is true but only loosely relevant to its unit may stand when the draft declares the transfer to the audience as a gap. Since D30 the review agent accepts it and the teacher judges its relevance from the gaps and the excerpts in the syllabus view; the alternative is a further calibration that asks for relevance to the unit's purpose (Chat 20 finding 5) | before the syllabus review is relied on without a teacher reading the gaps |
 | D32 | Details of the review loop (D30): whether the drafts the review agent refused are kept beside their verdicts (up to three syllabi per request), and whether an administrator's abandonment stops the loop between drafts instead of at the final write (Chat 20 findings 2 and 3) | none; when the review of a draft is audited, or long jobs are abandoned |
@@ -183,11 +184,18 @@ metamodel.
 | S09c | 4 | Rubrics, assessments, teacher and trainer content from the studio; teacher view for every proposal kind | S09a (S09a2 for prepared sources) |
 | S09d | 4 | Generation by blocks of units: a 48-unit course gets its assessments and content with the configured model (owner, 11 Nov 2026; before S09c2 part 2) | S09c, D34 |
 | S10 | 8 | Course validation: release and delivery views — **milestone M2: authoring to delivery** | S09c |
-| S11 | — | Runtime assessor role and evaluation adapter (G7) | S10, owner decision |
+| S11 | — | Runtime assessor role and evaluation adapter (G7); course membership (D25) (done: PR #131) | S10, D25, G7 / D4 |
+| S11b | — | Studio flow fixes from the SE-AI case study: an existing course id as delivery course (#132), pending activation and membership proposals (#133) | S11, D36 |
 | S12 | 5 | Learner API, including the learner's own courses | S11, D19, D20 |
 | S13 | 5 | Learner app: my courses, course view, practice — **milestone M3: learner practice end to end** | S12 |
+| S13b | — | Review and release readability for the teacher: release views (#125), the next action on long review pages (#134) | S13, the layout owner |
 | S14 | — | Scenario input independent of the AIM-PRO export | D16 |
 | S15 | 6 | Organisation context and guidance | decision 6 details |
+
+Planned order (owner, 17 November 2026, after the SE-AI case study): Chat 30 writes
+the D19 and D36 options for the owner and specifies S12; then S11b; then S12 and
+S13; then S13b. The SE-AI case study (`examples/se-ai/`) is run again, with the
+owner's authorization, as a live check at M3.
 
 S14 and S15 are listed so they are not forgotten; they are specified when their
 decisions exist. Phase 7 of the role plan (competence discovery, monitoring)
@@ -512,7 +520,23 @@ be considered.
 `docs/architecture/authoring-lifecycle.md`. It needs an explicit owner decision
 on how D4 is lifted before implementation.
 
-**Acceptance.** Defined with the owner when the step starts.
+**Done** in PR #131 (issue #129, handoffs `docs/plans/handoffs/chat-28.md` and
+`chat-29.md`), merged as `287cfff`. The owner ran the whole flow live on
+17 November 2026 (SE-AI case study, `examples/se-ai/README.md`).
+
+### S11b — Studio flow fixes from the SE-AI case study
+
+**Goal.** The delivery flow does not lead a teacher into refused or stale
+proposals.
+
+**Scope.** #132 and #133, labels and data only. The core rule of #133 follows
+D36; until D36 is decided the studio only shows and warns.
+
+**Acceptance.**
+
+- [ ] Creating a delivery course with an existing id is refused in the form, in words; nothing navigates (#132).
+- [ ] The course page shows a pending activation proposal instead of "Propose activation"; the members page lists pending membership proposals and says that one membership is applied at a time (#133).
+- [ ] Studio tests for each state; the S10 and S11 browser tests cover them.
 
 ### S12 — Learner API
 
@@ -543,6 +567,18 @@ for decision 1.
 
 - [ ] Browser test: practice, submission and a reviewed evaluation on the seed delivery.
 - [ ] The learner build contains no authoring code (bundle check).
+
+### S13b — Review and release readability
+
+**Goal.** A teacher finds what to check and what to do next on the review and
+release pages.
+
+**Scope.** #125 (release views) and #134 (the next action on long review pages).
+Labels and data first; any change to the structure of a page (where the decision
+form sits, collapsing the policy preview) is agreed with the layout owner. S10's
+rule that the policy preview is shown in full stays unless the owner changes it.
+
+**Acceptance.** Defined with the owner and the layout owner when the step starts.
 
 ## Chat prompts
 

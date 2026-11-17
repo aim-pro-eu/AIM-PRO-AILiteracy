@@ -1,0 +1,161 @@
+{
+  "status": "PASS",
+  "source": "docs/resources/aimpro-megamodel-2026-11-04.json",
+  "source_sha256": "e2d842b6dc88dc9b40af6d848b67d001d940df82fc48dde88b259ca6878f253a",
+  "megamodel_sha256": "9205855b992806bde4cb145a0bef1601ef7d13161b7876f1657402ea2a92be77",
+  "scenario": "SE_AI_iSQD",
+  "competencies": "SE_AI_Competencies",
+  "counts": {
+    "modules": 4,
+    "learning_targets": 8,
+    "activities": 16,
+    "competencies": 10,
+    "resources": 10,
+    "clusters": 4,
+    "assessment_items": 4
+  },
+  "scenario_findings": [],
+  "competency_mapping": [
+    {
+      "code": "D05",
+      "source_object_id": "Pointer1786054008235_USER_204",
+      "generated_object_id": "Pointer_SEAI_35b1b9d8affbf3cdc718",
+      "changes": [
+        {
+          "field": "sourceFrameworks",
+          "before": "OECD, DigComp, UNESCO",
+          "after": [
+            "OECD, DigComp, UNESCO"
+          ]
+        }
+      ]
+    },
+    {
+      "code": "D08",
+      "source_object_id": "Pointer1786054052274_USER_230",
+      "generated_object_id": "Pointer_SEAI_73be8d500830853fc28e",
+      "changes": [
+        {
+          "field": "sourceFrameworks",
+          "before": "OECD, AIM-PRO",
+          "after": [
+            "OECD, AIM-PRO"
+          ]
+        }
+      ]
+    },
+    {
+      "code": "D10",
+      "source_object_id": "Pointer1786054060473_USER_243",
+      "generated_object_id": "Pointer_SEAI_9dc11c91d6a9a3d25c6e",
+      "changes": [
+        {
+          "field": "sourceFrameworks",
+          "before": "OECD, DigPromise",
+          "after": [
+            "OECD, DigPromise"
+          ]
+        }
+      ]
+    },
+    {
+      "code": "D16",
+      "source_object_id": "Pointer1786054087944_USER_269",
+      "generated_object_id": "Pointer_SEAI_0d19b326cd3adb915fb7",
+      "changes": [
+        {
+          "field": "sourceFrameworks",
+          "before": "DigComp, EU AI Act",
+          "after": [
+            "DigComp, EU AI Act"
+          ]
+        }
+      ]
+    },
+    {
+      "code": "R27",
+      "source_object_id": "Pointer1786054141840_USER_334",
+      "generated_object_id": "Pointer_SEAI_030374d2e10ef031a8d9",
+      "changes": [
+        {
+          "field": "sourceFrameworks",
+          "before": "USAL v3.1 / EU AI Act Art. 14 anchor",
+          "after": [
+            "USAL v3.1 / EU AI Act Art. 14 anchor"
+          ]
+        }
+      ]
+    }
+  ],
+  "crosswalk": [
+    {
+      "module": "M1",
+      "title": "Requirements with AI critique",
+      "target_ids": [
+        "Pointer_SEAI_34c47f50932a9b7fd60f",
+        "Pointer_SEAI_6bba0b7eab61825f769f"
+      ],
+      "competency_codes": [
+        "SE01",
+        "SE05",
+        "D08",
+        "D16"
+      ],
+      "formative_item_id": "Pointer_SEAI_8dd502d19feaa2016b3d",
+      "rubric_key": "RUBRIC_M1"
+    },
+    {
+      "module": "M2",
+      "title": "Design and modelling decisions",
+      "target_ids": [
+        "Pointer_SEAI_52e1f5719a809304d7d3",
+        "Pointer_SEAI_8b1ad4485781844bc538"
+      ],
+      "competency_codes": [
+        "SE02",
+        "SE01",
+        "D10",
+        "D05"
+      ],
+      "formative_item_id": "Pointer_SEAI_0a390838a691d5b2f334",
+      "rubric_key": "RUBRIC_M2"
+    },
+    {
+      "module": "M3",
+      "title": "Testing AI-generated code",
+      "target_ids": [
+        "Pointer_SEAI_f73f8258cecd1fe856c3",
+        "Pointer_SEAI_8482d71d434a9b89a820"
+      ],
+      "competency_codes": [
+        "SE03",
+        "SE02",
+        "D05",
+        "R27"
+      ],
+      "formative_item_id": "Pointer_SEAI_14bd4a76e12480a9e9ed",
+      "rubric_key": "RUBRIC_M3"
+    },
+    {
+      "module": "M4",
+      "title": "Code review, maintenance and responsible delivery",
+      "target_ids": [
+        "Pointer_SEAI_35dd812eb9e5390d6900",
+        "Pointer_SEAI_c7ce7075a6ce811f5834"
+      ],
+      "competency_codes": [
+        "SE04",
+        "SE05",
+        "D10",
+        "D16",
+        "R27"
+      ],
+      "formative_item_id": "Pointer_SEAI_940306e2a85c0043601f",
+      "rubric_key": "RUBRIC_M4"
+    }
+  ],
+  "limitations": [
+    "Authored proposal: durations, rubrics and rules are design choices, not an official syllabus.",
+    "No native .jjodel project is produced; upload the megamodel JSON."
+  ]
+}
