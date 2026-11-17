@@ -137,8 +137,8 @@ describe('the activation of an imported delivery course (S10, part 2)', () => {
   it('shows why activation is refused, in words, and builds nothing further', async () => {
     const { requests } = await renderStudio(course({ status: 200, body: { proposal: null, findings: [
       { code: 'RELEASE_RUNTIME_ROLE', target: 'activity-assess', severity: 'BLOCKING',
-        reason: 'This ASSESS activity has no configured runtime assessor role; activation stays refused until a later explicit decision (D4).',
-        resolution: 'Keep the delivery in PREPARATION.' },
+        reason: 'This activity intent has no configured runtime role in the delivery.',
+        resolution: 'Correct the delivery configuration.' },
       { code: 'R08', target: 'req-material', severity: 'BLOCKING', reason: 'A mandatory resource requirement has no valid binding.',
         resolution: 'Bind an approved resource.' }] } }), '/studio/contexts/delivery-1/course');
     const section = within(await screen.findByRole('region', { name: en.delivery.activation.heading }));
@@ -147,7 +147,7 @@ describe('the activation of an imported delivery course (S10, part 2)', () => {
     fireEvent.click(section.getByRole('button', { name: en.delivery.activation.submit }));
     expect(await section.findByText(en.delivery.activation.refused_other.replace('{{count}}', '2'))).toBeTruthy();
     expect(within(section.getByTestId('activation-refusals')).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
-      '“Write and justify a prompt.” is an assessment, and no assessor is configured for students yet (decision D4): the course stays in preparation.',
+      'This activity intent has no configured runtime role in the delivery. What to do: Correct the delivery configuration. (RELEASE_RUNTIME_ROLE)',
       'A mandatory resource requirement has no valid binding. What to do: Bind an approved resource. (R08)',
     ]);
     const post = requests.find((request) => request.method === 'POST')!;

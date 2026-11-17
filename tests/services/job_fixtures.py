@@ -13,11 +13,12 @@ from uuid import uuid4
 
 from aimpro.audit import DEFAULT_PROJECT
 from aimpro.generators import GenerationCommand
+from learning.contracts import EntityRef
 from learning.store import LearningStore
 from services.api_common.contexts import ContextServices, PolicyDirectory
 from services.jobs.kinds import Resources
 from services.jobs.worker import Worker
-from tests.authoring_cycle_fixtures import AUTH
+from tests.authoring_cycle_fixtures import AUTH, synthetic_evaluation
 from tests.generator_fixtures import SyntheticModels
 from tests.store_backends import _administer, backend, postgres_url
 from tests.syllabus_fixtures import Curator, Reviewer, revised_syllabus
@@ -76,9 +77,14 @@ class SyntheticAgents:
         self.built.append('search-client')
         return _Client(self)
 
+    def assessor(self):
+        """The runtime assessor (S11): a synthetic draft that judges each rubric criterion it is given."""
+        self.built.append('assessor')
+        return synthetic_evaluation
+
     def resources(self):
         return Resources(authoring=self.authoring, search=self.search, exports=self.exports,
-                         search_client=self.search_client)
+                         search_client=self.search_client, assessor=self.assessor)
 
 
 class _Client:
@@ -123,6 +129,30 @@ class _Lead:
         if response_format is SyllabusVerdict:
             return self.syllabus.kickoff(prompt, response_format)
         return self.generators.kickoff(prompt, response_format)
+
+
+def activate_delivery(seed_dir, store_location, manifest):
+    """The seed's delivery made active: the operator installs its preview, the staff activates it; its policy."""
+    from learning.metamodel import load_contract
+    from learning.policies import TrustedPolicy
+    from learning.service import LearningService
+    from unittest.mock import Mock
+    preview = TrustedPolicy.model_validate_json((Path(seed_dir) / manifest.delivery_policy_preview).read_bytes())
+    PolicyDirectory(Path(seed_dir) / manifest.policy_dir).install(Path(manifest.delivery_policy_preview).name, preview)
+    context_id = manifest.delivery_context
+    with LearningStore(store_location) as store:
+        service = LearningService(store, load_contract(), preview, Mock(side_effect=AssertionError('No agents')))
+        result = service.propose_activation(context_id, manifest.staff,
+            {'base_context': store.read_context(context_id).ref}, request_id='seed-activation')
+        service.decide(context_id, manifest.staff, result.proposal, 'APPROVE', 'Synthetic activation review')
+        service.apply(context_id, manifest.staff, result.proposal, 'seed-activation')
+    return preview
+
+
+def evaluation_job(evidence, mode='FORMATIVE'):
+    """The runtime assessor's job (S11) on one observed attempt."""
+    return {'kind': 'propose-evaluation', 'command': {'evidence': EntityRef.model_validate(evidence).model_dump(),
+                                                      'mode': mode}}
 
 
 def worker(store, policies, jobs, agents, **kwargs):

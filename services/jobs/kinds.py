@@ -16,6 +16,10 @@ names no export and searches nothing.
 The source kinds (S09a2) build no model and propose nothing: a discovery
 records the excerpts its queries found, a preparation the exact excerpts of its
 source plan, which then await the teacher's choice.
+
+The runtime assessor (S11) drafts an evaluation of one observed attempt of an
+active delivery, for a subject with the ``ASSESSOR`` role; the draft is a
+pending proposal that a person with assessment authority decides and applies.
 """
 
 from __future__ import annotations
@@ -28,6 +32,7 @@ from pydantic import Field, model_validator
 
 from aimpro.generators import GenerationCommand
 from aimpro.source_selection import SourceDiscovery, SourcePlan
+from learning.evaluation import EvaluationCommand
 from learning.contracts import Record, Text
 
 
@@ -37,6 +42,7 @@ class Resources(NamedTuple):
     search: Callable[[], Any] | None
     exports: Path | None
     search_client: Callable[[], Any] | None = None
+    assessor: Callable[[], Any] | None = None
 
 
 class AssessmentJob(Record):
@@ -110,8 +116,14 @@ class PreparationJob(Record):
         return self
 
 
+class EvaluationJob(Record):
+    """The runtime assessor: ``learning propose-evaluation``, on one observed attempt (S11)."""
+    kind: Literal['propose-evaluation']
+    command: EvaluationCommand
+
+
 JobCommand = Annotated[AssessmentJob | TeacherJob | TrainerJob | SyllabusJob | RevisionJob | DiscoveryJob |
-                       PreparationJob, Field(discriminator='kind')]
+                       PreparationJob | EvaluationJob, Field(discriminator='kind')]
 
 
 class JobKind(NamedTuple):
@@ -187,6 +199,13 @@ def _preparation(service, context_id, subject_key, request_id, job, resources):
         competencies=job.competencies, root_id=job.root_id)
 
 
+def _evaluation(service, context_id, subject_key, request_id, job, resources):
+    if resources.assessor is None:
+        raise ValueError('The runtime assessor is not available to the worker')
+    return service.propose_evaluation(context_id, subject_key, job.command, request_id=request_id,
+                                      assessor_factory=resources.assessor)
+
+
 KINDS = {kind.name: kind for kind in (
     JobKind('generate-project-assessments', AssessmentJob, _project('generate_project_assessments')),
     JobKind('generate-project-teacher', TeacherJob, _project('generate_project_teacher')),
@@ -195,4 +214,5 @@ KINDS = {kind.name: kind for kind in (
     JobKind('revise-aimpro-syllabus', RevisionJob, _revision),
     JobKind('discover-aimpro-syllabus-sources', DiscoveryJob, _discovery),
     JobKind('prepare-aimpro-syllabus-sources', PreparationJob, _preparation),
+    JobKind('propose-evaluation', EvaluationJob, _evaluation),
 )}

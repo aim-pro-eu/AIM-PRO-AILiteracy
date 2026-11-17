@@ -30,11 +30,12 @@ export interface SeedManifest {
 export interface CliResult { status: number; output: unknown; errors: string }
 
 const CONFIRM_PROMPT = 'Type CONFIRM: ';
+/** The seed's installed policy: every other file of the policy directory was written by a test. */
+const SEED_POLICY = 'architecture-policy-1.json';
 
 /** The CLI on the database the API serves: what the browser did is checked there, or done "by another reviewer". */
 export function cli(subject: string, context: string, args: string[], input = 'CONFIRM\n'): CliResult {
-  const policy = 'architecture-policy-1.json';
-  const run = spawnSync(python(), ['-m', 'learning', '--db', DATABASE, '--policy', `${SEED}policies/${policy}`,
+  const run = spawnSync(python(), ['-m', 'learning', '--db', DATABASE, '--policy', `${SEED}policies/${SEED_POLICY}`,
     '--subject', subject, '--context', context, ...args], {
     cwd: ROOT, input, encoding: 'utf8', env: { ...process.env, ...TELEMETRY_OFF },
   });
@@ -62,9 +63,10 @@ export const test = base.extend<{ seed: SeedManifest }>({
   // The copy is renamed into place: a request still running from the previous test
   // would otherwise open a truncated file, which LearningStore initialises as new.
   seed: [async ({}, use) => {
-    // Courses created by an earlier test lose their context with the restore: their policy files go too.
+    // Policies an earlier test installed lose their context with the restore: the courses it created, a delivery
+    // preview it installed as the operator, the members it added. Only the seed's own policy stays.
     for (const name of readdirSync(`${SEED}policies`)) {
-      if (name.startsWith('course-')) rmSync(`${SEED}policies/${name}`);
+      if (name !== SEED_POLICY) rmSync(`${SEED}policies/${name}`);
     }
     copyFileSync(PRISTINE, `${DATABASE}.restore`);
     renameSync(`${DATABASE}.restore`, DATABASE);

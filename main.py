@@ -101,6 +101,47 @@ def build_aimpro_lead(
     return lead, budget
 
 
+def build_runtime_assessor(
+    base_dir: Path = BASE_DIR,
+    *,
+    model_catalog: ModelCatalog | None = None,
+    environ: Mapping[str, str] | None = None,
+    client_factory: Callable[..., Any] | None = None,
+    agent_factory: Callable[..., Any] = Agent,
+):
+    """Build the runtime assessor (S11): one typed evaluation draft per call, by learner-response-evaluator.
+
+    The agent gets no tool: it judges the supplied evidence against the supplied rubric only.
+    """
+    from learning.evaluation import EVALUATOR, EvaluationDraft, check_profile
+    if environ is None:
+        load_dotenv(base_dir / ".env")
+    runtime_environ = os.environ if environ is None else environ
+    catalog = model_catalog if model_catalog is not None else load_model_catalog(base_dir / "model.properties")
+    from agent_system.telemetry import initialize
+    initialize(runtime_environ)
+    skills = load_skill_catalog(base_dir / "skills")
+    registry = AgentRegistry.load(base_dir / "agents", profiles=catalog.profiles.keys(),
+        tools={SEARCH_TOOL_NAME: object()}, skills=skills, settings=catalog.settings,
+        categories=load_category_catalog(base_dir / "categories"), excluded_names={catalog.lead.name})
+    config = check_profile(registry.get(EVALUATOR))
+    llms = LLMFactory(catalog, environ=runtime_environ, client_factory=client_factory, anthropic_json_outputs=True)
+    llms.validate_settings(config.profile, config.settings)
+
+    def draft(prompt: str) -> EvaluationDraft:
+        agent = agent_factory(
+            role=config.name, goal="Draft one typed evaluation of the supplied learner evidence for human review.",
+            backstory=config.system_prompt, llm=llms(config.profile, config.settings), tools=[],
+            allow_delegation=False,
+        )
+        result = getattr(agent.kickoff(prompt, response_format=EvaluationDraft), "pydantic", None)
+        if type(result) is not EvaluationDraft:
+            raise ValueError("Invalid structured evaluation draft")
+        return EvaluationDraft.model_validate(result.model_dump(mode="json"))
+
+    return draft
+
+
 def build_orchestrator(
     base_dir: Path = BASE_DIR,
     *,

@@ -71,8 +71,8 @@ class DeliveryApiTest(ReviewApiCase):
         return self.post(self.staff, f'/contexts/{COURSE}/activations',
                          {'request_id': request_id, 'base_context': context.ref.model_dump()})
 
-    # Acceptance (S10, part 2): the import of the selection sent, approved and applied; activation refused in words.
-    def test_an_import_is_proposed_applied_installed_and_its_activation_refused(self):
+    # Acceptance (S10, part 2; S11): the import of the selection sent, approved and applied; activation proposed.
+    def test_an_import_is_proposed_applied_installed_and_its_activation_proposed(self):
         view = self.inspection()
         self.assertEqual(len(view.requirements), 7)
         self.assertTrue(all(r.resource and r.title for r in view.requirements))
@@ -98,14 +98,13 @@ class DeliveryApiTest(ReviewApiCase):
         fields = self.staff.get(f'/contexts/{COURSE}').json()['context']['fields']
         self.assertEqual((fields['mode'], fields['status']), ('PREPARATION', 'DRAFT'))
         self.assertEqual(fields['learningDesign'], result.design.model_dump())
-        digests = self.digests()
+        # The import configured the runtime assessor (S11): nothing refuses the activation any more.
+        self.assertIn('learner-response-evaluator', result.preview.workers)
         response = self.activation()
         self.assertEqual(response.status_code, 200, response.text)
         outcome = ActivationOutcome.model_validate(response.json())
-        self.assertIsNone(outcome.proposal)
-        self.assertEqual({f.code for f in outcome.findings}, {'RELEASE_RUNTIME_ROLE'})
-        self.assertTrue(all('D4' in f.reason for f in outcome.findings))
-        self.assertEqual(self.digests(), digests)
+        self.assertEqual(outcome.findings, ())
+        self.assertEqual(outcome.proposal.policy, result.policy_preview.policy_ref)
 
     def test_a_requirement_left_unbound_keeps_activation_refused(self):
         result = self.imported(self.command(omit=1))

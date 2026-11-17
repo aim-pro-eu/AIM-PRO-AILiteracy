@@ -1,15 +1,14 @@
 """Executable architecture acceptance: production services, simulated model outputs.
 
-Release, delivery import and activation use the production commands. The only
-simulated boundary they add is the future runtime assessor role (G7): owner
-decision D4 keeps activation refused while an ASSESS activity has no such role,
-so the runtime scenarios patch one explicit EVALUATOR worker into the import.
+Release, delivery import, activation and the assessor's evaluation draft use the
+production commands: the import configures the EVALUATOR runtime worker (G7, S11),
+which lifts D4. Model responses are synthetic.
 """
 
 from dataclasses import replace
 from tempfile import TemporaryDirectory
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 from learning.assessment import derive_activity_status, validate_evaluation
 from learning.authoring import (ArtifactSelection, ProjectManifest, dependency_findings,
@@ -23,9 +22,6 @@ from learning.store import LearningStore
 from tests.authoring_cycle_fixtures import (AUTH, DELIVERY, DELIVERY_TWO, ProductionAuthoring,
     SimulatedRuntimeAgents, entity, ref, trusted_policy)
 from tests.store_backends import block_network, new_store_location, on_both_backends
-
-
-SIMULATED_ASSESSOR = {'EVALUATOR': 'learner-response-evaluator'}
 
 
 @on_both_backends
@@ -63,8 +59,7 @@ class AuthoringCycleTest(unittest.TestCase):
     def import_and_activate(self, release, context_id=DELIVERY, request_id='import-1'):
         """Production import, destination review, policy installation and activation."""
         author = self.authoring
-        with patch.dict('learning.releases.RUNTIME_WORKERS', SIMULATED_ASSESSOR):
-            result = author.delivery_import(release, context_id, request_id)
+        result = author.delivery_import(release, context_id, request_id)
         self.assertEqual((result.preview.mode, result.preview.status), ('PREPARATION', 'DRAFT'))
         self.assertNotEqual(result.policy_preview, self.service.policy)
         self.assertEqual(self.store.read_context(context_id).fields['models'], [])
@@ -134,7 +129,7 @@ class AuthoringCycleTest(unittest.TestCase):
         _, feedback = self.runtime.request('course:practice', 'PRACTICE', 'trainer-1', practice)
         self.assertEqual(feedback.kind, 'ANSWER')
         observed = self.submit('course:assess', 'assessment-1')
-        proposal = self.runtime.assessor_proposal(observed, 'evaluator-1')
+        proposal = self.runtime.assessor_draft(observed, 'evaluator-1')
         self.assertEqual(proposal.fields['status'], 'AWAITING_DECISION')
         self.assertFalse(self.store.read_context(DELIVERY).fields['learningStates'])
         candidate = next(e for e in proposal_candidates(self.store, proposal) if e.type == 'Evaluation')
@@ -151,7 +146,7 @@ class AuthoringCycleTest(unittest.TestCase):
         phase = context.snapshot.get(context.snapshot.get(context.snapshot.context.fields['learningDesign']).fields['root'])
         self.assertEqual(derive_activity_status(phase, context.snapshot, context.snapshot.rule_bindings,
             learner_ref=context.participant.ref), 'IN_PROGRESS')
-        self.assertEqual(self.runtime.events, ['lesson-explainer', 'guided-practice-coach', 'simulated-assessor-evaluator'])
+        self.assertEqual(self.runtime.events, ['lesson-explainer', 'guided-practice-coach', 'learner-response-evaluator'])
         self.assertEqual(len(self.runtime.scopes), 2)
         self.assertEqual(len(self.store.owned(DELIVERY, 'LearningEvidence')), 2)
         self.assertEqual(self.store.read_context(AUTH).fields['mode'], 'PREPARATION')
@@ -174,7 +169,7 @@ class AuthoringCycleTest(unittest.TestCase):
     def test_dependency_revision_rebuild_and_new_release_preserve_running_history(self):
         release_one = self.publish_and_activate()
         observed = self.submit('course:assess', 'old-attempt')
-        evaluation = self.runtime.assessor_proposal(observed, 'old-evaluation')
+        evaluation = self.runtime.assessor_draft(observed, 'old-evaluation')
         self.authoring.review_and_apply(DELIVERY, evaluation, 'old-evaluation', service=self.delivery)
         delivery_before = self.store.read_context(DELIVERY)
         history_before = self.delivery_state(DELIVERY)

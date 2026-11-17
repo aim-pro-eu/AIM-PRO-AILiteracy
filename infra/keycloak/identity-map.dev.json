@@ -10,6 +10,11 @@
       "issuer": "http://127.0.0.1:58080/realms/alm-dev",
       "subject": "0305bbe3-81b8-4458-a974-c2a152eec3da",
       "subject_key": "learner"
+    },
+    {
+      "issuer": "http://127.0.0.1:58080/realms/alm-dev",
+      "subject": "726af9c7-0f64-41dc-8372-05b123af3d53",
+      "subject_key": "assessor"
     }
   ]
 }

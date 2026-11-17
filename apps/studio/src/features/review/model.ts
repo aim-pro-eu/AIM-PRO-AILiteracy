@@ -81,9 +81,15 @@ export function compareCandidates(candidates: Entity[], applied: Entity[]): Cand
   });
 }
 
-/** The change proposals of a context summary; the summary holds the latest revision of each. */
+/**
+ * The latest revision of each change proposal of a context summary. The summary lists the store's latest revisions
+ * after the records the context reaches, which may hold an older one: an applied evaluation reaches, through its
+ * decision, the revision that was decided (S11). The later revision of an id wins.
+ */
 export function latestProposals(entities: Entity[]): Entity[] {
-  return entities.filter((entity) => entity.type === 'ChangeProposal');
+  const latest = new Map<string, Entity>();
+  for (const entity of entities) if (entity.type === 'ChangeProposal') latest.set(entity.id, entity);
+  return [...latest.values()];
 }
 
 export const proposalStatus = (proposal: Entity) => String(proposal.fields.status ?? '');

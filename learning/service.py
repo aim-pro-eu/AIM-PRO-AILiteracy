@@ -283,6 +283,25 @@ class LearningService:
         from learning.releases import propose_activation
         return propose_activation(self, context_id, subject_key, command, request_id)
 
+    def propose_membership(self, context_id, subject_key, command, *, request_id, install=None):
+        """Propose a new member (D25); ``install`` writes the new trusted policy version before the proposal."""
+        from learning.membership import propose_membership
+        return propose_membership(self, context_id, subject_key, command, request_id, install)
+
+    def propose_evaluation(self, context_id, subject_key, command, *, request_id, assessor_factory):
+        """An assessor's evaluation draft on one observed attempt (S11); ``assessor_factory`` builds the model."""
+        from learning.evaluation import propose_evaluation
+        return propose_evaluation(self, context_id, subject_key, command, request_id, assessor_factory)
+
+    def authorize_evaluation(self, context_id, subject_key):
+        """Check that the subject may start evaluation drafts here: ``propose`` and ``ASSESSOR``; records nothing."""
+        from learning.evaluation import authorize_assessor
+        authorize_assessor(self._context(context_id, subject_key))
+
+    def members(self, context_id, subject_key):
+        from learning.membership import course_members
+        return course_members(self, context_id, subject_key)
+
     def generate_project_assessments(self, context_id, subject_key, command, **kwargs):
         from learning.generation import generate_project
         return generate_project(self, context_id, subject_key, 'ASSESSMENT', command, **kwargs)

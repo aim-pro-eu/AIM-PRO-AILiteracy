@@ -15,7 +15,8 @@ from learning.policies import TrustedPolicy
 from learning.service import LearningService
 from learning.store import LearningStore
 from tests.authoring_cycle_fixtures import AUTH, DELIVERY, DELIVERY_TWO, trusted_policy
-from tests.seed import SeedManifest, build_seed, main
+from tests.seed import SYNTHETIC_ATTEMPT, SeedManifest, build_seed, main, record_attempt
+from tests.services.job_fixtures import activate_delivery
 from tests.store_backends import block_network, new_store_location, on_both_backends, sqlite_only
 
 
@@ -73,6 +74,38 @@ class SeedTest(unittest.TestCase):
             self.assertIn('ASSESS', {c.fields.get('intent') for c in evaluator if c.type == 'ActivityDefinition'})
             imported = proposal_candidates(store, store.read(manifest.pending_proposals[DELIVERY_TWO][0], owner=DELIVERY_TWO))
             self.assertIn(DELIVERY_TWO, {c.id for c in imported if c.type == 'ExecutionContext'})
+
+    def test_the_seed_records_a_synthetic_attempt_through_submit_once_the_delivery_is_active(self):
+        manifest = build_seed(self.output, self.location)
+        # An attempt is learner history, which activation refuses: it is recorded after the activation (S11).
+        with self.assertRaisesRegex(ValueError, 'not installed'):
+            record_attempt(self.output, self.location)
+        delivery = activate_delivery(self.output, self.location, manifest)
+        evidence = record_attempt(self.output, self.location)
+        self.assertEqual(record_attempt(self.output, self.location), evidence)
+        with LearningStore(self.location) as store:
+            context = LearningService(store, load_contract(), delivery, Mock())._context(DELIVERY, 'admin')
+            observed = context.snapshot.get(evidence)
+            activity = context.snapshot.get(observed.fields['activity'])
+            learner = context.snapshot.get(observed.fields['learner'])
+        self.assertEqual((observed.type, observed.provenance.origin), ('LearningEvidence', 'OBSERVED_EVENT'))
+        self.assertEqual((observed.provenance.responsible, learner.fields['subjectKey']), ('learner', 'learner'))
+        self.assertEqual(activity.fields['intent'], 'ASSESS')
+        self.assertEqual(observed.fields['contentOrLocator'], SYNTHETIC_ATTEMPT)
+
+    @sqlite_only
+    def test_command_line_records_the_attempt_in_an_existing_seed(self):
+        output, errors = StringIO(), StringIO()
+        with redirect_stdout(output), redirect_stderr(errors):
+            self.assertEqual(main(['--output', str(self.output)]), 0)
+            self.assertEqual(main(['--output', str(self.output), '--attempt']), 2)
+        self.assertIn('Attempt not recorded', errors.getvalue())
+        manifest = SeedManifest.model_validate_json((self.output / 'seed.json').read_bytes())
+        activate_delivery(self.output, self.output / 'alm.sqlite', manifest)
+        output = StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(main(['--output', str(self.output), '--attempt']), 0)
+        self.assertEqual(json.loads(output.getvalue())['evidence']['type'], 'LearningEvidence')
 
     def test_output_must_be_new_or_empty(self):
         self.output.mkdir()

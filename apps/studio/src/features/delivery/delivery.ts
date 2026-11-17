@@ -68,20 +68,11 @@ export function isImportedDelivery(context: Entity): boolean {
   return models.some((model) => isObject(model) && text(model.id).startsWith(DELIVERY_PREFIX));
 }
 
-/** One reason activation is refused, in words: a catalogue sentence for the codes the studio knows. */
-export type Refusal =
-  | { message: 'delivery.activation.assessor'; values: { activity: string } }
-  | { message: 'delivery.activation.other'; values: { reason: string; resolution: string; code: string } };
+/** One reason activation is refused, in words: its reason, what to do and its code. */
+export type Refusal = { message: 'delivery.activation.other'; values: { reason: string; resolution: string; code: string } };
 
-/** The findings of a refused activation, in words; `entities` are the course's records, for activity names. */
-export function refusals(findings: ActivationOutcome['findings'], entities: Entity[]): Refusal[] {
-  return findings.map((finding) => {
-    const activity = entities.find((entity) => entity.type === 'ActivityDefinition' && entity.id === finding.target);
-    if (finding.code === 'RELEASE_RUNTIME_ROLE' && activity?.fields.intent === 'ASSESS') {
-      return { message: 'delivery.activation.assessor',
-        values: { activity: text(activity.fields.instruction).split('\n')[0] || finding.target } };
-    }
-    return { message: 'delivery.activation.other',
-      values: { reason: finding.reason, resolution: finding.resolution, code: finding.code } };
-  });
+/** The findings of a refused activation, in words. */
+export function refusals(findings: ActivationOutcome['findings']): Refusal[] {
+  return findings.map((finding) => ({ message: 'delivery.activation.other',
+    values: { reason: finding.reason, resolution: finding.resolution, code: finding.code } }));
 }

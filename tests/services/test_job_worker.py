@@ -32,14 +32,16 @@ from learning.service import ABANDONED_CONTENT, LearningService
 from learning.store import LearningStore
 from services.jobs.kinds import KINDS, JobKind
 from services.jobs.store import JobStore, StatusEvent
-from services.jobs.worker import JobEventSink
+from services.jobs.worker import JobEventSink, Worker
+from services.api_common.contexts import ContextServices, PolicyDirectory
+from learning.decisions import proposal_candidates
 from tests.authoring_cycle_fixtures import AUTH, trusted_policy
 from tests.generator_fixtures import GENERATION_REJECTION
 from tests.seed import build_seed
-from tests.services.job_fixtures import (EXPORT, REQUIREMENT, SyntheticAgents, discovery_job, evaluator_command,
-                                         evaluator_job, export_directory, export_ref, new_jobs_location,
-                                         prepared_syllabus_job, preparation_job, revision_job, source_plan,
-                                         worker)
+from tests.services.job_fixtures import (EXPORT, REQUIREMENT, SyntheticAgents, activate_delivery, discovery_job,
+                                         evaluation_job, evaluator_command, evaluator_job, export_directory,
+                                         export_ref, new_jobs_location, prepared_syllabus_job, preparation_job,
+                                         revision_job, source_plan, worker)
 from tests.store_backends import block_network, new_store_location, on_both_backends
 from tests.syllabus_fixtures import REJECTION
 
@@ -511,18 +513,65 @@ class EventSinkTest(WorkerCase):
         self.assertEqual(self.jobs.events(AUTH, 'job-events'), ())
 
 
+@on_both_backends
+class EvaluationJobTest(WorkerCase):
+    """The runtime assessor's job (S11): an evaluation draft on the seed's attempt, in the active delivery."""
+
+    def setUp(self):
+        super().setUp()
+        from tests.seed import record_attempt
+        activate_delivery(self.root / 'seed', self.location, self.seed)
+        self.evidence = record_attempt(self.root / 'seed', self.location)
+        self.delivery = self.seed.delivery_context
+
+    def test_an_evaluation_job_ends_as_a_pending_evaluation_proposal(self):
+        self.submit('job-evaluation', evaluation_job(self.evidence, 'FORMAL'), context_id=self.delivery)
+        done = self.worker.run_once()
+        self.assertEqual((done.status, done.detail, len(done.proposal_refs)), ('PROPOSED', None, 1))
+        self.assertEqual(self.agents.built, ['assessor'])
+        self.assertEqual(self.statuses('job-evaluation', self.delivery), ['QUEUED', 'RUNNING', 'PROPOSED'])
+        with LearningStore(self.location) as store:
+            (candidate,) = proposal_candidates(store, store.read(done.proposal_refs[0], owner=self.delivery))
+        self.assertEqual((candidate.type, candidate.fields['mode']), ('Evaluation', 'FORMAL'))
+        self.assertEqual(candidate.fields['evidence'], [self.evidence.model_dump()])
+
+    def test_a_learner_job_is_rejected_before_any_model(self):
+        self.submit('job-learner', evaluation_job(self.evidence), context_id=self.delivery, subject='learner')
+        done = self.worker.run_once()
+        self.assertEqual((done.status, done.detail), ('REJECTED', 'Action is not authorized'))
+        self.assertEqual(self.agents.built, [])
+        self.assertIsNone(self.request_result('job-learner', self.delivery))
+
+    def test_a_job_on_an_unknown_attempt_is_rejected_with_the_fixed_reason(self):
+        missing = EntityRef(type='LearningEvidence', id='evidence-missing', version='1')
+        self.submit('job-missing', evaluation_job(missing), context_id=self.delivery)
+        done = self.worker.run_once()
+        self.assertEqual((done.status, done.detail),
+                         ('REJECTED', 'An evaluation draft needs one observed attempt of this delivery'))
+        self.assertEqual(self.agents.built, [])
+
+    def test_a_worker_without_the_runtime_assessor_rejects_evaluation_jobs(self):
+        resources = self.agents.resources()._replace(assessor=None)
+        bare = Worker(self.jobs, ContextServices(str(self.location), PolicyDirectory(self.policies)), resources)
+        self.submit('job-bare', evaluation_job(self.evidence), context_id=self.delivery)
+        done = bare.run_once()
+        self.assertEqual((done.status, done.detail), ('REJECTED', 'The runtime assessor is not available to the worker'))
+        self.assertIsNone(self.request_result('job-bare', self.delivery))
+
+
 class KindsTest(unittest.TestCase):
     def test_one_kind_per_generator_and_curator_command_named_as_the_cli(self):
         from learning.__main__ import parse_args
         self.assertEqual(set(KINDS), {'generate-project-assessments', 'generate-project-teacher',
                                       'generate-project-trainer', 'generate-aimpro-syllabus',
                                       'discover-aimpro-syllabus-sources', 'prepare-aimpro-syllabus-sources',
-                                      'revise-aimpro-syllabus'})
+                                      'revise-aimpro-syllabus', 'propose-evaluation'})
         base = ['--db', 'x', '--policy', 'p', '--subject', 's', '--context', 'c']
         arguments = {'generate-aimpro-syllabus': ['x', '--source-scope', 's', '--query', 'q'],
                      'discover-aimpro-syllabus-sources': ['--discovery', 'd'],
                      'prepare-aimpro-syllabus-sources': ['x', '--plan', 'p'],
-                     'revise-aimpro-syllabus': ['--proposal', 'p']}
+                     'revise-aimpro-syllabus': ['--proposal', 'p'],
+                     'propose-evaluation': ['--evidence', 'e', '--mode', 'FORMAL']}
         for name in KINDS:
             with self.subTest(name):
                 self.assertEqual(parse_args([*base, name, *arguments.get(name, ['x']), '--request-id', 'r']).command,

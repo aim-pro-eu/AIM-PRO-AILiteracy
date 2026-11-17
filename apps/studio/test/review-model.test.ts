@@ -83,4 +83,15 @@ describe('proposals of a context summary', () => {
     ];
     expect(latestProposals(entities).map((p) => [p.id, p.fields.status])).toEqual([['p-1', 'APPROVED'], ['p-2', 'APPLIED']]);
   });
+
+  it('keeps the latest revision when the summary also reaches a decided one (an applied evaluation, S11)', () => {
+    // The context reaches the revision its decision targeted; the store's latest revision comes after it.
+    const entities = [
+      entity('ChangeProposal', 'p-1', 'r1', { status: 'AWAITING_DECISION', proposedChange: 'One' }),
+      entity('ChangeProposal', 'p-2', 'r1', { status: 'APPLIED', proposedChange: 'Two' }),
+      entity('ChangeProposal', 'p-1', 'r3', { status: 'APPLIED', proposedChange: 'One' }),
+    ];
+    expect(latestProposals(entities).map((p) => [p.id, p.version, p.fields.status]))
+      .toEqual([['p-1', 'r3', 'APPLIED'], ['p-2', 'r1', 'APPLIED']]);
+  });
 });

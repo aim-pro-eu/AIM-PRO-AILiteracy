@@ -7,7 +7,8 @@ import { ActivationSection } from '../delivery/ActivationSection';
 import { isImportedDelivery } from '../delivery/delivery';
 import { readable } from '../review/model';
 import { LoadFailure, useStatusLabel } from '../review/parts';
-import { buildPath, inboxPath, proposalPath, releasePath } from '../review/paths';
+import { assesses } from '../assessments/assessments';
+import { assessmentsPath, buildPath, inboxPath, membersPath, proposalPath, releasePath } from '../review/paths';
 import type { Inbox } from '../review/reviewApi';
 import { RubricTable } from '../review/RubricTable';
 import { INTENT_KEYS } from '../review/SyllabusView';
@@ -250,6 +251,12 @@ function mayAuthor(inbox: Inbox, subjectKey: string) {
     && Array.isArray(fields.roles) && fields.roles.some((role) => role === 'ADMINISTRATOR' || role === 'CONTENT_RESPONSIBLE'));
 }
 
+/** Whether the subject administers the context, and so manages its members (D25). */
+function administers(inbox: Inbox, subjectKey: string) {
+  return inbox.entities.some(({ type, fields }) => type === 'Participant' && fields.subjectKey === subjectKey
+    && Array.isArray(fields.roles) && fields.roles.includes('ADMINISTRATOR'));
+}
+
 function CourseContent({ contextId, inbox }: { contextId: string; inbox: Inbox }) {
   const { t } = useTranslation();
   const { state } = useSession();
@@ -262,6 +269,7 @@ function CourseContent({ contextId, inbox }: { contextId: string; inbox: Inbox }
         <StatusMessage>{t('course.notStarted')}</StatusMessage>
         <p><Link to={buildPath(contextId)}>{t('course.build')}</Link></p>
         <p><Link to={inboxPath(contextId)}>{t('course.review', { count: inbox.pending.length })}</Link></p>
+        {administers(inbox, subjectKey) ? <p><Link to={membersPath(contextId)}>{t('course.members')}</Link></p> : null}
       </>
     );
   }
@@ -275,6 +283,9 @@ function CourseContent({ contextId, inbox }: { contextId: string; inbox: Inbox }
       {delivery ? <p>{t('course.delivery')}</p> : null}
       <p><Link to={inboxPath(contextId)}>{t('course.review', { count: inbox.pending.length })}</Link></p>
       {delivery ? null : <p><Link to={buildPath(contextId)}>{t('course.continueBuild')}</Link></p>}
+      {administers(inbox, subjectKey) ? <p><Link to={membersPath(contextId)}>{t('course.members')}</Link></p> : null}
+      {delivery && course.status === 'ACTIVE' && assesses(inbox, subjectKey)
+        ? <p><Link to={assessmentsPath(contextId)}>{t('course.assess')}</Link></p> : null}
       {delivery && course.mode === 'PREPARATION' && mayAuthor(inbox, subjectKey) ? <ActivationSection inbox={inbox} /> : null}
       <CourseSections contextId={contextId} course={course} />
     </>

@@ -1,4 +1,4 @@
-import { proposalExplanation, proposalStatus } from '../review/model';
+import { latestProposals, proposalExplanation, proposalStatus } from '../review/model';
 import type { Entity, EntityRef, JsonValue } from '../review/reviewApi';
 import type { Criterion } from '../review/teacher';
 
@@ -143,7 +143,7 @@ export function courseOverview(context: Entity, entities: Entity[]): CourseOverv
 
   const decisions = entities.filter((entity) => entity.type === 'HumanDecision');
   const changes = entities.filter((entity) => entity.type === 'StateChange');
-  const history = entities.filter((entity) => entity.type === 'ChangeProposal').map((proposal): HistoryEntry => ({
+  const history = latestProposals(entities).map((proposal): HistoryEntry => ({
     proposalId: proposal.id,
     summary: proposalExplanation(proposal).summary,
     status: proposalStatus(proposal),

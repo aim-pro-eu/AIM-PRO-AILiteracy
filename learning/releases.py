@@ -19,6 +19,7 @@ from learning.authoring import (ProjectManifest, ReleaseManifest, ReviewReceipt,
 from learning.context import LearningRequest, RunContext, load_context, references
 from learning.contracts import EntityRef, Finding, Record, Text, entity_data, make_entity
 from learning.decisions import create_proposal, save_proposal
+from learning.membership import MEMBERSHIP_POLICY, validate_membership_application
 from learning.metamodel import validate_entity
 from learning.planning import ROLE_CONTRACTS
 from learning.policies import RuleBinding, ScopeGrant, TrustedPolicy
@@ -32,10 +33,11 @@ DELIVERY_PREFIX = 'authoring-delivery:'
 POLICY_PREVIEW = 'Proposed trusted local policy configuration: '
 HISTORY = ('ActivityOccurrence', 'LearningEvidence', 'LearningState', 'Evaluation')
 DELIVERY_FIELDS = ('models', 'learningDesign', 'policies', 'resourceBindings', 'mode', 'status')
-COMMANDS = ('PROPOSE_RELEASE', 'PROPOSE_DELIVERY_IMPORT', 'PROPOSE_ACTIVATION')
-# Runtime roles an import may configure. ASSESS has none until an assessor-facing
-# evaluation adapter exists (G7), so activation stays refused (owner decision D4).
-RUNTIME_WORKERS = {'TEACHER': 'lesson-explainer', 'TRAINER': 'guided-practice-coach'}
+COMMANDS = ('PROPOSE_RELEASE', 'PROPOSE_DELIVERY_IMPORT', 'PROPOSE_ACTIVATION', 'PROPOSE_MEMBERSHIP')
+# Runtime roles an import may configure. The EVALUATOR drafts the evaluations an assessor requests
+# (learning/evaluation.py; G7, S11), which lifts D4.
+RUNTIME_WORKERS = {'TEACHER': 'lesson-explainer', 'TRAINER': 'guided-practice-coach',
+                   'EVALUATOR': 'learner-response-evaluator'}
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -526,7 +528,9 @@ def activation_findings(store, context):
         findings.append(Finding(code='RELEASE_LEARNER_HISTORY', target=root.id,
             reason='The destination already holds learner history; this requires a reviewed migration.'))
     policy = snapshot.get(root.fields['policies'])
-    if POLICY_PREVIEW + canonical(context.policy.model_dump(mode='json')) not in policy.fields['permissions']:
+    installed = canonical(context.policy.model_dump(mode='json'))
+    # The reviewed import preview, or a reviewed membership version derived from it (D25).
+    if not {POLICY_PREVIEW + installed, MEMBERSHIP_POLICY + installed} & set(policy.fields['permissions']):
         findings.append(Finding(code='RELEASE_POLICY_NOT_INSTALLED', target=policy.id,
             reason='The installed trusted policy differs from the reviewed import preview.',
             resolution='Install the exact approved policy preview file before activation.'))
@@ -541,12 +545,9 @@ def activation_findings(store, context):
     roles = {snapshot.get(r).fields['role'] for r in runtime.fields['definitions'] if r['type'] == 'AgentSpecialization'}
     for activity in activities:
         if _role(activity.fields['intent']) not in roles:
-            assess = activity.fields['intent'] == 'ASSESS'
             findings.append(Finding(code='RELEASE_RUNTIME_ROLE', target=activity.id,
-                reason=('This ASSESS activity has no configured runtime assessor role; activation stays refused '
-                        'until a later explicit decision (D4).') if assess else
-                       'This activity intent has no configured runtime role in the delivery.',
-                resolution='Keep the delivery in PREPARATION.' if assess else 'Correct the delivery configuration.'))
+                reason='This activity intent has no configured runtime role in the delivery.',
+                resolution='Correct the delivery configuration.'))
     return release, tuple(findings)
 
 
@@ -583,7 +584,7 @@ def _recorded(store, owner, proposal):
         payload, result = json.loads(row.payload), json.loads(row.result)
         if (isinstance(payload, dict) and payload.get('operation') in COMMANDS and isinstance(result, dict)
                 and isinstance(result.get('proposal'), dict) and result['proposal'].get('id') == proposal.id):
-            return payload['operation'], payload['command']
+            return payload['operation'], payload['command'], result
     raise ValueError('Releases, delivery imports and their activation require the dedicated commands')
 
 
@@ -609,13 +610,17 @@ def _reserved_change(context, candidates):
     def entries(value):
         return [r for r in value.fields['models'] if r['id'].startswith((RELEASE_PREFIX, DELIVERY_PREFIX))]
     imported = any(r['id'].startswith(DELIVERY_PREFIX) for r in root.fields['models'])
-    return (any(_reserved(c) for c in candidates) or entries(root) != entries(updated) or
+    # Only the membership command records a reviewed membership policy, which activation accepts.
+    claimed = set(context.snapshot.get(root.fields['policies']).fields['permissions'])
+    membership = any(c.type == 'PolicySet' and any(p.startswith(MEMBERSHIP_POLICY) and p not in claimed
+                                                   for p in c.fields['permissions']) for c in candidates)
+    return (any(_reserved(c) for c in candidates) or membership or entries(root) != entries(updated) or
             bool(_foreign_projects(entities, updated) - _foreign_projects(entities, root)) or
             imported and any(root.fields.get(k) != updated.fields.get(k) for k in DELIVERY_FIELDS))
 
 
 def refuse_generic(context, candidates):
-    """Generic proposals cannot create releases, import them or activate an imported delivery."""
+    """Generic proposals cannot create releases, import them, activate an imported delivery or add a member."""
     if _reserved_change(context, candidates):
         raise ValueError('Releases, delivery imports and their activation require the dedicated commands')
 
@@ -625,8 +630,11 @@ def validate_release_application(store, context, proposal, candidates):
     if not _reserved_change(context, candidates):
         return
     root = context.snapshot.context
-    operation, command = _recorded(store, root.id, proposal)
+    operation, command, result = _recorded(store, root.id, proposal)
     _authorize(context)
+    if operation == 'PROPOSE_MEMBERSHIP':
+        validate_membership_application(context, command, result, candidates)
+        return
     updated = next((c for c in candidates if c.type == 'ExecutionContext'), root)
     if operation == 'PROPOSE_RELEASE':
         command = ReleaseCommand.model_validate(command)

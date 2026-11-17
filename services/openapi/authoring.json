@@ -1104,6 +1104,69 @@
         "title": "ErrorBody",
         "type": "object"
       },
+      "EvaluationCommand": {
+        "additionalProperties": false,
+        "description": "``propose-evaluation``: one observed attempt and the mode the assessor chose.",
+        "properties": {
+          "evidence": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "mode": {
+            "enum": [
+              "FORMATIVE",
+              "FORMAL"
+            ],
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "evidence",
+          "mode"
+        ],
+        "title": "EvaluationCommand",
+        "type": "object"
+      },
+      "EvaluationJob-Input": {
+        "additionalProperties": false,
+        "description": "The runtime assessor: ``learning propose-evaluation``, on one observed attempt (S11).",
+        "properties": {
+          "command": {
+            "$ref": "#/components/schemas/EvaluationCommand"
+          },
+          "kind": {
+            "const": "propose-evaluation",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "command"
+        ],
+        "title": "EvaluationJob",
+        "type": "object"
+      },
+      "EvaluationJob-Output": {
+        "additionalProperties": false,
+        "description": "The runtime assessor: ``learning propose-evaluation``, on one observed attempt (S11).",
+        "properties": {
+          "command": {
+            "$ref": "#/components/schemas/EvaluationCommand"
+          },
+          "kind": {
+            "const": "propose-evaluation",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "command"
+        ],
+        "title": "EvaluationJob",
+        "type": "object"
+      },
       "ExportObject": {
         "additionalProperties": false,
         "description": "An object of the export with the texts a coverage requirement may quote.",
@@ -1751,6 +1814,7 @@
                 "generate-project-teacher": "#/components/schemas/TeacherJob-Input",
                 "generate-project-trainer": "#/components/schemas/TrainerJob-Input",
                 "prepare-aimpro-syllabus-sources": "#/components/schemas/PreparationJob-Input",
+                "propose-evaluation": "#/components/schemas/EvaluationJob-Input",
                 "revise-aimpro-syllabus": "#/components/schemas/RevisionJob"
               },
               "propertyName": "kind"
@@ -1776,6 +1840,9 @@
               },
               {
                 "$ref": "#/components/schemas/PreparationJob-Input"
+              },
+              {
+                "$ref": "#/components/schemas/EvaluationJob-Input"
               }
             ],
             "title": "Job"
@@ -1838,6 +1905,7 @@
                 "generate-project-teacher": "#/components/schemas/TeacherJob-Output",
                 "generate-project-trainer": "#/components/schemas/TrainerJob-Output",
                 "prepare-aimpro-syllabus-sources": "#/components/schemas/PreparationJob-Output",
+                "propose-evaluation": "#/components/schemas/EvaluationJob-Output",
                 "revise-aimpro-syllabus": "#/components/schemas/RevisionJob"
               },
               "propertyName": "kind"
@@ -1863,6 +1931,9 @@
               },
               {
                 "$ref": "#/components/schemas/PreparationJob-Output"
+              },
+              {
+                "$ref": "#/components/schemas/EvaluationJob-Output"
               }
             ],
             "title": "Job"
@@ -2013,6 +2084,124 @@
           "end_session_url"
         ],
         "title": "LogoutView",
+        "type": "object"
+      },
+      "Member": {
+        "additionalProperties": false,
+        "properties": {
+          "roles": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Roles",
+            "type": "array"
+          },
+          "subject": {
+            "minLength": 1,
+            "title": "Subject",
+            "type": "string"
+          }
+        },
+        "required": [
+          "subject",
+          "roles"
+        ],
+        "title": "Member",
+        "type": "object"
+      },
+      "MemberList": {
+        "additionalProperties": false,
+        "description": "The members of a course, the mapped subjects who may still join, and the roles that may be granted.",
+        "properties": {
+          "addable": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Addable",
+            "type": "array"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/Member"
+            },
+            "title": "Members",
+            "type": "array"
+          },
+          "roles": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Roles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "members",
+          "addable",
+          "roles"
+        ],
+        "title": "MemberList",
+        "type": "object"
+      },
+      "MembershipProposal": {
+        "additionalProperties": false,
+        "properties": {
+          "participant": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/TrustedPolicy"
+          },
+          "proposal": {
+            "$ref": "#/components/schemas/EntityRef"
+          }
+        },
+        "required": [
+          "proposal",
+          "participant",
+          "policy"
+        ],
+        "title": "MembershipProposal",
+        "type": "object"
+      },
+      "MembershipRequest": {
+        "additionalProperties": false,
+        "description": "``propose-membership``: the subject, its role and the base context, with the ALM request id.",
+        "properties": {
+          "base_context": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "request_id": {
+            "minLength": 1,
+            "title": "Request Id",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "CONTENT_RESPONSIBLE",
+              "ASSESSOR",
+              "LEARNER",
+              "OBSERVER"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "subject": {
+            "minLength": 1,
+            "title": "Subject",
+            "type": "string"
+          }
+        },
+        "required": [
+          "base_context",
+          "subject",
+          "role",
+          "request_id"
+        ],
+        "title": "MembershipRequest",
         "type": "object"
       },
       "PendingProposal": {
@@ -4585,7 +4774,7 @@
   },
   "info": {
     "title": "ALM Authoring API",
-    "version": "0.14.0"
+    "version": "0.15.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -6658,6 +6847,198 @@
         "summary": "Server-sent events: status and content-free progress, until the job ends; resume with Last-Event-ID",
         "tags": [
           "jobs"
+        ]
+      }
+    },
+    "/contexts/{context_id}/members": {
+      "get": {
+        "operationId": "members_contexts__context_id__members_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "context_id",
+            "required": true,
+            "schema": {
+              "title": "Context Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not authorized, unmapped identity or missing CSRF token"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not found, or the context is unavailable"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Conflict with the current state; reload and retry"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Invalid request or data"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal error"
+          }
+        },
+        "summary": "The members of this course and the subjects who may join it; for its administrators",
+        "tags": [
+          "members"
+        ]
+      },
+      "post": {
+        "operationId": "propose_membership_contexts__context_id__members_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "context_id",
+            "required": true,
+            "schema": {
+              "title": "Context Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MembershipRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipProposal"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not authorized, unmapped identity or missing CSRF token"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not found, or the context is unavailable"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Conflict with the current state; reload and retry"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Invalid request or data"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal error"
+          }
+        },
+        "summary": "Propose a new member: a new trusted policy version and the member's participant record",
+        "tags": [
+          "members"
         ]
       }
     },

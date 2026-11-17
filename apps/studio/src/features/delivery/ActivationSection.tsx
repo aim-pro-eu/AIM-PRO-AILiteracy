@@ -61,7 +61,7 @@ export function ActivationSection({ inbox }: { inbox: Inbox }) {
         <>
           <StatusMessage tone="error">{t('delivery.activation.refused', { count: outcome.findings.length })}</StatusMessage>
           <ul data-testid="activation-refusals">
-            {refusals(outcome.findings, inbox.entities).map((refusal, index) => (
+            {refusals(outcome.findings).map((refusal, index) => (
               <li key={index}>{t(refusal.message, refusal.values)}</li>
             ))}
           </ul>

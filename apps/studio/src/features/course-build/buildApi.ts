@@ -15,6 +15,9 @@ export type ProjectInspection = Schemas['ProjectInspection'];
 export type ReleaseProposal = Schemas['ReleaseProposal'];
 export type ReleaseInspection = Schemas['ReleaseInspection'];
 export type ImportProposal = Schemas['ImportProposal'];
+export type MemberList = Schemas['MemberList'];
+export type MemberRole = Schemas['MembershipRequest']['role'];
+export type MembershipProposal = Schemas['MembershipProposal'];
 export type ActivationOutcome = Schemas['ActivationOutcome'];
 export type SourceDiscovery = Schemas['SourceDiscoveryView'];
 export type SourcePreparation = Schemas['SourcePreparationView'];
@@ -38,6 +41,9 @@ export const DISCOVERY = 'discover-aimpro-syllabus-sources';
 export const PREPARATION = 'prepare-aimpro-syllabus-sources';
 export const CURATOR = 'generate-aimpro-syllabus';
 export const REVISION = 'revise-aimpro-syllabus';
+/** The runtime assessor's job: a draft evaluation of one observed attempt (S11). */
+export const EVALUATION = 'propose-evaluation';
+export type EvaluationMode = 'FORMATIVE' | 'FORMAL';
 /** The Evaluator, Teacher and Trainer job kinds, whose drafts the review agent judges (S09c). */
 export const GENERATORS: readonly string[] = [
   'generate-project-assessments', 'generate-project-teacher', 'generate-project-trainer',
@@ -126,6 +132,16 @@ export interface BuildApi {
   proposeActivation(contextId: string, csrfToken: string, command: {
     requestId: string; baseContext: EntityRef;
   }): Promise<ActivationOutcome>;
+  /** The course's members, the mapped people who may still join and the roles; for its administrators (D25). */
+  members(contextId: string): Promise<MemberList>;
+  /** Propose a new member: a new policy version and a participant to review; the same request id replays. */
+  proposeMembership(contextId: string, csrfToken: string, command: {
+    requestId: string; baseContext: EntityRef; subject: string; role: MemberRole;
+  }): Promise<MembershipProposal>;
+  /** Ask the runtime assessor for a draft evaluation of one observed attempt; the same request id returns the same job. */
+  queueEvaluation(contextId: string, csrfToken: string, requestId: string, command: {
+    evidence: EntityRef; mode: EvaluationMode;
+  }): Promise<JobView>;
 }
 
 /** What a delivery import sends: the release, its course, the exact resource of each bound requirement, the handlers. */
@@ -350,6 +366,26 @@ export function createBuildApi(client: AuthoringClient): BuildApi {
         params: { path: { context_id: contextId } },
         headers: writing(csrfToken),
         body: { request_id: requestId, base_context: baseContext },
+      }));
+    },
+
+    async members(contextId) {
+      return settle(() => client.GET('/contexts/{context_id}/members', { params: { path: { context_id: contextId } } }));
+    },
+
+    async proposeMembership(contextId, csrfToken, { requestId, baseContext, subject, role }) {
+      return settle(() => client.POST('/contexts/{context_id}/members', {
+        params: { path: { context_id: contextId } },
+        headers: writing(csrfToken),
+        body: { request_id: requestId, base_context: baseContext, subject, role },
+      }));
+    },
+
+    async queueEvaluation(contextId, csrfToken, requestId, { evidence, mode }) {
+      return settle(() => client.POST('/contexts/{context_id}/jobs', {
+        params: { path: { context_id: contextId } },
+        headers: writing(csrfToken),
+        body: { request_id: requestId, job: { kind: EVALUATION, command: { evidence, mode } } },
       }));
     },
   };

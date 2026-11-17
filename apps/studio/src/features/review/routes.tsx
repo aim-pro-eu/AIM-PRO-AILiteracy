@@ -1,9 +1,11 @@
 import type { RouteObject } from 'react-router';
 import { useParams, useSearchParams } from 'react-router';
 
+import { AssessmentsPage } from '../assessments/AssessmentsPage';
 import { BuildPage } from '../course-build/BuildPage';
 import { CoursePage } from '../course/CoursePage';
 import { ImportPage } from '../delivery/ImportPage';
+import { MembersPage } from '../members/MembersPage';
 import { ReleasePage } from '../release/ReleasePage';
 import { ProposalPage } from './ProposalPage';
 import { ReviewInboxPage } from './ReviewInboxPage';
@@ -23,6 +25,16 @@ function CourseRoute() {
 function BuildRoute() {
   const { contextId = '' } = useParams();
   return <BuildPage key={contextId} contextId={contextId} />;
+}
+
+function MembersRoute() {
+  const { contextId = '' } = useParams();
+  return <MembersPage key={contextId} contextId={contextId} />;
+}
+
+function AssessmentsRoute() {
+  const { contextId = '' } = useParams();
+  return <AssessmentsPage key={contextId} contextId={contextId} />;
 }
 
 function ProposalRoute() {
@@ -58,4 +70,6 @@ export const reviewRoutes: RouteObject[] = [
   { path: 'contexts/:contextId/review/:proposalId/edit', element: <SyllabusEditRoute /> },
   { path: 'contexts/:contextId/releases/:releaseId/versions/:version', element: <ReleaseRoute /> },
   { path: 'contexts/:contextId/import', element: <ImportRoute /> },
+  { path: 'contexts/:contextId/members', element: <MembersRoute /> },
+  { path: 'contexts/:contextId/assessments', element: <AssessmentsRoute /> },
 ];

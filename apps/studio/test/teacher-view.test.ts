@@ -27,6 +27,46 @@ const requirement = (version: string, constraints: string[], mandatory = true) =
 const CONTEXT = entity('ExecutionContext', 'ctx', 'c2', { models: [] });
 
 describe('teacher view', () => {
+  it('describes a new member, not a delivery import, though its candidates hold a policy (D25)', () => {
+    const view = teacherView([CONTEXT, entity('Participant', 'ctx:participant:assessor', 'p2',
+      { subjectKey: 'assessor', roles: ['ASSESSOR'], learningNeeds: [] }),
+    entity('PolicySet', 'course:ctx', 'p2', { sourceScopes: ['wp3'], permissions: [] })], []);
+    expect(view.kind).toBe('membership');
+    expect(view.membership).toEqual({ subject: 'assessor', roles: ['ASSESSOR'] });
+    expect(view.delivery).toBeNull();
+    expect(view.changes).toEqual([]);
+  });
+
+  it('reads an evaluation draft in plain words: the attempt, each criterion, the result and the agent (S11)', () => {
+    const evidence = entity('LearningEvidence', 'evidence-1', '1', { activity: ref('ActivityDefinition', 'activity-1', 'a1'),
+      learner: ref('Participant', 'ctx:participant:learner', '1'), kind: 'CRITERIA_BASED_PRODUCT',
+      contentOrLocator: 'Dear Alex, please send EXAMPLE-01.', observedAt: '2026-11-17T09:00:00Z' });
+    const records = [OUTCOME, activity('a1', 'Write a prompt.\nUse the rubric.'), rubric('a1', [CLARITY,
+      { ...CLARITY, key: 'tone', description: 'The tone is stated.' }]), spec('a1', []), evidence,
+    entity('Participant', 'ctx:participant:learner', '1', { subjectKey: 'learner', roles: ['LEARNER'] }),
+    entity('AgentSpecialization', 'authoring-delivery:x:learner-response-evaluator', 'w1',
+      { registryName: 'learner-response-evaluator', role: 'EVALUATOR' })];
+    const evaluation = entity('Evaluation', 'evaluation-1', '1', { context: ref('ExecutionContext', 'ctx', 'c2'),
+      evidence: [ref('LearningEvidence', 'evidence-1', '1')], specification: ref('AssessmentSpecification', 'spec-1', 'a1'),
+      mode: 'FORMAL', result: 'Meets the clarity criterion.', reviewPayloadKey: 'k',
+      assistedBy: ref('AgentSpecialization', 'authoring-delivery:x:learner-response-evaluator', 'w1'),
+      criterionJudgments: [
+        { criterionKey: 'clarity', levelKey: 'clear', evidenceRefs: [ref('LearningEvidence', 'evidence-1', '1')],
+          reason: 'The task is named.' },
+        { criterionKey: 'tone', evidenceRefs: [ref('LearningEvidence', 'evidence-1', '1')], reason: 'No tone is visible.' }] });
+    const view = teacherView([evaluation], records);
+    expect(view.kind).toBe('evaluation');
+    expect(view.evaluation).toEqual({
+      mode: 'FORMAL', agent: 'learner-response-evaluator', activity: 'Write a prompt.', learner: 'learner',
+      response: 'Dear Alex, please send EXAMPLE-01.', result: 'Meets the clarity criterion.',
+      judgments: [
+        { criterion: 'The task is identifiable.', level: 'clear', descriptor: 'Explicitly stated.', reason: 'The task is named.' },
+        { criterion: 'The tone is stated.', level: null, descriptor: null, reason: 'No tone is visible.' }],
+    });
+    expect(view.changes).toEqual([]);
+    expect(view.compared).toBe(false);
+  });
+
   const applied = [OUTCOME, activity('a1', 'Write a prompt.'), rubric('a1', [CLARITY]),
     spec('a1', ['One evening workshop']), requirement('a1', ['Fictional data only'])];
 

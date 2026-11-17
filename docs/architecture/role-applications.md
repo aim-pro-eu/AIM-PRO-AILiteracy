@@ -257,10 +257,13 @@ authorized by both policies, at proposal and again at application; an authoring
 context whose policy is not installed refuses the import (422).
 
 Since S09a the API writes one kind of file there: the policy of a course created
-from the studio (`POST /courses`, see "Course from an AIM-PRO model"). It is a
-new file, written under a temporary name that no reader lists and then linked to
-its name, so it appears whole or not at all; an existing file is never replaced,
-changed or removed. Every other policy change stays an operator action.
+from the studio (`POST /courses`, see "Course from an AIM-PRO model"). Since S11
+(D25) it also writes a new version of a course's policy when its administrator
+adds a member (`POST /contexts/{context_id}/members`, see "Course members"). Each
+is a new file, written under a temporary name that no reader lists and then
+linked to its name, so it appears whole or not at all; an existing file is never
+replaced, changed or removed. Every other policy change, a delivery import's
+preview included, stays an operator action.
 
 ## Configuration
 
@@ -377,7 +380,16 @@ installed) and `seed.json` (contexts, subjects, exact references).
 | `architecture-delivery-2` | a pending import of the same release; `learner` is a participant |
 
 The subjects are `admin` (administrator, content responsible, assessor) and
-`learner`, the subject keys of the dev identity map.
+`learner`, the subject keys of the dev identity map. The map also holds
+`assessor`, who is in no policy of the seed: a course administrator adds them
+as a member (D25).
+
+`python -m tests.seed --output DIR --attempt [--db LOCATION]` records the
+learner's synthetic attempt at the assessment of `architecture-delivery`
+through `submit` (S11, dev only). An attempt is learner history, which
+activation refuses, so it is a separate step: the delivery's policy must be
+installed in `policies/` and the delivery active. The same attempt is recorded
+once.
 
 ## Front-end workspace
 
@@ -536,9 +548,10 @@ WCAG 2.1 A and AA rules). `npm run test:browser` in `apps/`:
    (`python -m tests.synthetic_worker`); the Python is `ALM_PYTHON`, else
    `.venv/bin/python`, else `python3`;
 2. builds the studio and serves it with `vite preview` on `127.0.0.1:58000`;
-3. signs in once as `dev-admin` and once as `dev-learner` through Keycloak and keeps the session cookies;
-4. restores the seed database before each test, removes the course policy
-   files an earlier test created and deletes the jobs of the jobs database
+3. signs in once as `dev-admin`, `dev-learner` and `dev-assessor` through Keycloak and keeps the session cookies;
+4. restores the seed database before each test, removes every policy file an
+   earlier test wrote (course policies, an installed delivery preview, member
+   versions; only the seed's own policy stays) and deletes the jobs of the jobs database
    (`e2e/.state/jobs.sqlite`, kept open by the worker); tests run one at a time.
 
 Ports already in use fail the run (no reuse of another process). The tests need
@@ -561,7 +574,8 @@ browser recorded.
 | `teacher-views.spec.ts`: every proposal kind in words (S09c2, part 2) | on the seed, every proposal of the authoring context and the delivery imports of both delivery contexts, pending or decided, opened by URL: each has its title (syllabus, project initialization, assessments, teacher and trainer content, completion rules, release, delivery import; never "Proposed change"), the initialization says what it creates, the release lists its parts by kind, the import names its resources and agents, a decided proposal shows no comparison; axe on each; the course page links decided proposals with "Read this proposal" |
 | `cycle.spec.ts`: the rest of the authoring cycle (S09c2) | a new course: upload, Curator, approve and apply the syllabus, initialize and apply the project; the Evaluator form shows the project and course version it sends (read back through the API), the Teacher form says it needs the assessments; axe; another author applies an Evaluator proposal through the API, so the form's job is refused at queue time (409): the form says the course changed and shows the new course version; the Evaluator queued again, its proposal read in its teacher view (rubric; axe), approved and applied; the Teacher form shows the applied assessment it sends; the Teacher and Trainer proposals read with their material texts (axe), approved and applied; the completion rules proposed from the build page, read part by part (axe), approved and applied; the project inspection lists the five artifacts with their receipts and no stale dependency, and every node of the design has a rule |
 | `release.spec.ts`: a release and its delivery course (S10, part 1) | on the seed's authoring context, the build page's release step shows the project model it sends; the release proposed from it, read in its teacher view (its parts; axe), approved and applied; "Inspect this release": nothing stands in the way, seven approvals (the release, its project and five parts), what it freezes, no problem; axe; a delivery course created from the release page opens on the import of that release, its policy file names the creator on that course only, and it is in PREPARATION/DRAFT without a model; axe; the course page lists both releases, and the seeded one inspects with nothing in the way |
-| `delivery.spec.ts`: a release imported and its activation refused (S10, part 2) | from the seeded release page, a delivery course created; the import form proposes, for each of the seven requirements, the resource the release pins; axe; the first set to "No resource": "6 of 7"; the import proposed with six resources and its policy preview shown in full, naming the new course; no policy file installed; its teacher view lists six resources and the same preview; axe; approved and applied: the course is unavailable and no policy file was written; the test, as operator, installs the preview; on the course page, activation proposed and refused in words (the assessment without assessor, D4, and the unbound requirement, R08); axe; the course is still PREPARATION/DRAFT with six bindings |
+| `delivery.spec.ts`: a release imported and its activation refused (S10, part 2) | from the seeded release page, a delivery course created; the import form proposes, for each of the seven requirements, the resource the release pins; axe; the first set to "No resource": "6 of 7"; the import proposed with six resources and its policy preview shown in full, naming the new course; no policy file installed; its teacher view lists six resources and the same preview; axe; approved and applied: the course is unavailable and no policy file was written; the test, as operator, installs the preview; on the course page, activation proposed and refused in words (the unbound requirement, R08; no runtime-role refusal since S11); axe; the course is still PREPARATION/DRAFT with six bindings |
+| `assessment.spec.ts`: an assessor evaluates the seeded attempt (S11) | the test, as operator, installs the seeded delivery's preview; `dev-admin` adds `assessor` as Assessor from the members page, reads the proposal as a new member, approves and applies it; proposes activation, approves and applies it (LEARNING/ACTIVE); the seed records the learner's synthetic attempt (`--attempt`); `dev-assessor`, in their own session, follows "Evaluate the students' submitted attempts" to the one attempt (axe), chooses Formative and asks for a draft; the synthetic worker's runtime assessor proposes it; the draft read in words (the agent `learner-response-evaluator`, the response, one criterion, the result; axe); no learning state before; approved and applied by the assessor: one learning state, one formative evaluation with its human decision |
 | `build.spec.ts`: a syllabus not accepted (issue #112) | upload; the Curator by a query holding the synthetic reviewer's `REJECT_EVERY` marker ends with a proposal; the job list shows the fixed notice; axe; the syllabus view says the review agent accepted no draft, with its reason as model text; axe; approve and apply; the course shows the structure |
 | `build.spec.ts`: an invalid file | a text file is refused with "The file is not UTF-8 JSON"; no report; the export directory and the database file are unchanged; axe |
 | `accessibility.spec.ts` | axe on the home page (also with its validation error), the inbox with and without pending proposals, the proposal page with every disclosure open, its validation errors, the apply step, a refused application, and an unavailable context |
@@ -607,8 +621,45 @@ own. The course template (`ALM_COURSE_TEMPLATE`) is installed by an operator:
 - The same request again returns the same `CourseView` (`context_id`,
   `policy_ref`) and writes nothing; it also completes a creation that stopped
   after the policy file was written.
-- Not in S09a: adding other teachers or learners, and changing or revoking a
-  course policy from the studio.
+- Not in S09a: adding other teachers or learners (since S11, "Course members"
+  below), and changing or revoking a course policy from the studio.
+
+### Course members: module `members` (D25, S11)
+
+The owner decided D25 on 16 November 2026 (issue #129): a member joins a course
+through a new version of its trusted policy written by the API.
+
+- `GET /contexts/{context_id}/members`, for an administrator of the course only
+  (403 otherwise): the members (`subject`, their `roles` in this course, from
+  the context's `Participant` records), the subject keys of the identity map
+  that are not members yet (`addable`), and the roles that may be granted.
+- `POST /contexts/{context_id}/members` with `request_id`, `base_context`,
+  `subject` and `role`, by an administrator of the course with the CSRF token.
+  The subject must be in the identity map (422 otherwise); the role is one of
+  `CONTENT_RESPONSIBLE`, `ASSESSOR` (both: `read`, `propose`, `decide`, `apply`,
+  `interact`), `LEARNER` (`read`, `interact`, `submit`) or `OBSERVER` (`read`);
+  `ADMINISTRATOR` cannot be granted. A subject who already takes part is refused.
+- The command (`learning/membership.py`, CLI-free) copies the installed policy as
+  a new version: the member's grant for this context (a subject that the policy
+  already names in other contexts keeps those grants), and the member added to
+  every scope of this context alone, so a learner of an imported delivery reads
+  its bound resources. The API installs it as `<policy id>-<version>.json`
+  before the proposal is recorded; a failure leaves at most an unused file.
+- The proposal holds the member's `Participant`, the new `PolicySet` version
+  (its permissions end with the canonical new policy) and the context with only
+  `participants` and `policies` changed. An administrator decides and applies
+  it; until then the member has no authority. Application rechecks that exactly
+  that policy is installed. The same request id returns the same proposal; a
+  different command under it is a 409.
+- A generic proposal cannot record a membership policy (a `PolicySet` with a new
+  membership entry), and in an imported delivery it still cannot move
+  `policies`. In an imported delivery the command works in PREPARATION and
+  ACTIVE, and activation accepts a membership version derived from the reviewed
+  import preview.
+- Studio: the course page of an administrator links "Members of this course"
+  (`/contexts/{context_id}/members`): the members with their roles in words, and
+  a person and role to propose. The review page describes the proposal as a new
+  member. Removing a member is not offered.
 
 ### Uploading the model: module `exports`
 
@@ -1179,22 +1230,59 @@ release pins, or none).
    course.
 6. **Activation.** The course page of an imported delivery course in
    PREPARATION says it is a delivery course, offers no build link, and has a
-   section "Activation". "Propose activation" shows the refusal in words: for
-   `RELEASE_RUNTIME_ROLE` on an assessment, the activity's first line and
-   decision D4; any other finding with its reason, what to do and its code. An
-   accepted activation links to its proposal. With D4 open, every release of an
-   assessed course is refused.
+   section "Activation". "Propose activation" shows the refusal in words: each
+   finding with its reason, what to do and its code. An accepted activation
+   links to its proposal. Since S11 an assessment no longer refuses it: the
+   import configures the runtime assessor.
 7. **Who may import.** The import's scope grants the delivery course's
    participants, which is its creator only (D25 open).
+
+## Runtime assessor from the studio (S11)
+
+Issue #129; owner decisions of 16 November 2026 (D4 lifted by option A; D25 = A;
+decisions 1–8). The core is described in
+[the release guide](releases.md#runtime-assessor-s11).
+
+1. **The job.** `POST /contexts/{context_id}/jobs` takes the kind
+   `propose-evaluation` with `command: {evidence, mode}` (an observed
+   `LearningEvidence` and `FORMATIVE` or `FORMAL`). It is queued only by a
+   subject who may `propose` and holds `ASSESSOR` in the course (403
+   otherwise). The worker runs `LearningService.propose_evaluation` with the
+   runtime assessor its resources hold (`Resources.assessor`; the production
+   worker builds `learner-response-evaluator`, the synthetic worker answers
+   with the highest level of each criterion). Its outcome is `PROPOSED` with
+   the evaluation proposal, `REJECTED` with the core's fixed reason (no attempt,
+   not an assessment, no active delivery, no assessment authority), or `FAILED`
+   with the fixed text after three failing drafts. API version 0.15.0 (S11).
+2. **The page** `/contexts/{context_id}/assessments`, linked from the course
+   page of an active delivery for a participant with the `ASSESSOR` role
+   ("Evaluate the students' submitted attempts"). It lists the observed
+   attempts at ASSESS activities, read from the course summary: the student,
+   the assessment's first line, when, the response, and the evaluations
+   already applied. For each, the assessor chooses the kind of evaluation
+   (Formative or Formal; nothing is preselected) and asks the assessor agent
+   for a draft; the job is followed until it ends, then the page links the
+   draft or gives the job's fixed reason. A retry of the same choice reuses its
+   request id until that job has ended; asking again then starts a new draft.
+3. **The draft in words.** The review page titles an evaluation proposal
+   "Evaluate a student's attempt" and shows who drafted it (the agent's
+   registry name) and in which mode, the assessment and the student, the
+   response, each criterion of the rubric with the level given and its
+   descriptor (or "not determined") and the agent's reason, and the result.
+   The decision and the application are the usual ones; the requester may
+   decide.
 
 ## Local identity smoke test
 
 `compose.identity.yml` runs Keycloak 26.8.1 (pinned by digest) with the realm
 `alm-dev` from `infra/keycloak/alm-dev-realm.json`, imported at every start. The
 realm has one confidential client, `alm-authoring-api` (code flow with S256 PKCE
-only), and three synthetic users: `dev-admin` and `dev-learner`, mapped to the
+only), and four synthetic users: `dev-admin` and `dev-learner`, mapped to the
 subjects `admin` and `learner` of `tests/fixtures/alm/trusted-policy.json` by
-`infra/keycloak/identity-map.dev.json`, and `dev-unmapped`. The realm file holds
+`infra/keycloak/identity-map.dev.json`; `dev-assessor`, mapped to `assessor`, a
+subject in no policy that a course administrator adds as a member (D25, S11);
+and `dev-unmapped`. A Keycloak started before S11 imported the realm without
+`dev-assessor`: restart it to import the realm again. The realm file holds
 placeholders; the client secret and the user password come from the environment.
 
 ```sh

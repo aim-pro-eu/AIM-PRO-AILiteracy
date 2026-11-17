@@ -3,12 +3,14 @@ import { dirname } from 'node:path';
 
 import { expect, test as setup } from '@playwright/test';
 
-import { ADMIN_STATE, LEARNER_STATE } from './stack/paths.mjs';
+import { ADMIN_STATE, ASSESSOR_STATE, LEARNER_STATE } from './stack/paths.mjs';
 import { en } from './support';
 
 // One real sign-in per subject through the local Keycloak (D8): the BFF session
 // cookie is kept for the tests. The API holds sessions in memory, so they last for one run.
-for (const [user, subject, state] of [['dev-admin', 'admin', ADMIN_STATE], ['dev-learner', 'learner', LEARNER_STATE]]) {
+// `dev-assessor` is in no installed policy: a course administrator adds them as a member (D25, S11).
+for (const [user, subject, state] of [['dev-admin', 'admin', ADMIN_STATE], ['dev-learner', 'learner', LEARNER_STATE],
+  ['dev-assessor', 'assessor', ASSESSOR_STATE]]) {
   setup(`sign in as ${user} through Keycloak`, async ({ page }) => {
     await page.goto('/studio/');
     await page.getByRole('button', { name: en.session.signIn }).click();
