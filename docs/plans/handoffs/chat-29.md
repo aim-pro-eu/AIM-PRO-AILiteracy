@@ -92,7 +92,8 @@ approves and applies it; one learning state follows. `delivery.spec.ts` (S10) no
 | `.github/workflows/aimpro-contracts.yml` | `tests.test_runtime_assessor` in the SQLite and PostgreSQL jobs |
 | `infra/keycloak/alm-dev-realm.json`, `infra/keycloak/identity-map.dev.json` | `dev-assessor` → `assessor` |
 | `apps/studio/src/features/assessments/` (new), `course/CoursePage.tsx`, `review/{teacher.ts,TeacherView.tsx,paths.ts,routes.tsx}`, `course-build/{buildApi.ts,JobsList.tsx}`, `delivery/{delivery.ts,ActivationSection.tsx}`, `i18n/en.json` | the assessor page, the evaluation view, the queue call, labels |
-| `apps/studio/test/assessments.test.tsx` (new), `teacher-view.test.ts`, `delivery.test.tsx` | 4 + 1 new studio tests; the refusal without D4 |
+| `apps/studio/test/assessments.test.tsx` (new), `teacher-view.test.ts`, `review-model.test.ts`, `delivery.test.tsx` | 4 + 1 + 1 new studio tests; the refusal without D4 |
+| `apps/studio/src/features/review/model.ts`, `course/course.ts` | `latestProposals` keeps the latest revision of each proposal (see "PR and CI") |
 | `apps/e2e/assessment.spec.ts` (new), `delivery.spec.ts`, `sign-in.setup.ts`, `support.ts`, `stack/paths.mjs` | the S11 browser test; `dev-assessor` session; policy files cleaned before each test |
 | `docs/architecture/releases.md`, `authoring-lifecycle.md`, `role-applications.md` | the runtime assessor, no D4 refusal, the studio views, the seed step, the dev users |
 | `docs/plans/handoffs/chat-29.md` (new) | this handoff |
@@ -105,7 +106,7 @@ Final run on the branch, telemetry off:
 | --- | --- |
 | `python -m unittest discover -q` | 1214 tests, OK, 255 skipped (576 s; was 1166 / 232: 48 new tests, 23 of them PostgreSQL variants skipped locally) |
 | `python -m aimpro.generate --check`, `python -m services.api_common.openapi --check`, `python -m evaluation --check` | exit 0, exit 0, exit 0 |
-| `npm run check:client`, `typecheck`, `test`, `build` (in `apps/`) | OK, OK, 179 tests OK (was 174), OK |
+| `npm run check:client`, `typecheck`, `test`, `build` (in `apps/`) | OK, OK, 180 tests OK (was 174), OK |
 | `git diff --check` | exit 0 |
 
 The browser tests were **not run locally**: they need ports 58000/58001, which the owner's demo stack holds, and a
@@ -198,4 +199,12 @@ S12 acceptance, specify S12 on a new issue and hand it off.
 ## PR and CI
 
 PR [#131](https://github.com/thesis-fedfalco-2026/AIM-PRO-AILiteracy/pull/131): part 1 `fe0ec15`, `f1f022c`; part 2
-in this chat's commit. The CI result is reported in the PR conversation.
+`32978ac` and the fix below.
+
+The first CI run of `32978ac` failed in `browser` only ([run 44058710453](https://github.com/thesis-fedfalco-2026/AIM-PRO-AILiteracy/actions/runs/44058710453)):
+`assessment.spec.ts` approved the evaluation, applied it, and the page then showed "Awaiting a decision" (20 other
+browser tests passed). Cause: once an evaluation is applied, the context reaches, through LearningState → Evaluation
+→ HumanDecision, the proposal revision that was decided; the course summary lists it before the store's latest
+revision, and the studio took the first revision of each id. `latestProposals` now keeps the later revision of each
+id, and the course history uses it (a contract test in `review-model.test.ts`). The result of the next run is
+reported in the PR conversation.
