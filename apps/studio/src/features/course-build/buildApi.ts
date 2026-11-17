@@ -15,6 +15,9 @@ export type ProjectInspection = Schemas['ProjectInspection'];
 export type ReleaseProposal = Schemas['ReleaseProposal'];
 export type ReleaseInspection = Schemas['ReleaseInspection'];
 export type ImportProposal = Schemas['ImportProposal'];
+export type MemberList = Schemas['MemberList'];
+export type MemberRole = Schemas['MembershipRequest']['role'];
+export type MembershipProposal = Schemas['MembershipProposal'];
 export type ActivationOutcome = Schemas['ActivationOutcome'];
 export type SourceDiscovery = Schemas['SourceDiscoveryView'];
 export type SourcePreparation = Schemas['SourcePreparationView'];
@@ -126,6 +129,12 @@ export interface BuildApi {
   proposeActivation(contextId: string, csrfToken: string, command: {
     requestId: string; baseContext: EntityRef;
   }): Promise<ActivationOutcome>;
+  /** The course's members, the mapped people who may still join and the roles; for its administrators (D25). */
+  members(contextId: string): Promise<MemberList>;
+  /** Propose a new member: a new policy version and a participant to review; the same request id replays. */
+  proposeMembership(contextId: string, csrfToken: string, command: {
+    requestId: string; baseContext: EntityRef; subject: string; role: MemberRole;
+  }): Promise<MembershipProposal>;
 }
 
 /** What a delivery import sends: the release, its course, the exact resource of each bound requirement, the handlers. */
@@ -350,6 +359,18 @@ export function createBuildApi(client: AuthoringClient): BuildApi {
         params: { path: { context_id: contextId } },
         headers: writing(csrfToken),
         body: { request_id: requestId, base_context: baseContext },
+      }));
+    },
+
+    async members(contextId) {
+      return settle(() => client.GET('/contexts/{context_id}/members', { params: { path: { context_id: contextId } } }));
+    },
+
+    async proposeMembership(contextId, csrfToken, { requestId, baseContext, subject, role }) {
+      return settle(() => client.POST('/contexts/{context_id}/members', {
+        params: { path: { context_id: contextId } },
+        headers: writing(csrfToken),
+        body: { request_id: requestId, base_context: baseContext, subject, role },
       }));
     },
   };

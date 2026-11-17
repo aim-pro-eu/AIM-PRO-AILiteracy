@@ -257,10 +257,13 @@ authorized by both policies, at proposal and again at application; an authoring
 context whose policy is not installed refuses the import (422).
 
 Since S09a the API writes one kind of file there: the policy of a course created
-from the studio (`POST /courses`, see "Course from an AIM-PRO model"). It is a
-new file, written under a temporary name that no reader lists and then linked to
-its name, so it appears whole or not at all; an existing file is never replaced,
-changed or removed. Every other policy change stays an operator action.
+from the studio (`POST /courses`, see "Course from an AIM-PRO model"). Since S11
+(D25) it also writes a new version of a course's policy when its administrator
+adds a member (`POST /contexts/{context_id}/members`, see "Course members"). Each
+is a new file, written under a temporary name that no reader lists and then
+linked to its name, so it appears whole or not at all; an existing file is never
+replaced, changed or removed. Every other policy change, a delivery import's
+preview included, stays an operator action.
 
 ## Configuration
 
@@ -607,8 +610,45 @@ own. The course template (`ALM_COURSE_TEMPLATE`) is installed by an operator:
 - The same request again returns the same `CourseView` (`context_id`,
   `policy_ref`) and writes nothing; it also completes a creation that stopped
   after the policy file was written.
-- Not in S09a: adding other teachers or learners, and changing or revoking a
-  course policy from the studio.
+- Not in S09a: adding other teachers or learners (since S11, "Course members"
+  below), and changing or revoking a course policy from the studio.
+
+### Course members: module `members` (D25, S11)
+
+The owner decided D25 on 16 November 2026 (issue #129): a member joins a course
+through a new version of its trusted policy written by the API.
+
+- `GET /contexts/{context_id}/members`, for an administrator of the course only
+  (403 otherwise): the members (`subject`, their `roles` in this course, from
+  the context's `Participant` records), the subject keys of the identity map
+  that are not members yet (`addable`), and the roles that may be granted.
+- `POST /contexts/{context_id}/members` with `request_id`, `base_context`,
+  `subject` and `role`, by an administrator of the course with the CSRF token.
+  The subject must be in the identity map (422 otherwise); the role is one of
+  `CONTENT_RESPONSIBLE`, `ASSESSOR` (both: `read`, `propose`, `decide`, `apply`,
+  `interact`), `LEARNER` (`read`, `interact`, `submit`) or `OBSERVER` (`read`);
+  `ADMINISTRATOR` cannot be granted. A subject who already takes part is refused.
+- The command (`learning/membership.py`, CLI-free) copies the installed policy as
+  a new version: the member's grant for this context (a subject that the policy
+  already names in other contexts keeps those grants), and the member added to
+  every scope of this context alone, so a learner of an imported delivery reads
+  its bound resources. The API installs it as `<policy id>-<version>.json`
+  before the proposal is recorded; a failure leaves at most an unused file.
+- The proposal holds the member's `Participant`, the new `PolicySet` version
+  (its permissions end with the canonical new policy) and the context with only
+  `participants` and `policies` changed. An administrator decides and applies
+  it; until then the member has no authority. Application rechecks that exactly
+  that policy is installed. The same request id returns the same proposal; a
+  different command under it is a 409.
+- A generic proposal cannot record a membership policy (a `PolicySet` with a new
+  membership entry), and in an imported delivery it still cannot move
+  `policies`. In an imported delivery the command works in PREPARATION and
+  ACTIVE, and activation accepts a membership version derived from the reviewed
+  import preview.
+- Studio: the course page of an administrator links "Members of this course"
+  (`/contexts/{context_id}/members`): the members with their roles in words, and
+  a person and role to propose. The review page describes the proposal as a new
+  member. Removing a member is not offered.
 
 ### Uploading the model: module `exports`
 

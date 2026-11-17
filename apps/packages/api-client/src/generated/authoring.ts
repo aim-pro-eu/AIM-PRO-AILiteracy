@@ -344,6 +344,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/contexts/{context_id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The members of this course and the subjects who may join it; for its administrators */
+        get: operations["members_contexts__context_id__members_get"];
+        put?: never;
+        /** Propose a new member: a new trusted policy version and the member's participant record */
+        post: operations["propose_membership_contexts__context_id__members_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/contexts/{context_id}/pending-proposals": {
         parameters: {
             query?: never;
@@ -1344,6 +1362,47 @@ export interface components {
         LogoutView: {
             /** End Session Url */
             end_session_url: string | null;
+        };
+        /** Member */
+        Member: {
+            /** Roles */
+            roles: string[];
+            /** Subject */
+            subject: string;
+        };
+        /**
+         * MemberList
+         * @description The members of a course, the mapped subjects who may still join, and the roles that may be granted.
+         */
+        MemberList: {
+            /** Addable */
+            addable: string[];
+            /** Members */
+            members: components["schemas"]["Member"][];
+            /** Roles */
+            roles: string[];
+        };
+        /** MembershipProposal */
+        MembershipProposal: {
+            participant: components["schemas"]["EntityRef"];
+            policy: components["schemas"]["TrustedPolicy"];
+            proposal: components["schemas"]["EntityRef"];
+        };
+        /**
+         * MembershipRequest
+         * @description ``propose-membership``: the subject, its role and the base context, with the ALM request id.
+         */
+        MembershipRequest: {
+            base_context: components["schemas"]["EntityRef"];
+            /** Request Id */
+            request_id: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "CONTENT_RESPONSIBLE" | "ASSESSOR" | "LEARNER" | "OBSERVER";
+            /** Subject */
+            subject: string;
         };
         /** PendingProposal */
         PendingProposal: {
@@ -3772,6 +3831,162 @@ export interface operations {
                 };
                 content: {
                     "text/event-stream": unknown;
+                };
+            };
+            /** @description No valid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not authorized, unmapped identity or missing CSRF token */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not found, or the context is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Conflict with the current state; reload and retry */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Invalid request or data */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Internal error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    members_contexts__context_id__members_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                context_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberList"];
+                };
+            };
+            /** @description No valid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not authorized, unmapped identity or missing CSRF token */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not found, or the context is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Conflict with the current state; reload and retry */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Invalid request or data */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Internal error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    propose_membership_contexts__context_id__members_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                context_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MembershipRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MembershipProposal"];
                 };
             };
             /** @description No valid session */

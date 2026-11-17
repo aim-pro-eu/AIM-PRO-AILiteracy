@@ -286,6 +286,12 @@
         "heading": "When each part counts as completed",
         "intro": "Each part of the course gets this rule. It records completion only, never a grade or a verified competence. The teaching content does not change.",
         "rule": "{{kind}} “{{node}}”: {{rule}}"
+      },
+      "titleMembership": "Add a member to the course",
+      "membership": {
+        "heading": "New member",
+        "joins": "{{subject}} joins this course as {{roles}}.",
+        "policy": "The course’s new trusted policy that grants this role is already installed, as a new file; the course uses it only once this proposal is approved and applied. Until then, nothing changes for this person."
       }
     },
     "syllabus": {
@@ -442,7 +448,8 @@
       "empty": "No release yet.",
       "inspect": "Release {{number}}: inspect it"
     },
-    "delivery": "This is a delivery course: it holds a frozen release, which is not built further here. Students get nothing until the course is activated."
+    "delivery": "This is a delivery course: it holds a frozen release, which is not built further here. Students get nothing until the course is activated.",
+    "members": "Members of this course"
   },
   "build": {
     "title": "Build the course",
@@ -818,6 +825,39 @@
       "forbidden": "You are not allowed to activate this course.",
       "conflict": "The course changed meanwhile. Reload the page and try again.",
       "failed": "Activation could not be proposed. Try again."
+    }
+  },
+  "members": {
+    "title": "Course members",
+    "back": "Back to the course",
+    "loading": "Loading the members…",
+    "forbidden": "Only an administrator of this course manages its members.",
+    "loadFailed": "The members could not be loaded. Reload the page to try again.",
+    "role": {
+      "ADMINISTRATOR": "Administrator",
+      "CONTENT_RESPONSIBLE": "Teacher (content responsible)",
+      "ASSESSOR": "Assessor",
+      "LEARNER": "Student",
+      "OBSERVER": "Observer (read only)",
+      "other": "{{role}}"
+    },
+    "list": {
+      "heading": "Members",
+      "item": "{{subject}}: {{roles}}"
+    },
+    "add": {
+      "heading": "Add a member",
+      "intro": "Choose a person known to the sign-in service and their role. The studio proposes the change; the person joins the course only once the proposal is approved and applied in the review inbox.",
+      "nobody": "Everyone known to the sign-in service is already a member of this course.",
+      "subject": "Person",
+      "role": "Role",
+      "choose": "Choose…",
+      "submit": "Propose the new member",
+      "proposed": "{{subject}} is proposed as {{role}}. Nothing has changed yet: the proposal awaits review in this course.",
+      "review": "Review the new member",
+      "refused": "The member cannot be proposed: {{detail}}",
+      "conflict": "The course changed meanwhile. Reload the page and try again.",
+      "failed": "The member could not be proposed. Try again: the retry repeats the same request."
     }
   }
 }

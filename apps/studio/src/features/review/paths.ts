@@ -16,3 +16,6 @@ export const releasePath = (contextId: string, release: { id: string; version: s
 /** The import of an applied release of `authoringId` into the delivery course `contextId` (S10, part 2). */
 export const importPath = (contextId: string, authoringId: string, release: { id: string; version: string }) =>
   `/contexts/${encodeURIComponent(contextId)}/import?${new URLSearchParams({ from: authoringId, release: release.id, version: release.version })}`;
+
+/** The members of a course, for its administrators (D25). */
+export const membersPath = (contextId: string) => `/contexts/${encodeURIComponent(contextId)}/members`;

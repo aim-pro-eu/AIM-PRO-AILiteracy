@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
 import { PolicyPreviewSection } from '../delivery/PolicyPreviewSection';
+import { roleKey } from '../members/roles';
 import { readable } from './model';
 import { RubricTable } from './RubricTable';
 import type { ContentChange, CoursePart, Issue, PlainIssues, TeacherView as View } from './teacher';
@@ -186,12 +187,26 @@ function Delivery({ delivery }: { delivery: NonNullable<View['delivery']> }) {
   );
 }
 
+/** A new member (D25): who joins, with which role, and when the new policy is used. */
+function Membership({ membership }: { membership: NonNullable<View['membership']> }) {
+  const { t } = useTranslation();
+  return (
+    <section aria-labelledby="teacher-membership">
+      <h2 id="teacher-membership">{t('review.teacher.membership.heading')}</h2>
+      <p>{t('review.teacher.membership.joins', { subject: membership.subject,
+        roles: membership.roles.map((role) => t(roleKey(role), { role })).join(', ') })}</p>
+      <p>{t('review.teacher.membership.policy')}</p>
+    </section>
+  );
+}
+
 /** What a teacher needs to decide: the changes, the teaching content, and what to check, in plain words. */
 export function TeacherView({ view, issues }: { view: View; issues: PlainIssues }) {
   const { t } = useTranslation();
   if (view.kind === 'completion') return <CompletionRules view={view} issues={issues} />;
   if (view.project) return <><Project project={view.project} /><Issues issues={issues} /></>;
   if (view.release) return <><Release release={view.release} /><Issues issues={issues} /></>;
+  if (view.membership) return <><Membership membership={view.membership} /><Issues issues={issues} /></>;
   return (
     <>
       {view.notAccepted !== null

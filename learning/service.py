@@ -283,6 +283,15 @@ class LearningService:
         from learning.releases import propose_activation
         return propose_activation(self, context_id, subject_key, command, request_id)
 
+    def propose_membership(self, context_id, subject_key, command, *, request_id, install=None):
+        """Propose a new member (D25); ``install`` writes the new trusted policy version before the proposal."""
+        from learning.membership import propose_membership
+        return propose_membership(self, context_id, subject_key, command, request_id, install)
+
+    def members(self, context_id, subject_key):
+        from learning.membership import course_members
+        return course_members(self, context_id, subject_key)
+
     def generate_project_assessments(self, context_id, subject_key, command, **kwargs):
         from learning.generation import generate_project
         return generate_project(self, context_id, subject_key, 'ASSESSMENT', command, **kwargs)

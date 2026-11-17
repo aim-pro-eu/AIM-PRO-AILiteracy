@@ -50,6 +50,7 @@ class OpenApiSnapshotTest(unittest.TestCase):
                           '/contexts/{context_id}/completion-rules': ['post'], '/contexts/{context_id}/releases': ['post'],
                           '/contexts/{context_id}/delivery-imports': ['post'],
                           '/contexts/{context_id}/activations': ['post'],
+                          '/contexts/{context_id}/members': ['get', 'post'],
                           '/contexts/{context_id}/designs/{design_id}/versions/{version}/syllabus': ['get'],
                           resource + '/project-syllabus': ['get'], resource + '/release': ['get'],
                           '/contexts/{context_id}/jobs': ['get', 'post'], job: ['get'], job + '/events': ['get'],
