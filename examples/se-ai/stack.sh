@@ -23,6 +23,9 @@ mkdir -p $STATE/policies $STATE/exports
 
 export ALM_STORE=$STATE/alm.sqlite ALM_POLICY_DIR=$STATE/policies ALM_JOBS_STORE=$STATE/jobs.sqlite \
   ALM_AIMPRO_EXPORTS=$STATE/exports
+# Course codes (S12b) are derived from this host secret: drawn once for the state, kept with it.
+[[ -f $STATE/enrolment-secret ]] || (umask 077; openssl rand -hex 32 > $STATE/enrolment-secret)
+export ALM_ENROLMENT_SECRET=$(<$STATE/enrolment-secret)
 cd $ROOT
 # The API and the worker never create the learning store: create it empty here.
 [[ -f $ALM_STORE ]] || $PYTHON -c 'import sys; from learning.store import LearningStore; LearningStore(sys.argv[1]).close()' $ALM_STORE

@@ -20,7 +20,7 @@ from services.api_common.settings import ApiSettings
 from services.authoring_api.app import create_app as authoring_app
 from services.learner_api.app import REGISTRY, create_app
 from tests.authoring_cycle_fixtures import AUTH, DELIVERY, DELIVERY_TWO
-from tests.services.course_fixtures import module_settings
+from tests.services.course_fixtures import ENROLMENT_SECRET, module_settings
 from tests.services.job_fixtures import new_jobs_location
 from tests.services.oidc_fixtures import (ISSUER, MAPPED_SUBJECT, NO_NETWORK, FakeProvider, auth_settings, log_in,
                                           write_identity_map)
@@ -42,7 +42,8 @@ class LearnerApiTest(unittest.TestCase):
                                                           for key, subject in SUBJECTS.items()))
         self.settings = ApiSettings(auth=auth_settings(), identity_map=identities, store=str(self.seed.location),
                                     policy_dir=self.seed.output / self.seed.manifest.policy_dir,
-                                    jobs_store=str(new_jobs_location(self, str(self.seed.root))))
+                                    jobs_store=str(new_jobs_location(self, str(self.seed.root))),
+                                    enrolment_secret=ENROLMENT_SECRET)
         self.app = create_app(self.settings, transport=self.provider.transport)
         self.clients = {key: self.signed_in(self.app, subject) for key, subject in SUBJECTS.items()}
 
@@ -147,7 +148,7 @@ class LearnerConfigurationTest(unittest.TestCase):
         self.identities = write_identity_map(self.root)
 
     def test_the_learner_modules_are_registered(self):
-        self.assertEqual(REGISTRY.names, ('courses', 'progress', 'attempts', 'questions'))
+        self.assertEqual(REGISTRY.names, ('courses', 'progress', 'attempts', 'questions', 'enrolments'))
 
     def test_learner_modules_need_a_store_and_a_policy_directory(self):
         settings = ApiSettings(auth=auth_settings(), identity_map=self.identities)

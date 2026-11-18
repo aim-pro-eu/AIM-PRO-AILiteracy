@@ -1,8 +1,9 @@
 """Login, callback, session and logout routes, and the dependencies modules use (D8, D9).
 
 Modules depend on :func:`current_principal` to read and on :func:`csrf_protected`
-to write. A principal carries only the policy ``subject_key``; the trusted
-policy decides what it may do.
+to write. A principal carries only the policy ``subject_key``: the mapped key, or
+for a person of the configured issuer outside the map an automatic one (D9
+revised, S12b); the trusted policy decides what it may do.
 """
 
 from __future__ import annotations
@@ -20,7 +21,7 @@ from pydantic import BaseModel
 import httpx
 
 from services.api_common.errors import error_responses
-from services.api_common.identity import IdentityMap
+from services.api_common.identity import IdentityMap, auto_subject_key
 from services.api_common.oidc import LoginFailed, OidcClient, ProviderUnavailable, new_secret, pkce_pair
 from services.api_common.registry import ApiModule
 from services.api_common.sessions import MemorySessionStore, PendingLogin, Session
@@ -65,6 +66,13 @@ class Authenticator:
         self.clock = clock
         self.sessions = sessions or MemorySessionStore()
 
+    def subject_key(self, issuer: str, subject: str) -> str | None:
+        """The mapped key, else an automatic key for the configured issuer; ``None`` for another issuer."""
+        mapped = self.identities.subject_key(issuer, subject)
+        if mapped is not None or issuer != self.settings.issuer:
+            return mapped
+        return auto_subject_key(issuer, subject)
+
     def _set_cookie(self, response: Response, name: str, value: str, max_age: int, path: str) -> None:
         response.set_cookie(name, value, max_age=max_age, path=path, httponly=True,
                             secure=self.settings.cookie_secure, samesite='lax')
@@ -96,7 +104,7 @@ class Authenticator:
         except LoginFailed as failure:
             logger.warning('Login refused: %s', failure)
             raise HTTPException(401, 'Login failed') from None
-        if self.identities.subject_key(claims['iss'], claims['sub']) is None:
+        if self.subject_key(claims['iss'], claims['sub']) is None:
             logger.warning('Login refused: identity is not mapped')
             raise HTTPException(403, 'Identity is not mapped to a policy subject')
         now = self.clock()
@@ -116,7 +124,7 @@ class Authenticator:
         return session
 
     def principal(self, session: Session) -> Principal:
-        subject_key = self.identities.subject_key(session.issuer, session.subject)
+        subject_key = self.subject_key(session.issuer, session.subject)
         if subject_key is None:
             raise HTTPException(403, 'Identity is not mapped to a policy subject')
         return Principal(subject_key)

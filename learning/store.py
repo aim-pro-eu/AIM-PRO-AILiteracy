@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 from contextlib import closing, contextmanager, nullcontext
+from datetime import datetime, timezone
 from pathlib import Path
 import sqlite3
 from typing import NamedTuple
@@ -24,6 +25,14 @@ class RequestRecord(NamedTuple):
     """A reserved request: its canonical payload and, once confirmed, its canonical result."""
     payload: str
     result: str | None
+
+
+class EnrolmentCodeRecord(NamedTuple):
+    """A context's current course code (D37, S12b): what derives it with the host secret and its digest, never the code."""
+    nonce: str
+    digest: str
+    responsible: str
+    changed_at: str
 
 
 class StoreLocation(NamedTuple):
@@ -72,6 +81,17 @@ TABLES = {
     "contexts": ("id", "version"),
     "operations": ("id", "owner", "fingerprint", "result"),
     "requests": ("id", "owner", "payload", "result"),
+    "enrolment_codes": ("context_id", "nonce", "digest", "responsible", "changed_at"),
+}
+# Outside the ALM metamodel: each context's current course code, by its nonce and digest (S12b, schema version 3).
+ENROLMENT_CODES = {
+    "sqlite": """CREATE TABLE enrolment_codes (
+        context_id TEXT PRIMARY KEY, nonce TEXT NOT NULL, digest TEXT NOT NULL UNIQUE,
+        responsible TEXT NOT NULL, changed_at TEXT NOT NULL)""",
+    "postgresql": """CREATE TABLE enrolment_codes (
+        context_id TEXT COLLATE "C" PRIMARY KEY, nonce TEXT COLLATE "C" NOT NULL,
+        digest TEXT COLLATE "C" NOT NULL UNIQUE, responsible TEXT COLLATE "C" NOT NULL,
+        changed_at TEXT COLLATE "C" NOT NULL)""",
 }
 # The insertion order: SQLite's rowid, PostgreSQL's identity column (D13).
 INSERTION = {"sqlite": "rowid", "postgresql": "seq"}
@@ -93,8 +113,9 @@ POSTGRESQL_SCHEMA = (
         payload TEXT COLLATE "C" NOT NULL, result TEXT COLLATE "C",
         seq BIGINT GENERATED ALWAYS AS IDENTITY UNIQUE,
         PRIMARY KEY(owner,id))""",
+    ENROLMENT_CODES["postgresql"],
     "CREATE TABLE schema_version (version INTEGER NOT NULL)",
-    "INSERT INTO schema_version VALUES (2)",
+    "INSERT INTO schema_version VALUES (3)",
 )
 
 
@@ -258,13 +279,17 @@ class LearningStore:
                             """CREATE TABLE requests (
                                 id TEXT NOT NULL, owner TEXT NOT NULL, payload TEXT NOT NULL, result TEXT,
                                 PRIMARY KEY(owner,id))""",
-                            "PRAGMA user_version=2",
+                            ENROLMENT_CODES["sqlite"],
+                            "PRAGMA user_version=3",
                         ):
                             self.db.execute(statement)
-                        version = 2
+                        version = 3
             if version == 1:
                 self._migrate_v1(Path(path))
-            elif version != 2:
+                version = 2
+            if version == 2:
+                self._migrate_v2()
+            elif version != 3:
                 raise ValueError("Unsupported learning database version")
         except Exception:
             self.close()
@@ -282,8 +307,15 @@ class LearningStore:
                         raise ValueError("Unversioned learning database contains tables")
                     for statement in POSTGRESQL_SCHEMA:
                         self.db.execute(statement)
-                    version = 2
-        if version != 2:
+                    version = 3
+        if version == 2:
+            with self.db:
+                self.db.execute("BEGIN IMMEDIATE")
+                if self._postgresql_version() == 2:
+                    self.db.execute(ENROLMENT_CODES["postgresql"])
+                    self.db.execute("UPDATE schema_version SET version=3")
+            version = self._postgresql_version()
+        if version != 3:
             raise ValueError("Unsupported learning database version")
 
     def _postgresql_version(self) -> int | None:
@@ -327,6 +359,14 @@ class LearningStore:
         except Exception:
             self.db.rollback()
             raise
+
+    def _migrate_v2(self) -> None:
+        """Add the enrolment codes (version 3); every existing row is kept as it is."""
+        with self.db:
+            self.db.execute("BEGIN IMMEDIATE")
+            if self.db.execute("PRAGMA user_version").fetchone()[0] == 2:
+                self.db.execute(ENROLMENT_CODES["sqlite"])
+                self.db.execute("PRAGMA user_version=3")
 
     def __enter__(self):
         return self
@@ -537,6 +577,30 @@ class LearningStore:
     def abandon_request(self, request_id: str, owner: str, result: dict):
         self.finish_request(request_id, owner, result)
 
+    def enrolment_code(self, context_id: str) -> EnrolmentCodeRecord | None:
+        row = self.db.execute("SELECT nonce,digest,responsible,changed_at FROM enrolment_codes WHERE context_id=?",
+                              (context_id,)).fetchone()
+        return None if row is None else EnrolmentCodeRecord(*row)
+
+    def enrolment_context(self, digest: str) -> str | None:
+        """The context whose current code has this digest; ``None`` when there is none."""
+        row = self.db.execute("SELECT context_id FROM enrolment_codes WHERE digest=?", (digest,)).fetchone()
+        return None if row is None else row[0]
+
+    def set_enrolment_code(self, context_id: str, nonce: str, digest: str, responsible: str) -> None:
+        """Make this the context's code, replacing the previous one; a digest names one context at most."""
+        with nullcontext() if self.in_transaction else self.write_transaction():
+            if self.db.execute("SELECT 1 FROM enrolment_codes WHERE digest=? AND context_id<>?",
+                               (digest, context_id)).fetchone():
+                raise StateConflict("The code digest names another context")
+            self.db.execute("DELETE FROM enrolment_codes WHERE context_id=?", (context_id,))
+            self.db.execute("INSERT INTO enrolment_codes VALUES (?,?,?,?,?)",
+                            (context_id, nonce, digest, responsible, datetime.now(timezone.utc).isoformat()))
+
+    def remove_enrolment_code(self, context_id: str) -> None:
+        with nullcontext() if self.in_transaction else self.write_transaction():
+            self.db.execute("DELETE FROM enrolment_codes WHERE context_id=?", (context_id,))
+
     def table_digests(self) -> dict[str, TableDigest]:
         """Row count and SHA-256 of every table, as the copy tool verifies them."""
         return _table_digests(self.db, self.backend)
@@ -555,7 +619,7 @@ def _table_digests(db, backend: str) -> dict[str, TableDigest]:
 
 def _copy_order(backend: str, table: str) -> str:
     return {"entities": INSERTION[backend], "requests": INSERTION[backend],
-            "contexts": "id", "operations": "owner,id"}[table]
+            "contexts": "id", "operations": "owner,id", "enrolment_codes": "context_id"}[table]
 
 
 def _read_sqlite_source(path: Path) -> sqlite3.Connection:
@@ -563,8 +627,8 @@ def _read_sqlite_source(path: Path) -> sqlite3.Connection:
         raise ValueError("Source learning database file not found")
     db = sqlite3.connect(f"{path.resolve().as_uri()}?mode=ro", uri=True, timeout=5)
     try:
-        if db.execute("PRAGMA user_version").fetchone()[0] != 2:
-            raise ValueError("Source is not a version 2 learning database")
+        if db.execute("PRAGMA user_version").fetchone()[0] != 3:
+            raise ValueError("Source is not a version 3 learning database; open it once with this version first")
     except Exception:
         db.close()
         raise

@@ -248,7 +248,7 @@ class StoreBackendParityTest(unittest.TestCase):
 
     def test_table_digests_follow_insertion_order(self):
         empty = self.store.table_digests()
-        self.assertEqual(set(empty), {'entities', 'contexts', 'operations', 'requests'})
+        self.assertEqual(set(empty), {'entities', 'contexts', 'operations', 'requests', 'enrolment_codes'})
         self.assertEqual(empty['entities'].rows, len(load_bundle()))
         self.store.claim_request('one', 'session', 'payload')
         digests = self.store.table_digests()
@@ -268,14 +268,15 @@ class PostgreSQLSchemaTest(unittest.TestCase):
 
     def test_new_schema_matches_the_logical_tables_and_version(self):
         with LearningStore(self.location) as store:
-            self.assertEqual(store.db.execute('SELECT version FROM schema_version').fetchall(), [(2,)])
+            self.assertEqual(store.db.execute('SELECT version FROM schema_version').fetchall(), [(3,)])
             keys = store.db.execute("""
                 SELECT table_name, string_agg(column_name, ',' ORDER BY ordinal_position)
                 FROM information_schema.key_column_usage
                 WHERE table_schema=current_schema() AND constraint_name LIKE '%pkey'
                 GROUP BY table_name""").fetchall()
             self.assertEqual(dict(keys), {'entities': 'namespace,id,version', 'contexts': 'id',
-                                          'operations': 'owner,id', 'requests': 'owner,id'})
+                                          'operations': 'owner,id', 'requests': 'owner,id',
+                                          'enrolment_codes': 'context_id'})
             columns = store.db.execute("""
                 SELECT table_name, column_name, data_type, collation_name FROM information_schema.columns
                 WHERE table_schema=current_schema() ORDER BY table_name, ordinal_position""").fetchall()
@@ -297,10 +298,21 @@ class PostgreSQLSchemaTest(unittest.TestCase):
 
     def test_unsupported_version_is_refused(self):
         with LearningStore(self.location) as store:
-            store.db.execute('UPDATE schema_version SET version=3')
+            store.db.execute('UPDATE schema_version SET version=4')
             store.db.commit()
         with self.assertRaisesRegex(ValueError, 'Unsupported'):
             LearningStore(self.location)
+
+    def test_a_version_2_schema_gains_the_enrolment_codes(self):
+        with LearningStore(self.location) as store:
+            store.reserve_request('kept', 'session', 'payload')
+            store.db.execute('DROP TABLE enrolment_codes')
+            store.db.execute('UPDATE schema_version SET version=2')
+            store.db.commit()
+        with LearningStore(self.location) as store:
+            self.assertEqual(store.db.execute('SELECT version FROM schema_version').fetchall(), [(3,)])
+            self.assertEqual(store.request_record('kept', 'session').payload, 'payload')
+            self.assertIsNone(store.enrolment_code('session'))
 
     def test_concurrent_initialization_does_not_reject_newly_created_schema(self):
         from learning import store as module
@@ -342,6 +354,7 @@ def synthetic_database(path):
         for request_id in ('b', 'a', 'c'):
             store.claim_request(request_id, 'session', canonical({'text': TRICKY_TEXT, 'id': request_id}))
         store.finish_request('a', 'session', {'content': TRICKY_TEXT})
+        store.set_enrolment_code('session', 'nonce', 'digest', 'admin')
         return store.table_digests()
 
 
@@ -371,10 +384,10 @@ class CopyStoreRefusalTest(unittest.TestCase):
                 copy_store(self.source, location)
         self.assertFalse(target.exists())
 
-    def test_source_that_is_not_a_version_two_store_is_refused(self):
+    def test_source_that_is_not_a_version_three_store_is_refused(self):
         with sqlite3.connect(self.source) as db:
             db.execute('CREATE TABLE unrelated (id TEXT)')
-        with self.assertRaisesRegex(ValueError, 'version 2'):
+        with self.assertRaisesRegex(ValueError, 'version 3'):
             copy_store(self.source, 'postgresql://alm@127.0.0.1/alm')
 
 

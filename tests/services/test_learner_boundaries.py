@@ -1,8 +1,8 @@
 """Process boundary of the Learner API (S12): no authoring module is importable from it.
 
 A separate interpreter imports the Learner API, builds its app and serves every
-endpoint to a signed-in learner of the seed's active delivery, the attempt and
-the question included; afterwards no authoring module (the Authoring API, the
+endpoint to a signed-in learner of the seed's active delivery, the attempt, the
+question and joining with the course code (S12b) included; afterwards no authoring module (the Authoring API, the
 authoring, release and membership commands, the generators and their agents,
 the job kinds and the job worker, the CLI) and no model client is loaded. The
 Learner API's own files import none of them either. It queues a question in the
@@ -18,7 +18,9 @@ import subprocess
 import sys
 import unittest
 
+from learning.membership import EnrolmentCommand
 from tests.authoring_cycle_fixtures import DELIVERY
+from tests.services.course_fixtures import ENROLMENT_SECRET
 from tests.services.oidc_fixtures import ISSUER, NO_NETWORK, write_identity_map
 from tests.services.test_job_boundaries import MODEL_CLIENTS, imports
 from tests.store_backends import block_network
@@ -46,7 +48,7 @@ if served:
     from services.api_common.auth import CSRF_HEADER
     app = create_app(ApiSettings(auth=auth_settings(), identity_map=Path(served['identities']),
                                  store=served['store'], policy_dir=Path(served['policies']),
-                                 jobs_store=served['jobs']),
+                                 jobs_store=served['jobs'], enrolment_secret=served['secret']),
                      transport=provider.transport)
     client = TestClient(app, base_url='https://testserver', follow_redirects=False)
     log_in(client, provider, served['subject'])
@@ -80,14 +82,22 @@ class LearnerProcessTest(unittest.TestCase):
         with seed.contexts.open(DELIVERY) as service:
             activity = next(e.ref for e in service._context(DELIVERY, 'learner').snapshot.active_domain()
                             if e.type == 'ActivityDefinition' and e.fields['intent'] == 'ASSESS')
-        posts = [(f'/courses/{DELIVERY}/attempts', {'request_id': 'attempt-1', 'activity': activity.model_dump(),
+            opening = service.propose_enrolment(DELIVERY, seed.manifest.staff,
+                EnrolmentCommand(base_context=service.store.read_context(DELIVERY).ref), request_id='open-1',
+                install=lambda policy: seed.policies.install('open-1.json', policy))
+        seed.apply(opening.proposal, 'open-1')
+        with seed.contexts.open(DELIVERY) as service:
+            code = service.reset_enrolment_code(DELIVERY, seed.manifest.staff, secret=ENROLMENT_SECRET.encode()).code
+        posts = [('/enrolments', {'request_id': 'join-1', 'code': code}),
+                 (f'/courses/{DELIVERY}/attempts', {'request_id': 'attempt-1', 'activity': activity.model_dump(),
                                                      'content': 'Synthetic attempt'}),
                  (f'/courses/{DELIVERY}/questions', {'request_id': 'question-1', 'question': {'text': 'Synthetic'}})]
         paths = ['/courses', f'/courses/{DELIVERY}', f'/courses/{DELIVERY}/progress', f'/courses/{DELIVERY}/questions',
                  f'/courses/{DELIVERY}/questions/question-1']
         result = probe({'identities': str(identities), 'store': str(seed.location),
                         'policies': str(seed.output / seed.manifest.policy_dir), 'subject': 'kc-user-learner',
-                        'jobs': str(seed.root / 'jobs.sqlite'), 'posts': posts, 'paths': paths})
+                        'jobs': str(seed.root / 'jobs.sqlite'), 'secret': ENROLMENT_SECRET, 'posts': posts,
+                        'paths': paths})
         self.assertEqual(result['statuses'], {path: 200 for path in [*(p for p, _ in posts), *paths]})
         self.assertEqual(result['loaded'], [])
 
@@ -96,9 +106,11 @@ class LearnerProcessTest(unittest.TestCase):
 
     def test_learner_api_files_import_no_authoring_module(self):
         files = sorted((ROOT / 'services' / 'learner_api').glob('*.py'))
-        self.assertTrue({'app.py', 'courses.py', 'progress.py', 'attempts.py', 'questions.py', '__main__.py'}
+        self.assertTrue({'app.py', 'courses.py', 'progress.py', 'attempts.py', 'questions.py', 'enrolments.py',
+                         '__main__.py'}
                         <= {p.name for p in files})
-        for path in [*files, ROOT / 'services' / 'jobs' / 'learner.py', ROOT / 'services' / 'jobs' / 'store.py']:
+        for path in [*files, ROOT / 'services' / 'jobs' / 'learner.py', ROOT / 'services' / 'jobs' / 'store.py',
+                     ROOT / 'learning' / 'enrolment.py', ROOT / 'learning' / 'learner.py']:
             with self.subTest(path.name):
                 found = [name for name in imports(path) if any(name == f or name.startswith(f + '.') for f in AUTHORING)]
                 self.assertEqual(found, [])

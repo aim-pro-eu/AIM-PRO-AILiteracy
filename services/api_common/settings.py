@@ -39,11 +39,13 @@ class ApiSettings(Settings):
     aimpro_exports: Path | None = Field(None, description='Directory of uploaded AIM-PRO exports, the one the worker reads')
     export_max_bytes: int = Field(10 * 1024 * 1024, gt=0, description='Largest AIM-PRO export accepted by an upload')
     course_template: Path | None = Field(None, description='Course template: who may create courses and their source scopes')
+    enrolment_secret: SecretStr | None = Field(None, min_length=32,
+                                               description='Host secret the course codes are derived from (S12b)')
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str] | None = None) -> ApiSettings:
         """Read ``ALM_OIDC_*``, ``ALM_IDENTITY_MAP``, ``ALM_STORE``, ``ALM_POLICY_DIR``, ``ALM_JOBS_STORE``,
-        ``ALM_AIMPRO_EXPORTS``, ``ALM_COURSE_TEMPLATE`` and ``ALM_API_*``.
+        ``ALM_AIMPRO_EXPORTS``, ``ALM_COURSE_TEMPLATE``, ``ALM_ENROLMENT_SECRET`` and ``ALM_API_*``.
 
         Unset ``ALM_API_MODULES`` selects all modules.
         """
@@ -69,4 +71,5 @@ class ApiSettings(Settings):
                    modules=None if modules is None else tuple(m.strip() for m in modules.split(',') if m.strip()),
                    store=env.get('ALM_STORE') or None,
                    policy_dir=Path(env['ALM_POLICY_DIR']) if env.get('ALM_POLICY_DIR') else None,
-                   jobs_store=env.get('ALM_JOBS_STORE') or None, **limits, **paths)
+                   jobs_store=env.get('ALM_JOBS_STORE') or None,
+                   enrolment_secret=env.get('ALM_ENROLMENT_SECRET') or None, **limits, **paths)

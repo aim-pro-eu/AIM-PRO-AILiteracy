@@ -30,14 +30,21 @@ class LearningService:
         self.store, self.contract, self.policy = store, contract, policy
         self.orchestrator_factory, self.policies = orchestrator_factory, policies
 
+    def policy_for(self, context_id, subject_key):
+        """The installed policy as it applies to the subject in the context: with the context's learner grant for a
+        participant who is only a learner there (D37, S12b); otherwise the installed policy itself."""
+        from learning.enrolment import learner_policy
+        return learner_policy(self.store, self.policy, context_id, subject_key)
+
     def _context(self, context_id, subject_key, request=None):
         root = self.store.read_context(context_id)
         request = request or LearningRequest(request_id=uuid4().hex, context_ref=root.ref,
                                              subject_key=subject_key, text='Local operation', intent='STATE')
-        snapshot = load_context(self.store, request, self.policy, self.contract)
+        policy = self.policy_for(context_id, subject_key)
+        snapshot = load_context(self.store, request, policy, self.contract)
         participant = next(snapshot.get(ref) for ref in root.fields['participants']
                            if snapshot.get(ref).fields['subjectKey'] == subject_key)
-        return RunContext(snapshot, self.policy, self.contract, request, participant, policies=self.policies)
+        return RunContext(snapshot, policy, self.contract, request, participant, policies=self.policies)
 
     def bootstrap(self, context_id, subject_key):
         ref = EntityRef(type='ExecutionContext', id=context_id, version='1')
@@ -86,14 +93,14 @@ class LearningService:
 
     def authorize_jobs(self, context_id, subject_key):
         """Check that the subject may queue and follow agent jobs here: ``propose``, as each generator checks."""
-        authorize(self.policy, subject_key, 'propose', self.store.read_context(context_id).ref)
+        authorize(self.policy_for(context_id, subject_key), subject_key, 'propose', self.store.read_context(context_id).ref)
         self._context(context_id, subject_key)
 
     def authorize_abandonment(self, context_id, subject_key):
         """Check the administrative authority that :meth:`abandon_request` requires; records nothing."""
-        authorize(self.policy, subject_key, 'apply', self.store.read_context(context_id).ref)
+        authorize(self.policy_for(context_id, subject_key), subject_key, 'apply', self.store.read_context(context_id).ref)
         context = self._context(context_id, subject_key)
-        roles = set(self.policy.subjects[subject_key].roles) & set(context.participant.fields['roles'])
+        roles = set(context.policy.subjects[subject_key].roles) & set(context.participant.fields['roles'])
         if 'ADMINISTRATOR' not in roles:
             raise ValueError('Abandonment requires administrative authority')
 
@@ -115,7 +122,7 @@ class LearningService:
         """Check that the subject may ask questions here as a learner of an active course; records nothing."""
         from learning.learner import learner_context
         context = learner_context(self._context(context_id, subject_key))
-        authorize(self.policy, subject_key, 'interact', context.snapshot.context.ref)
+        authorize(context.policy, subject_key, 'interact', context.snapshot.context.ref)
 
     def ask(self, context_id, subject_key, question, *, request_id, orchestrator_factory):
         """A learner's question, run as :meth:`request` with ``orchestrator_factory`` (the learner request job, S12)."""
@@ -248,7 +255,7 @@ class LearningService:
         from learning.policies import AuthorizationError
         with self.store.read_transaction():
             context = self._context(context_id, subject_key)
-            if self._learner_only(subject_key):
+            if self._learner_only(context):
                 raise AuthorizationError('Action is not authorized')
             found = proposed(self.store, context, proposal_id)
             refines = found.artifact.revises
@@ -323,6 +330,25 @@ class LearningService:
         from learning.evaluation import authorize_assessor
         authorize_assessor(self._context(context_id, subject_key))
 
+    def propose_enrolment(self, context_id, subject_key, command, *, request_id, install=None):
+        """Open a delivery to learners (D37); ``install`` writes the new trusted policy version before the proposal."""
+        from learning.membership import propose_enrolment
+        return propose_enrolment(self, context_id, subject_key, command, request_id, install)
+
+    def enrolment(self, context_id, subject_key, *, secret):
+        """Whether the course is open to learners and its current code, derived with the host ``secret``."""
+        from learning.membership import enrolment_view
+        with self.store.read_transaction():
+            return enrolment_view(self, context_id, subject_key, secret=secret)
+
+    def reset_enrolment_code(self, context_id, subject_key, *, secret):
+        from learning.membership import reset_enrolment_code
+        return reset_enrolment_code(self, context_id, subject_key, secret=secret)
+
+    def disable_enrolment_code(self, context_id, subject_key, *, secret):
+        from learning.membership import disable_enrolment_code
+        return disable_enrolment_code(self, context_id, subject_key, secret=secret)
+
     def members(self, context_id, subject_key):
         from learning.membership import course_members
         return course_members(self, context_id, subject_key)
@@ -370,15 +396,16 @@ class LearningService:
             return export_trace(self.store, context, project, scenario=scenario,
                                 competencies=competencies)
 
-    def _learner_only(self, subject_key):
-        return set(self.policy.subjects[subject_key].roles) <= {'LEARNER'}
+    @staticmethod
+    def _learner_only(context):
+        return set(context.policy.subjects[context.request.subject_key].roles) <= {'LEARNER'}
 
     def pending_proposals(self, context_id, subject_key):
         """Proposals awaiting a decision; a learner-only subject sees none, as in :meth:`show`."""
         from learning.review import pending_proposals
         with self.store.read_transaction():
             context = self._context(context_id, subject_key)
-            if self._learner_only(subject_key):
+            if self._learner_only(context):
                 return ()
             return pending_proposals(self.store, context)
 
@@ -387,7 +414,7 @@ class LearningService:
         from learning.review import proposal_review
         with self.store.read_transaction():
             context = self._context(context_id, subject_key)
-            if self._learner_only(subject_key):
+            if self._learner_only(context):
                 return None
             return proposal_review(self.store, context, proposal_id)
 
@@ -398,7 +425,7 @@ class LearningService:
         records; the context lists only its own participant, occurrences and states, never another learner's (S12).
         """
         context = self._context(context_id, subject_key)
-        learner_only = self._learner_only(subject_key)
+        learner_only = self._learner_only(context)
         root = context.snapshot.context
         if learner_only:
             root = root.model_copy(update={'fields': {**root.fields,
@@ -428,7 +455,7 @@ class LearningService:
         other record fails and writes nothing but its failure.
         """
         context = self._context(request.context_ref.id, request.subject_key, request)
-        authorize(self.policy, request.subject_key, 'interact', request.context_ref)
+        authorize(context.policy, request.subject_key, 'interact', request.context_ref)
         payload = canonical(request.model_dump(mode='json'))
         cached = self.store.request_result(request.request_id, request.context_ref.id, payload)
         if cached is not None and cached.get('kind') == 'FAILURE' and cached.get('content') == ABANDONED_CONTENT:
@@ -436,7 +463,7 @@ class LearningService:
         findings = validate_snapshot(context.snapshot)
         for activity in (*request.activity_refs, *(r for r in request.references if r.type == 'ActivityDefinition')):
             findings += check_readiness(context.snapshot, activity, 'interact', learner_ref=context.participant.ref,
-                                        policy=self.policy, subject_key=request.subject_key)
+                                        policy=context.policy, subject_key=request.subject_key)
         if any(f.severity == 'BLOCKING' for f in findings):
             return LearningResponse(kind='CLARIFICATION', content='The context requires corrections before delegation.', findings=findings)
         if context.snapshot.context.fields['status'] not in {'DRAFT','ACTIVE'}:

@@ -25,7 +25,7 @@ from services.api_common.settings import ApiSettings
 from services.authoring_api.app import create_app
 from tests.authoring_cycle_fixtures import AUTH, DELIVERY_TWO
 from tests.seed import build_seed
-from tests.services.course_fixtures import new_export_directory, write_course_template
+from tests.services.course_fixtures import ENROLMENT_SECRET, new_export_directory, write_course_template
 from tests.services.oidc_fixtures import ISSUER, MAPPED_SUBJECT, NO_NETWORK, FakeProvider, auth_settings, write_identity_map
 from tests.services.test_authoring_review_api import LEARNER_SUBJECT, ReviewApiCase
 from tests.store_backends import block_network, new_store_location, on_both_backends
@@ -56,7 +56,8 @@ class CoursesApiTest(ReviewApiCase):
             {'issuer': ISSUER, 'subject': LEARNER_SUBJECT, 'subject_key': 'learner'})
         settings = ApiSettings(auth=auth_settings(), identity_map=identities, store=str(self.location),
                                policy_dir=self.policies, jobs_store=str(self.root / 'jobs.sqlite'),
-                               aimpro_exports=new_export_directory(self.root), course_template=self.template)
+                               aimpro_exports=new_export_directory(self.root), course_template=self.template,
+                               enrolment_secret=ENROLMENT_SECRET)
         self.app = create_app(settings, transport=self.provider.transport)
         self.staff = self.signed_in(MAPPED_SUBJECT)
         self.learner = self.signed_in(LEARNER_SUBJECT)
@@ -215,7 +216,7 @@ class CourseSettingsTest(unittest.TestCase):
         seed = build_seed(root / 'seed', root / 'seed.sqlite')
         defaults = dict(store=str(root / 'seed.sqlite'), policy_dir=root / 'seed' / seed.policy_dir,
                         jobs_store=str(root / 'jobs.sqlite'), aimpro_exports=new_export_directory(root),
-                        course_template=write_course_template(root))
+                        course_template=write_course_template(root), enrolment_secret=ENROLMENT_SECRET)
         return ApiSettings(auth=auth_settings(), identity_map=identities, **{**defaults, **values})
 
     def test_the_courses_module_needs_a_valid_course_template(self):

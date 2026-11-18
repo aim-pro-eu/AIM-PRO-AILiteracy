@@ -55,6 +55,8 @@ const api = spawn(python(), ['-m', 'services.authoring_api', '--port', String(AP
     ALM_OIDC_POST_LOGOUT_REDIRECT_URI: `${STUDIO_URL}/`,
     ALM_IDENTITY_MAP: `${ROOT}infra/keycloak/identity-map.dev.json`,
     ALM_API_COOKIE_SECURE: 'false',
+    // Course codes (S12b) are derived from it; a fixed value for the throwaway browser-test state only.
+    ALM_ENROLMENT_SECRET: 'browser-tests-only-synthetic-enrolment-secret',
   },
 });
 for (const signal of /** @type {const} */ (['SIGINT', 'SIGTERM'])) {
