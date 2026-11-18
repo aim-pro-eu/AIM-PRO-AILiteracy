@@ -15,7 +15,7 @@ from learning.policies import TrustedPolicy
 from learning.service import LearningService
 from learning.store import LearningStore
 from tests.authoring_cycle_fixtures import AUTH, DELIVERY, DELIVERY_TWO, trusted_policy
-from tests.seed import SYNTHETIC_ATTEMPT, SeedManifest, build_seed, main, record_attempt
+from tests.seed import SYNTHETIC_ATTEMPT, SeedManifest, build_seed, main, record_attempt, seed_policy
 from tests.services.job_fixtures import activate_delivery
 from tests.store_backends import block_network, new_store_location, on_both_backends, sqlite_only
 
@@ -38,10 +38,15 @@ class SeedTest(unittest.TestCase):
         self.assertEqual(SeedManifest.model_validate_json((self.output / 'seed.json').read_bytes()), manifest)
         self.assertEqual((manifest.authoring_context, manifest.delivery_context, manifest.pending_delivery_context),
                          (AUTH, DELIVERY, DELIVERY_TWO))
-        self.assertEqual((manifest.staff, manifest.learner, manifest.project_id), ('admin', 'learner', 'synthetic-course'))
+        self.assertEqual((manifest.staff, manifest.learner, manifest.second_learner, manifest.project_id),
+                         ('admin', 'learner', 'learner-2', 'synthetic-course'))
         installed = sorted((self.output / manifest.policy_dir).iterdir())
         self.assertEqual([p.name for p in installed], ['architecture-policy-1.json'])
-        self.assertEqual(TrustedPolicy.model_validate_json(installed[0].read_bytes()), trusted_policy())
+        self.assertEqual(TrustedPolicy.model_validate_json(installed[0].read_bytes()), seed_policy())
+        # The seed's policy is the test policy with a second learner granted as the first one (S12).
+        self.assertEqual(seed_policy().subjects['learner-2'], trusted_policy().subjects['learner'])
+        self.assertEqual({k: v for k, v in seed_policy().subjects.items() if k != 'learner-2'}, trusted_policy().subjects)
+        self.assertEqual(seed_policy().policy_ref, trusted_policy().policy_ref)
         preview = TrustedPolicy.model_validate_json((self.output / manifest.delivery_policy_preview).read_bytes())
         self.assertEqual(preview.policy_ref, manifest.delivery_policy)
         self.assertNotEqual(preview.policy_ref, trusted_policy().policy_ref)
@@ -75,6 +80,19 @@ class SeedTest(unittest.TestCase):
             imported = proposal_candidates(store, store.read(manifest.pending_proposals[DELIVERY_TWO][0], owner=DELIVERY_TWO))
             self.assertIn(DELIVERY_TWO, {c.id for c in imported if c.type == 'ExecutionContext'})
 
+    def test_both_deliveries_have_two_synthetic_learners(self):
+        manifest = build_seed(self.output, self.location)
+        with LearningStore(self.location) as store:
+            for context_id in (DELIVERY, DELIVERY_TWO):
+                root = store.read_context(context_id)
+                participants = {store.read(EntityRef.model_validate(r), owner=context_id).fields['subjectKey']: r
+                                for r in root.fields['participants']}
+                with self.subTest(context_id):
+                    self.assertEqual(set(participants), {manifest.staff, manifest.learner, manifest.second_learner})
+                    for learner in (manifest.learner, manifest.second_learner):
+                        roles = store.read(EntityRef.model_validate(participants[learner]), owner=context_id).fields['roles']
+                        self.assertEqual(roles, ['LEARNER'])
+
     def test_the_seed_records_a_synthetic_attempt_through_submit_once_the_delivery_is_active(self):
         manifest = build_seed(self.output, self.location)
         # An attempt is learner history, which activation refuses: it is recorded after the activation (S11).
@@ -92,6 +110,14 @@ class SeedTest(unittest.TestCase):
         self.assertEqual((observed.provenance.responsible, learner.fields['subjectKey']), ('learner', 'learner'))
         self.assertEqual(activity.fields['intent'], 'ASSESS')
         self.assertEqual(observed.fields['contentOrLocator'], SYNTHETIC_ATTEMPT)
+        # The second learner's attempt is their own, under its own request id.
+        second = record_attempt(self.output, self.location, manifest.second_learner)
+        self.assertNotEqual(second, evidence)
+        self.assertEqual(record_attempt(self.output, self.location, manifest.second_learner), second)
+        with LearningStore(self.location) as store:
+            learner = store.read(EntityRef.model_validate(store.read(second, owner=DELIVERY).fields['learner']),
+                                 owner=DELIVERY)
+        self.assertEqual(learner.fields['subjectKey'], 'learner-2')
 
     @sqlite_only
     def test_command_line_records_the_attempt_in_an_existing_seed(self):

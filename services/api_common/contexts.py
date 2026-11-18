@@ -24,6 +24,7 @@ from uuid import uuid4
 from fastapi import Depends, Request, Response
 
 from learning.contracts import Entity, EntityRef
+from learning.learner import LearnerCourse, enrolled_courses
 from learning.metamodel import load_contract
 from learning.policies import TrustedPolicy
 from learning.service import LearningService
@@ -130,6 +131,12 @@ class ContextServices:
                 if grant and 'read' in grant.actions.get(context_id, []):
                     found.append((context, policy))
         return found
+
+    def enrolled(self, subject_key: str) -> tuple[LearnerCourse, ...]:
+        """The courses the subject is enrolled in as a learner (D19, S12), each read with its installed policy."""
+        installed = self.policies.installed()
+        with LearningStore(self.store) as store:
+            return enrolled_courses(store, lambda ref: self.policies.find(ref, installed), subject_key)
 
     def bootstrap(self, context_id: str, subject_key: str, policy: TrustedPolicy):
         """Create the context with ``policy``, as the CLI ``bootstrap`` does; returns its root."""

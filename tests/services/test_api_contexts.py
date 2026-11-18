@@ -14,7 +14,7 @@ from services.api_common.registry import ConfigurationError
 from services.api_common.settings import ApiSettings
 from services.authoring_api.app import REGISTRY, create_app
 from tests.authoring_cycle_fixtures import AUTH, DELIVERY, trusted_policy
-from tests.seed import build_seed
+from tests.seed import build_seed, seed_policy
 from tests.services.oidc_fixtures import NO_NETWORK, FakeProvider, auth_settings, write_identity_map
 from tests.store_backends import block_network
 
@@ -82,7 +82,7 @@ class ContextServicesTest(unittest.TestCase):
 
     def test_opens_a_service_with_the_policy_of_the_context(self):
         with self.services.open(AUTH) as service:
-            self.assertEqual(service.policy, trusted_policy())
+            self.assertEqual(service.policy, seed_policy())
             self.assertEqual(service.show(AUTH, 'admin')['context']['id'], AUTH)
             with self.assertRaises(RuntimeError):
                 service.orchestrator_factory()
