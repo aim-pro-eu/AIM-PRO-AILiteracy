@@ -5,7 +5,7 @@ import { basename } from 'node:path';
 import type { Page } from '@playwright/test';
 
 import { ASSESSOR_STATE, ROOT, SEED, TELEMETRY_OFF, python } from './stack/paths.mjs';
-import { approveAndApply, en, expect, expectAccessible, test } from './support';
+import { approveAndApply, en, expect, expectAccessible, newCourse, test } from './support';
 
 const section = (page: Page, name: string) => page.getByRole('region', { name });
 
@@ -13,26 +13,46 @@ const section = (page: Page, name: string) => page.getByRole('region', { name })
 // activates the delivery in the browser (proposed, decided, applied): the import configured the runtime assessor, so
 // D4 no longer refuses it. The seed records the learner's synthetic attempt through submit (dev only, D15). The
 // assessor, signed in as themselves, sees the attempt, asks the runtime assessor (synthetic model) for a draft, reads
-// it in plain words, decides and applies it; only then does a learning state follow.
+// it in plain words, decides and applies it; only then does a learning state follow. A membership proposed while
+// another is pending is not refused; the members page lists both and, once one is applied, the other as stale; an
+// activation already proposed is shown instead of a new one (S11b, #133, D36).
 test('an assessor added from the studio evaluates the seeded attempt with the runtime assessor', async ({ page, browser, seed }) => {
   const delivery = seed.delivery_context;
   // The operator installs the reviewed import preview of the seeded delivery, as in S10.
   copyFileSync(`${SEED}${seed.delivery_policy_preview}`, `${SEED}${seed.policy_dir}/${basename(seed.delivery_policy_preview)}`);
 
   // The administrator adds the assessor: a new policy version and a participant, proposed, approved and applied.
+  // A first proposal (as observer) is still pending when the second (as assessor) is proposed: both are listed.
   await page.goto(`/studio/contexts/${delivery}/course`);
   await page.getByRole('link', { name: en.course.members }).click();
-  await page.getByLabel(en.members.add.subject).selectOption('assessor');
-  await page.getByLabel(en.members.add.role).selectOption('ASSESSOR');
-  await page.getByRole('button', { name: en.members.add.submit }).click();
+  const role = page.getByLabel(en.members.add.role.replace('{{subject}}', 'assessor'));
+  await role.selectOption('OBSERVER');
+  await page.getByRole('button', { name: en.members.add.submit_one }).click();
+  const pending = section(page, en.members.pending.heading);
+  await expect(pending.getByText(en.members.pending.intro)).toBeVisible();
+  await expect(pending.getByRole('listitem')).toHaveCount(1);
+  await role.selectOption('ASSESSOR');
+  await page.getByRole('button', { name: en.members.add.submit_one }).click();
+  await expect(pending.getByRole('listitem')).toHaveCount(2);
+  await expect(pending.getByRole('listitem').first()).toContainText('assessor as Assessor');
+  await expectAccessible(page);
   await page.getByRole('link', { name: en.members.add.review }).click();
   await expect(page.locator('.alm-lead strong')).toHaveText(en.review.teacher.titleMembership);
   await approveAndApply(page);
+  // The other proposal was made on the course before this change: it can no longer be applied.
+  await page.goto(`/studio/contexts/${delivery}/members`);
+  await expect(section(page, en.members.pending.heading).getByRole('listitem'))
+    .toHaveText([`assessor as Observer (read only): ${en.members.pending.stale}. ${en.members.pending.review}`]);
 
-  // The administrator activates the delivery: nothing refuses it any more.
+  // The administrator activates the delivery: nothing refuses it any more. Once proposed, the course page shows the
+  // proposal instead of offering another.
   await page.goto(`/studio/contexts/${delivery}/course`);
   const activation = section(page, en.delivery.activation.heading);
   await activation.getByRole('button', { name: en.delivery.activation.submit }).click();
+  await expect(activation.getByRole('link', { name: en.delivery.activation.review })).toBeVisible();
+  await page.reload();
+  await expect(activation.getByText(en.delivery.activation.pending)).toBeVisible();
+  await expect(activation.getByRole('button', { name: en.delivery.activation.submit })).toHaveCount(0);
   await activation.getByRole('link', { name: en.delivery.activation.review }).click();
   await approveAndApply(page);
   const active = await page.request.get(`/contexts/${delivery}`);
@@ -85,4 +105,26 @@ test('an assessor added from the studio evaluates the seeded attempt with the ru
   expect(evaluations).toHaveLength(1);
   expect(evaluations[0]!.fields).toMatchObject({ mode: 'FORMATIVE', humanDecision: expect.anything() });
   await session.close();
+});
+
+// Acceptance (S11b, issue #138, D36): one membership proposal adds several members in one new policy version; the
+// review names each of them, and once applied both are members of the course.
+test('an administrator adds two members to a new course in one proposal', async ({ page }) => {
+  await newCourse(page, 'class-course');
+  await page.goto('/studio/contexts/class-course/members');
+  await page.getByLabel(en.members.add.role.replace('{{subject}}', 'assessor')).selectOption('ASSESSOR');
+  await page.getByLabel(en.members.add.role.replace('{{subject}}', 'learner')).selectOption('LEARNER');
+  await page.getByRole('button', { name: en.members.add.submit_other }).click();
+  await expect(page.getByText('Proposed: assessor as Assessor; learner as Student.', { exact: false })).toBeVisible();
+  await page.getByRole('link', { name: en.members.add.review }).click();
+  await expect(page.getByRole('heading', { name: en.review.teacher.membership.heading_other })).toBeVisible();
+  await expect(page.getByText('assessor joins this course as Assessor.')).toBeVisible();
+  await expect(page.getByText('learner joins this course as Student.')).toBeVisible();
+  await expectAccessible(page);
+  await approveAndApply(page);
+  await page.goto('/studio/contexts/class-course/members');
+  await expect(page.getByTestId('course-members').getByRole('listitem')).toHaveText([
+    'admin: Administrator, Teacher (content responsible)', 'assessor: Assessor', 'learner: Student']);
+  await expect(section(page, en.members.pending.heading)).toHaveCount(0);
+  await expect(page.getByText(en.members.add.nobody)).toBeVisible();
 });

@@ -13,11 +13,15 @@ import { ReviewError } from '../review/reviewApi';
 import type { Inbox } from '../review/reviewApi';
 import { useCsrfToken } from '../review/ReviewServices';
 import { useInbox } from '../review/useInbox';
-import { roleKey } from './roles';
+import { pendingMemberships, roleKey } from './roles';
+
+/** One membership proposal in words: who joins with which role, as far as the studio reads it. */
+type Proposed = { proposal: string; members: string; state: 'awaiting' | 'approved' | 'stale' };
 
 /**
- * The members of a course and a new member (D25): a person of the sign-in map with one role. The studio
- * proposes it; the course changes only when the proposal is decided and applied in the review inbox.
+ * The members of a course and new members (D25): people of the sign-in map, each with one role, proposed together
+ * in one proposal (D36). The course changes only when the proposal is decided and applied in the review inbox. The
+ * membership proposals not applied yet are listed: once one is applied, the others go stale (#133).
  */
 function Members({ inbox }: { inbox: Inbox }) {
   const { t } = useTranslation();
@@ -28,10 +32,9 @@ function Members({ inbox }: { inbox: Inbox }) {
   const contextId = inbox.context.id;
   const [list, setList] = useState<MemberList | null>(null);
   const [loadFailure, setLoadFailure] = useState<string | null>(null);
-  const [subject, setSubject] = useState('');
-  const [role, setRole] = useState<MemberRole | ''>('');
+  const [chosen, setChosen] = useState<Record<string, MemberRole | ''>>({});
   const [busy, setBusy] = useState(false);
-  const [proposed, setProposed] = useState<{ subject: string; role: string; proposal: string } | null>(null);
+  const [proposed, setProposed] = useState<Proposed[]>([]);
   const [failure, setFailure] = useState<string | null>(null);
   // A retry of the same choice on the same course version replays the same request.
   const sent = useRef<{ key: string; requestId: string } | null>(null);
@@ -52,16 +55,27 @@ function Members({ inbox }: { inbox: Inbox }) {
     };
   }, [api, contextId, reloadSession, t]);
 
+  const roles = (codes: readonly string[]) => codes.map((code) => t(roleKey(code), { role: code })).join(', ');
+  const named = (members: { subject: string; roles: readonly string[] }[]) => members
+    .map(({ subject, roles: codes }) => t('members.add.member', { subject, role: roles(codes) })).join('; ');
+  const members = (list?.addable ?? []).flatMap((subject) => {
+    const role = chosen[subject];
+    return role ? [{ subject, role }] : [];
+  });
+
   const propose = async () => {
-    if (!subject || !role) return;
-    const key = `${inbox.context.version}\u0000${subject}\u0000${role}`;
+    if (members.length === 0) return;
+    const key = [inbox.context.version, ...members.flatMap(({ subject, role }) => [subject, role])].join('\u0000');
     if (sent.current?.key !== key) sent.current = { key, requestId: newRequestId() };
+    const { requestId } = sent.current;
     setBusy(true);
     setFailure(null);
     try {
       const result = await api.proposeMembership(contextId, csrfToken,
-        { requestId: sent.current.requestId, baseContext: refOf(inbox.context), subject, role });
-      setProposed({ subject, role, proposal: result.proposal.id });
+        { requestId, baseContext: refOf(inbox.context), members });
+      const entry: Proposed = { proposal: result.proposal.id, state: 'awaiting',
+        members: named(members.map(({ subject, role }) => ({ subject, roles: [role] }))) };
+      setProposed((earlier) => [entry, ...earlier.filter(({ proposal }) => proposal !== entry.proposal)]);
     } catch (error) {
       const reason = error instanceof ReviewError ? error.reason : 'failed';
       const detail = error instanceof ReviewError ? error.detail ?? '' : '';
@@ -75,7 +89,11 @@ function Members({ inbox }: { inbox: Inbox }) {
 
   if (loadFailure) return <StatusMessage tone="error">{loadFailure}</StatusMessage>;
   if (!list) return <StatusMessage>{t('members.loading')}</StatusMessage>;
-  const roles = (codes: readonly string[]) => codes.map((code) => t(roleKey(code), { role: code })).join(', ');
+  const pending: Proposed[] = [...proposed, ...pendingMemberships(inbox)
+    .filter(({ proposal }) => !proposed.some((entry) => entry.proposal === proposal.id))
+    .map(({ proposal, members: joining, current, records }) => ({
+      proposal: proposal.id, members: joining ? named(joining) : t('members.pending.unnamed'),
+      state: !current ? 'stale' as const : records ? 'awaiting' as const : 'approved' as const }))];
   return (
     <>
       <section aria-labelledby={`${id}-members`}>
@@ -86,35 +104,45 @@ function Members({ inbox }: { inbox: Inbox }) {
           ))}
         </ul>
       </section>
+      {pending.length > 0 ? (
+        <section aria-labelledby={`${id}-pending`}>
+          <h2 id={`${id}-pending`}>{t('members.pending.heading')}</h2>
+          <p>{t('members.pending.intro')}</p>
+          <ul data-testid="pending-memberships">
+            {pending.map((entry) => (
+              <li key={entry.proposal}>
+                {t('members.pending.item', { members: entry.members, state: t(`members.pending.${entry.state}`) })}{' '}
+                <Link to={proposalPath(contextId, entry.proposal)}>{t('members.pending.review')}</Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       <section aria-labelledby={`${id}-add`}>
         <h2 id={`${id}-add`}>{t('members.add.heading')}</h2>
         <p>{t('members.add.intro')}</p>
         {list.addable.length === 0 ? <p className="alm-muted">{t('members.add.nobody')}</p> : (
           <>
-            <div className="alm-field">
-              <label htmlFor={`${id}-subject`}>{t('members.add.subject')}</label>
-              <select id={`${id}-subject`} className="alm-input" value={subject}
-                onChange={(event) => setSubject(event.target.value)}>
-                <option value="">{t('members.add.choose')}</option>
-                {list.addable.map((key) => <option key={key} value={key}>{key}</option>)}
-              </select>
-            </div>
-            <div className="alm-field">
-              <label htmlFor={`${id}-role`}>{t('members.add.role')}</label>
-              <select id={`${id}-role`} className="alm-input" value={role}
-                onChange={(event) => setRole(event.target.value as MemberRole | '')}>
-                <option value="">{t('members.add.choose')}</option>
-                {list.roles.map((code) => <option key={code} value={code}>{t(roleKey(code), { role: code })}</option>)}
-              </select>
-            </div>
-            <Button busy={busy} disabled={!subject || !role} onClick={() => void propose()}>{t('members.add.submit')}</Button>
+            {list.addable.map((subject) => (
+              <div key={subject} className="alm-field">
+                <label htmlFor={`${id}-role-${subject}`}>{t('members.add.role', { subject })}</label>
+                <select id={`${id}-role-${subject}`} className="alm-input" value={chosen[subject] ?? ''}
+                  onChange={(event) => setChosen({ ...chosen, [subject]: event.target.value as MemberRole | '' })}>
+                  <option value="">{t('members.add.none')}</option>
+                  {list.roles.map((code) => <option key={code} value={code}>{t(roleKey(code), { role: code })}</option>)}
+                </select>
+              </div>
+            ))}
+            <Button busy={busy} disabled={members.length === 0} onClick={() => void propose()}>
+              {t('members.add.submit', { count: members.length })}
+            </Button>
           </>
         )}
         {failure ? <StatusMessage tone="error">{failure}</StatusMessage> : null}
-        {proposed ? (
+        {proposed[0] ? (
           <>
-            <StatusMessage>{t('members.add.proposed', { subject: proposed.subject, role: roles([proposed.role]) })}</StatusMessage>
-            <p><Link to={proposalPath(contextId, proposed.proposal)}>{t('members.add.review')}</Link></p>
+            <StatusMessage>{t('members.add.proposed', { members: proposed[0].members })}</StatusMessage>
+            <p><Link to={proposalPath(contextId, proposed[0].proposal)}>{t('members.add.review')}</Link></p>
           </>
         ) : null}
       </section>
@@ -122,7 +150,7 @@ function Members({ inbox }: { inbox: Inbox }) {
   );
 }
 
-/** The members page of a course: who takes part, with which role, and a new member to propose. */
+/** The members page of a course: who takes part, with which role, the membership proposals not applied, new members. */
 export function MembersPage({ contextId }: { contextId: string }) {
   const { t } = useTranslation();
   const { state, reload } = useInbox(contextId);

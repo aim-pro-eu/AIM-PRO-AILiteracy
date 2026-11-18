@@ -706,13 +706,19 @@
             "title": "Context Id",
             "type": "string"
           },
+          "created": {
+            "description": "Whether this request created the course; false when it returns an existing one",
+            "title": "Created",
+            "type": "boolean"
+          },
           "policy_ref": {
             "$ref": "#/components/schemas/EntityRef"
           }
         },
         "required": [
           "context_id",
-          "policy_ref"
+          "policy_ref",
+          "created"
         ],
         "title": "CourseView",
         "type": "object"
@@ -2149,8 +2155,12 @@
       "MembershipProposal": {
         "additionalProperties": false,
         "properties": {
-          "participant": {
-            "$ref": "#/components/schemas/EntityRef"
+          "participants": {
+            "items": {
+              "$ref": "#/components/schemas/EntityRef"
+            },
+            "title": "Participants",
+            "type": "array"
           },
           "policy": {
             "$ref": "#/components/schemas/TrustedPolicy"
@@ -2161,7 +2171,7 @@
         },
         "required": [
           "proposal",
-          "participant",
+          "participants",
           "policy"
         ],
         "title": "MembershipProposal",
@@ -2169,16 +2179,36 @@
       },
       "MembershipRequest": {
         "additionalProperties": false,
-        "description": "``propose-membership``: the subject, its role and the base context, with the ALM request id.",
+        "description": "``propose-membership``: one or more subjects with their roles and the base context, with the ALM request id.",
         "properties": {
           "base_context": {
             "$ref": "#/components/schemas/EntityRef"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/NewMember"
+            },
+            "minItems": 1,
+            "title": "Members",
+            "type": "array"
           },
           "request_id": {
             "minLength": 1,
             "title": "Request Id",
             "type": "string"
-          },
+          }
+        },
+        "required": [
+          "base_context",
+          "members",
+          "request_id"
+        ],
+        "title": "MembershipRequest",
+        "type": "object"
+      },
+      "NewMember": {
+        "additionalProperties": false,
+        "properties": {
           "role": {
             "enum": [
               "CONTENT_RESPONSIBLE",
@@ -2196,12 +2226,10 @@
           }
         },
         "required": [
-          "base_context",
           "subject",
-          "role",
-          "request_id"
+          "role"
         ],
-        "title": "MembershipRequest",
+        "title": "NewMember",
         "type": "object"
       },
       "PendingProposal": {
@@ -4774,7 +4802,7 @@
   },
   "info": {
     "title": "ALM Authoring API",
-    "version": "0.15.0"
+    "version": "0.16.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -7036,7 +7064,7 @@
             "description": "Internal error"
           }
         },
-        "summary": "Propose a new member: a new trusted policy version and the member's participant record",
+        "summary": "Propose new members: a new trusted policy version and a participant record for each",
         "tags": [
           "members"
         ]

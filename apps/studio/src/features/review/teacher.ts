@@ -54,8 +54,8 @@ export interface TeacherView {
   /** For a delivery import: its units, the resource each requirement uses, its agents, its source scopes and policy. */
   delivery: { units: number; bindings: { need: string; resource: string }[]; agents: { role: string; name: string }[];
     scopes: string[]; policy: PolicyPreview | null } | null;
-  /** For a new member (D25): who joins and with which role. */
-  membership: { subject: string; roles: string[] } | null;
+  /** For new members (D25, D36): who joins and with which role, one or more. */
+  membership: { subject: string; roles: string[] }[] | null;
   /** For the evaluation of an attempt (S11): what the student did, each criterion's judgment and who drafted it. */
   evaluation: EvaluationView | null;
   /** The review agent's assessment of generated content it did not accept (model text), or null. */
@@ -382,7 +382,7 @@ export function teacherView(candidates: Entity[], applied: Entity[], compare = t
     release: kind === 'release' ? releaseOf(candidates, applied) : null,
     delivery: kind === 'import' ? deliveryOf(candidates, applied) : null,
     membership: kind === 'membership' ? candidates.filter((candidate) => candidate.type === 'Participant')
-      .map(({ fields }) => ({ subject: text(fields.subjectKey), roles: texts(fields.roles) }))[0] ?? null : null,
+      .map(({ fields }) => ({ subject: text(fields.subjectKey), roles: texts(fields.roles) })) : null,
     evaluation: kind === 'evaluation' ? evaluationOf(candidates, applied) : null,
     notAccepted: notAcceptedOf(candidates),
     compared: compare && !DESCRIBED.has(kind),

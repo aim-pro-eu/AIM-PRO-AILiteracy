@@ -289,9 +289,11 @@
       },
       "titleMembership": "Add a member to the course",
       "membership": {
-        "heading": "New member",
+        "heading_one": "New member",
+        "heading_other": "New members",
         "joins": "{{subject}} joins this course as {{roles}}.",
-        "policy": "The course’s new trusted policy that grants this role is already installed, as a new file; the course uses it only once this proposal is approved and applied. Until then, nothing changes for this person."
+        "policy_one": "The course’s new trusted policy that grants this role is already installed, as a new file; the course uses it only once this proposal is approved and applied. Until then, nothing changes for this person.",
+        "policy_other": "The course’s new trusted policy that grants these roles is already installed, as a new file; the course uses it only once this proposal is approved and applied. Until then, nothing changes for these people."
       },
       "titleEvaluation": "Evaluate a student’s attempt",
       "evaluation": {
@@ -789,7 +791,8 @@
     "delivery": {
       "heading": "Create a delivery course",
       "intro": "A delivery course is a new course, in preparation, where this release is brought in for students. You become its administrator, then choose the resource each requirement uses. The release is brought in by an import, proposed and reviewed in the delivery course; students get nothing until that course is activated.",
-      "submit": "Create the delivery course"
+      "submit": "Create the delivery course",
+      "exists": "You already have a course with this id. A delivery course needs a new id."
     }
   },
   "delivery": {
@@ -835,6 +838,8 @@
       "intro": "Activation opens the course to students (LEARNING, ACTIVE). It is proposed, then reviewed like any change; the studio shows why it is refused when it cannot be proposed.",
       "submit": "Propose activation",
       "proposed": "Activation is proposed. It awaits review in this course.",
+      "pending": "Activation is already proposed and awaits review in this course.",
+      "approved": "Activation is approved and waits to be applied in this course.",
       "review": "Review the activation",
       "refused_one": "Activation cannot be proposed: {{count}} reason. Nothing was recorded; the course stays in preparation.",
       "refused_other": "Activation cannot be proposed: {{count}} reasons. Nothing was recorded; the course stays in preparation.",
@@ -864,18 +869,29 @@
       "item": "{{subject}}: {{roles}}"
     },
     "add": {
-      "heading": "Add a member",
-      "intro": "Choose a person known to the sign-in service and their role. The studio proposes the change; the person joins the course only once the proposal is approved and applied in the review inbox.",
+      "heading": "Add members",
+      "intro": "Choose a role for each person known to the sign-in service who joins the course. The studio proposes them together, in one proposal; they join the course only once it is approved and applied in the review inbox.",
       "nobody": "Everyone known to the sign-in service is already a member of this course.",
-      "subject": "Person",
-      "role": "Role",
-      "choose": "Choose…",
-      "submit": "Propose the new member",
-      "proposed": "{{subject}} is proposed as {{role}}. Nothing has changed yet: the proposal awaits review in this course.",
-      "review": "Review the new member",
-      "refused": "The member cannot be proposed: {{detail}}",
+      "role": "Role of {{subject}}",
+      "none": "Not added",
+      "submit_one": "Propose the new member",
+      "submit_other": "Propose the new members",
+      "member": "{{subject}} as {{role}}",
+      "proposed": "Proposed: {{members}}. Nothing has changed yet: the proposal awaits review in this course.",
+      "review": "Review the proposal",
+      "refused": "The members cannot be proposed: {{detail}}",
       "conflict": "The course changed meanwhile. Reload the page and try again.",
-      "failed": "The member could not be proposed. Try again: the retry repeats the same request."
+      "failed": "The members could not be proposed. Try again: the retry repeats the same request."
+    },
+    "pending": {
+      "heading": "Membership proposals not applied yet",
+      "intro": "One membership proposal is applied at a time: once one is applied, the others can no longer be applied and their members are proposed again. To add several people, choose them all in one proposal.",
+      "item": "{{members}}: {{state}}.",
+      "awaiting": "awaits review",
+      "approved": "approved, waits to be applied",
+      "stale": "made on an earlier version of the course, it can no longer be applied; propose these members again",
+      "unnamed": "the members named in the proposal",
+      "review": "Open the proposal"
     }
   },
   "assess": {

@@ -130,7 +130,7 @@ function ReleaseContent({ contextId, inbox, inspection }: { contextId: string; i
       <Findings findings={report.findings} />
       {ready ? (
         <CreateCourse heading={t('release.delivery.heading')} intro={t('release.delivery.intro')}
-          submit={t('release.delivery.submit')}
+          submit={t('release.delivery.submit')} existing={t('release.delivery.exists')}
           onCreated={(created) => void navigate(importPath(created, contextId, inspection.release))} />
       ) : null}
     </>

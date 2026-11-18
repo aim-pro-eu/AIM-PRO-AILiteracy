@@ -3,7 +3,7 @@ import { readdirSync, writeFileSync } from 'node:fs';
 import type { Page } from '@playwright/test';
 
 import { SEED } from './stack/paths.mjs';
-import { en, expect, expectAccessible, test } from './support';
+import { en, expect, expectAccessible, newCourse, test } from './support';
 
 const DELIVERY = 'studio-delivery';
 const section = (page: Page, name: string) => page.getByRole('region', { name });
@@ -14,11 +14,17 @@ const releasePath = (context: string, release: { id: string; version: string }) 
 // proposes a resource for each requirement, the teacher changes one, and the exact selection is sent; the import is
 // read in its teacher view and approved; the policy preview is shown in full and installed by the operator, never by
 // the browser; activation is proposed and refused in words: the requirement left without a resource (R08). The
-// assessment no longer refuses it: the import configures the runtime assessor (S11).
+// assessment no longer refuses it: the import configures the runtime assessor (S11). A course the teacher already
+// has is refused as the delivery course, in words, and nothing navigates (S11b, #132).
 test('a release is imported into a new delivery course, and its activation is refused in words', async ({ page, seed }) => {
+  await newCourse(page, 'taken-course');
   await page.goto(releasePath(seed.authoring_context, seed.release));
   await expect(page.getByTestId('release-verdict')).toHaveText(en.release.ready);
   const delivery = section(page, en.release.delivery.heading);
+  await delivery.getByLabel(en.home.courseLabel).fill('taken-course');
+  await delivery.getByRole('button', { name: en.release.delivery.submit }).click();
+  await expect(delivery.getByText(en.release.delivery.exists)).toBeVisible();
+  await expect(page).toHaveURL(releasePath(seed.authoring_context, seed.release));
   await delivery.getByLabel(en.home.courseLabel).fill(DELIVERY);
   await delivery.getByRole('button', { name: en.release.delivery.submit }).click();
 

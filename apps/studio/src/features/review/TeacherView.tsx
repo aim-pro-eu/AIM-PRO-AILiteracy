@@ -187,15 +187,18 @@ function Delivery({ delivery }: { delivery: NonNullable<View['delivery']> }) {
   );
 }
 
-/** A new member (D25): who joins, with which role, and when the new policy is used. */
+/** New members (D25, D36): who joins, with which role, and when the new policy is used. */
 function Membership({ membership }: { membership: NonNullable<View['membership']> }) {
   const { t } = useTranslation();
+  const count = membership.length;
   return (
     <section aria-labelledby="teacher-membership">
-      <h2 id="teacher-membership">{t('review.teacher.membership.heading')}</h2>
-      <p>{t('review.teacher.membership.joins', { subject: membership.subject,
-        roles: membership.roles.map((role) => t(roleKey(role), { role })).join(', ') })}</p>
-      <p>{t('review.teacher.membership.policy')}</p>
+      <h2 id="teacher-membership">{t('review.teacher.membership.heading', { count })}</h2>
+      {membership.map((member) => (
+        <p key={member.subject}>{t('review.teacher.membership.joins', { subject: member.subject,
+          roles: member.roles.map((role) => t(roleKey(role), { role })).join(', ') })}</p>
+      ))}
+      <p>{t('review.teacher.membership.policy', { count })}</p>
     </section>
   );
 }

@@ -1,12 +1,18 @@
-"""Course membership: an administrator adds a member (D25, option A; S11, #129).
+"""Course membership: an administrator adds members (D25, option A; S11, #129; batch, D36, S11b).
 
 The command writes a new version of the context's trusted policy through the
-host's installer, which never changes an installed file, and proposes the
-member's ``Participant`` with the context's new ``policies`` reference. The
-member gains no authority before a person with administrative authority decides
-and applies the proposal; application rechecks that exactly that policy is
-installed. ``ADMINISTRATOR`` cannot be granted this way, and removing a member
-is not offered.
+host's installer, which never changes an installed file, and proposes each
+member's ``Participant`` with the context's new ``policies`` reference. One
+proposal may add several members in that one policy version, so a class is
+enrolled in one propose–decide–apply cycle. No member gains authority before a
+person with administrative authority decides and applies the proposal;
+application rechecks that exactly that policy is installed. ``ADMINISTRATOR``
+cannot be granted this way, and removing a member is not offered.
+
+Every membership proposal starts from the installed policy: once one is
+applied, the others pending in the course go stale and are proposed again. The
+core does not refuse a proposal while another is pending (D36); the studio
+shows them and warns.
 
 A member joins every source or delivery scope of this context alone, so a
 learner added to an imported delivery reads its bound resources. The policy
@@ -16,6 +22,8 @@ derived from the reviewed import preview.
 
 from typing import Literal
 from uuid import uuid4
+
+from pydantic import Field, model_validator
 
 from learning.contracts import EntityRef, Record, Text, entity_data, make_entity
 from learning.decisions import create_proposal, save_proposal
@@ -33,10 +41,29 @@ MEMBER_ACTIONS = {
 }
 
 
-class MembershipCommand(Record):
-    base_context: EntityRef
+class NewMember(Record):
     subject: Text
     role: Literal['CONTENT_RESPONSIBLE', 'ASSESSOR', 'LEARNER', 'OBSERVER']
+
+
+class MembershipCommand(Record):
+    base_context: EntityRef
+    members: tuple[NewMember, ...] = Field(min_length=1)
+
+    @model_validator(mode='before')
+    @classmethod
+    def _one_member(cls, data):
+        # A command recorded before batches (S11) names one subject and its role.
+        if isinstance(data, dict) and 'members' not in data and {'subject', 'role'} <= data.keys():
+            data = {**{k: v for k, v in data.items() if k not in ('subject', 'role')},
+                    'members': [{'subject': data['subject'], 'role': data['role']}]}
+        return data
+
+    @model_validator(mode='after')
+    def _distinct(self):
+        if len({member.subject for member in self.members}) != len(self.members):
+            raise ValueError('A subject is named more than once')
+        return self
 
 
 class Member(Record):
@@ -46,8 +73,16 @@ class Member(Record):
 
 class MembershipProposal(Record):
     proposal: EntityRef
-    participant: EntityRef
+    participants: tuple[EntityRef, ...]
     policy: TrustedPolicy
+
+    @model_validator(mode='before')
+    @classmethod
+    def _one_participant(cls, data):
+        # A result recorded before batches (S11) names one participant.
+        if isinstance(data, dict) and 'participant' in data and 'participants' not in data:
+            data = {**{k: v for k, v in data.items() if k != 'participant'}, 'participants': [data['participant']]}
+        return data
 
 
 def member_policy(policy, context_id, subject, role, version):
@@ -80,35 +115,41 @@ def _build(install):
     def build(store, context, command):
         root, subject = context.snapshot.context, context.request.subject_key
         _administrator(context)
-        member = context.policy.subjects.get(command.subject)
-        if (member and root.id in member.actions or any(context.snapshot.get(r).fields['subjectKey'] == command.subject
-                                                         for r in root.fields['participants'])):
-            raise ValueError('This subject is already a member of the course')
-        policy = member_policy(context.policy, root.id, command.subject, command.role, uuid4().hex)
+        joined = {context.snapshot.get(r).fields['subjectKey'] for r in root.fields['participants']}
+        for new in command.members:
+            granted = context.policy.subjects.get(new.subject)
+            if new.subject in joined or granted and root.id in granted.actions:
+                raise ValueError(f'{new.subject} is already a member of the course')
+        version, policy = uuid4().hex, context.policy
+        for new in command.members:
+            policy = member_policy(policy, root.id, new.subject, new.role, version)
         current = context.snapshot.get(context.policy.policy_ref)
         policy_entity = validate_entity(entity_data(current.model_copy(update={
-            'version': policy.policy_ref.version,
+            'version': version,
             'fields': {**current.fields, 'permissions': [*current.fields['permissions'],
                                                          MEMBERSHIP_POLICY + canonical(policy.model_dump(mode='json'))]},
             'provenance': current.provenance.model_copy(update={'origin': 'GENERATED_PROPOSAL', 'responsible': subject})})),
             context.contract)
-        participant = validate_entity(entity_data(make_entity('Participant', f'{root.id}:participant:{command.subject}',
-            {'subjectKey': command.subject, 'roles': [command.role], 'learningNeeds': []},
-            version=policy.policy_ref.version, origin='GENERATED_PROPOSAL', responsible=subject)), context.contract)
+        participants = tuple(validate_entity(entity_data(make_entity('Participant', f'{root.id}:participant:{new.subject}',
+            {'subjectKey': new.subject, 'roles': [new.role], 'learningNeeds': []},
+            version=version, origin='GENERATED_PROPOSAL', responsible=subject)), context.contract)
+            for new in command.members)
         updated = root.model_copy(update={'version': uuid4().hex, 'fields': {**root.fields,
-            'participants': [*root.fields['participants'], participant.ref.model_dump()],
+            'participants': [*root.fields['participants'], *(p.ref.model_dump() for p in participants)],
             'policies': policy_entity.ref.model_dump()}})
-        candidates = (participant, policy_entity, updated)
+        candidates = (*participants, policy_entity, updated)
+        added = ', '.join(f'{new.subject} as {new.role}' for new in command.members)
         proposal = create_proposal(context, (root.ref,), candidates,
-            f'Add {command.subject} to this course as {command.role}. The new trusted policy version is installed '
+            f'Add {added} to this course. The new trusted policy version is installed '
             'but used only after this proposal is decided and applied. ' + canonical({
-                'subject': command.subject, 'role': command.role, 'actions': MEMBER_ACTIONS[command.role],
+                'members': [{'subject': new.subject, 'role': new.role, 'actions': MEMBER_ACTIONS[new.role]}
+                            for new in command.members],
                 'policy': policy.policy_ref.model_dump()}))
         # The policy file exists before the proposal that references it: a failure leaves only an unused file.
         if install is not None:
             install(policy)
         save_proposal(store, context, proposal, candidates)
-        return MembershipProposal(proposal=proposal.ref, participant=participant.ref, policy=policy)
+        return MembershipProposal(proposal=proposal.ref, participants=tuple(p.ref for p in participants), policy=policy)
     return build
 
 
