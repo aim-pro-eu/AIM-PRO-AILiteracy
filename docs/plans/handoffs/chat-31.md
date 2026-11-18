@@ -112,13 +112,20 @@ The browser tests need the local Keycloak; they run in CI (reported in the PR).
 
 ## Open decisions
 
-None answered here. Still open: D21, D28, D29, D31–D33, D37, the stale rule for evaluation drafts (S13). The other
-roadmap rows proposed in `chat-30.md` (D19 partial, D20 projection, D37, S12 and S13 notes) are still for the owner.
+None answered in this chat. Answered afterwards by the owner (18 November 2026): D37 and D9 revised (see "Next
+step", #141). Still open: D21, D28, D29, D31–D33, the stale rule for evaluation drafts (S13). The roadmap rows
+proposed in `chat-30.md` (D19 partial, D20 projection, S12 and S13 notes) were recorded on 18 November 2026 at the
+owner's request (PR #140).
 
 ## Next step
 
 **Chat 32: S12 part 1** (#136): the separate Learner API process, my courses (D19 for now), the course view (D20),
-own progress and two-learner isolation. Then S12 part 2, S13, S13b.
+own progress and two-learner isolation. Then S12 part 2, S12b (Teams-style enrolment, #141), S13, S13b.
+
+Owner, 18 November 2026: **D37 decided** (enrolment like Teams: a course code or link for students, reviewed
+membership for staff; a joining student does not stale pending proposals) and **D9 revised** (automatic subject keys
+for people of the configured issuer); both implemented in S12b (#141), after S12 and before S13. Recorded in the
+roadmap with the Chat 30 rows (PR #140).
 
 ### Prompt for Chat 32
 
@@ -146,8 +153,10 @@ courses (D19 for now), the course view (D20), own progress and isolation across 
    services/authoring_api/app.py and context_summary.py, PolicyDirectory.readable, learning/service.py (show, the
    learner-only redaction, submit), learning/assessment.py, learning/membership.py, tests/seed.py and the
    architecture tests that keep modules apart.
-3. Ask the owner whether the roadmap rows proposed in chat-30.md (D19 partial, D20 projection, D37) are to be
-   recorded; do not decide D37. Write the contract tests first: the learner app imports no authoring module; my
+3. The roadmap records the Chat 30 rows and the owner's 18 November decisions (PR #140): D19 partial, the D20
+   projection, the S12 acceptance, D37 = Teams-style enrolment and D9 revised, both for S12b (#141). Keep "my courses"
+   in one function whose source S12b can extend with learners who joined by code; do not implement enrolment by code.
+   Write the contract tests first: the learner app imports no authoring module; my
    courses (policy ∩ participant, ACTIVE LEARNING only, a pending member not listed); the course view from the
    validated course only, with no answer key, proposal, decision or other participant; own progress; two learners of
    one delivery isolated on every Learner API endpoint and on the Authoring API context summary; reads leave the
@@ -160,12 +169,12 @@ courses (D19 for now), the course view (D20), own progress and isolation across 
 
 - Code, tests, docs and GitHub content in English; chat with the owner in Italian. Do not spawn agents.
 - No model call, no live run; synthetic seed only. Never edit an AIM-PRO/jjodel export or the ALM metamodel.
-- No learner app (S13). Do not start S12 part 2 unless the owner asks, #125 or #134.
+- No learner app (S13). Do not start S12 part 2 unless the owner asks, S12b (#141), #125 or #134.
 - Leave the others' uncommitted changes (README.md, docs/architecture/system-overview.md,
   docs/plans/handoffs/chat-01.md, docs/plans/sequential-chat-plan.md, examples/lpo-ai/) alone and out of PRs.
 - The owner's stacks (ports 58000/58001; /tmp/alm-demo and /tmp/alm-se-ai): never stop or restart them; read their
   stores read-only.
-- Do not decide D21, D28, D29, D31–D33, D37 or the stale rule for evaluation drafts.
+- Do not decide D21, D28, D29, D31–D33 or the stale rule for evaluation drafts.
 ```
 
 ## PR and CI

@@ -86,9 +86,12 @@ Facts in this table are a snapshot. Every chat re-verifies the ones it uses.
 | D30 | The review of a Curator syllabus (Chat 20, issue #107, refines D27). A request makes at most three drafts: a draft refused by the deterministic checks or not accepted by the review agent (`REJECT`, `UNCERTAIN`, a flag false) goes back to the Curator with its draft and the reason, as untrusted data; the review agent judges each draft on its own. When the drafts run out the request fails as before, so a generated syllabus always carries an `ACCEPT` review. Every attempt's verdict, or the fixed text of the check that refused it, is kept with the request's result in the ALM requests store, read through the API and shown in the studio; the review agent's reason is shown as model text and never becomes an error message, a log line or an event. The review of a revision receives the previous syllabus and the teacher's reasons. The review prompt was calibrated on 4 + 4 owner-authorized live jobs, in three clauses only: source diagnostics are not by themselves grounds for rejection, uncited excerpts are not grounds for rejection, and a claim is judged as worded. The configured models are unchanged | 10 Nov 2026 |
 | D34 | Generation by blocks of units (S09d, issue #118, refines D30 for the generators). The Evaluator, Teacher (unstructured) and Trainer write a request in blocks of 12 target units; the generator of a block receives the whole input (the whole syllabus included), its units and the accepted drafts of the earlier blocks, as untrusted data. Each block is judged by the review agent on its own, with the full input and that block only, up to three drafts per block; the assembled draft is judged once at the end, also for one block. One proposal per job. A flow ends with something for the teacher to decide (13 November 2026, changes D30 for these generators): a block the review agent does not accept keeps its last checked draft, and a final review that is not `ACCEPT` is proposed with its verdict and a fixed notice; a block whose drafts all fail the checks is written in two halves, and only a one-unit block failing them fails the job. Accepted blocks are kept and reused, without a model call, by a new job over the same exact inputs. The structured Teacher and the Curator keep one response. A block whose response does not fit (a call past its deadline, or a response cut at its output length limit) is written in two halves, down to one unit, so the approach does not depend on the model; only a one-unit block that does not fit stops the request, with a fixed text, never the provider's message; the deadline of a model call is 1200 s (was 600); block progress is a content-free event shown in the studio job list. A draft that does not cover its units is refused in words the author can read, naming the units by their position in the syllabus; the retry receives the unit keys as data (Chat 23, 12–13 November 2026) | 13 Nov 2026 |
 | D35 | Responses may reveal which contexts exist: the rule "a response never reveals which contexts exist" (D10, S05) is removed, so the API may list the contexts of the signed-in subject, for the studio home (in place of the context id field) and for the learner's courses (D19, S12). A missing context and an uninstalled policy still both answer 404 `context_unavailable` | 16 Nov 2026 |
-| D20 | A learner sees everything needed to follow and learn from the course: syllabus, material, activities, exercises and the rest of the learning content. What the learner sees comes from the validated course, never from drafts or other learners' records; the exact projection (for example rubrics and assessment criteria) is defined in S12 with the owner | 9 Nov 2026 |
+| D20 | A learner sees everything needed to follow and learn from the course: syllabus, material, activities, exercises and the rest of the learning content. What the learner sees comes from the validated course, never from drafts or other learners' records; the exact projection (for example rubrics and assessment criteria) is defined in S12 with the owner. Projection (17 Nov 2026, #136): for an assessment, its activity, conditions, accepted evidence and the rubric's criteria and levels; the learner's own applied evaluations with each criterion's level and reason and the result; never an answer key, never a pending draft | 9 Nov 2026, 17 Nov 2026 |
 | D25 | Course membership, option A: the administrator of a course adds a member (any subject of the identity map, as `CONTENT_RESPONSIBLE`, `ASSESSOR`, `LEARNER` or `OBSERVER`; never `ADMINISTRATOR`); the API writes a new trusted policy file (an installed file is never changed or removed, as D23) and records a proposal that adds the member's `Participant` and changes the context's `policies` reference; the member's authority starts when a person applies it (Chat 28, #129) | 16 Nov 2026 |
 | G7 / D4 | D4 is lifted by an assessor-requested evaluation draft (option A): a person with the `ASSESSOR` role asks the runtime evaluator `learner-response-evaluator` for a draft on one observed attempt; control builds the `Evaluation`, checks it with `validate_evaluation` (at most three drafts) and records it as a proposal that a person decides and applies; FORMATIVE and FORMAL; the import configures the EVALUATOR worker (Chat 28–29, #129, PR #131) | 16 Nov 2026 |
+| D19 (partial) | A learner's courses are those they are enrolled in; for now the deliveries where they are `LEARNER` by D25 membership (policy ∩ participant), behind one function that D37 may change. One delivery context per learner is excluded (#136) | 17 Nov 2026 |
+| D37 | Enrolment like Microsoft Teams: students join a published course with a course code (or a link carrying it) and take part at once; the teacher's reviewed choice to open the course with a code is the human decision. Teaching staff are still added by the reviewed membership proposal (D25, D36). The course is authored independently of its students; once approved, students join or are added, and **the course version stays the same whatever students enrol**: proposals, approvals and the stale check use a course version that leaves out participants and learners' own records, and a student, whether joining with the code or added by the teacher, is recorded as a participant only under the delivery's reviewed learner grant, with no new policy version (this replaces D25/D36 membership for the `LEARNER` role). Staff are left as they are for now. Implemented in S12b (#141) | 18 Nov 2026 |
+| D9 (revised) | A person who signs in through the configured identity provider and is not in the identity map gets a subject key automatically; Keycloak roles still grant nothing and course authority still comes from the trusted policy and the participant record (S12b, #141) | 18 Nov 2026 |
 | D36 | Membership proposals made together (#133): the studio shows the pending membership proposals and warns that one is applied at a time; one membership proposal may add several members (batch); the core does not refuse a proposal while another is pending (options B + batch, S11b) | 17 Nov 2026 |
 | Earlier | Socratic option b; live model runs only with owner authorization; never edit AIM-PRO/jjodel exports | see `docs/architecture/agentic-network-decisions.md` |
 
@@ -113,7 +116,7 @@ Open decisions that block later steps, not decided here:
 | Id | Decision | Blocks |
 | --- | --- | --- |
 | D16 | Scenario input independent of the AIM-PRO export (today the Curator reads the AIM-PRO project export) | nothing before S13; needed when scenarios change |
-| D19 | How a learner's courses are listed: the contexts where the learner is a participant (an API that lists the subject's own contexts, allowed by D35), or an enrolment record. The owner could not try the learner side yet (9 Nov 2026): no learner app exists before S13 | S12 |
+| Stale drafts | The stale rule for evaluation drafts: every apply and every learner's `submit` gives the course a new version, so every pending proposal goes stale, evaluation drafts included (Chat 29 finding 3, Chat 30 finding 1). Decided with the owner after the learner app is tried | S13 |
 | D21 | The trainer's role once a course is validated, beyond authoring trainer content. Owner direction (9 Nov 2026), to be clarified: the trainer is used to give learners practice, a kind of Socratic agent that hands out exercises with a method. Open points: whether the trainer is a person, an agent or both, and how it relates to the Socratic coach of S13 | after S13 |
 | D28 | A Curator revision of the syllabus in use. Today an applied syllabus can be edited by the teacher but not revised by the Curator: a revision needs a revision request, and a decision on an applied proposal is not one. Options: a revision job that carries its own reason, or a new decision kind (Chat 19 finding 2) | when a course is refined after it is applied |
 | D29 | The form of the optional agent review of a teacher's edit (D27): a job that records a new proposal with the review agent's verdict, or a review record beside the edited proposal. Needs a model call (Chat 19 finding 3) | before the review of an edit is offered |
@@ -185,16 +188,18 @@ metamodel.
 | S09d | 4 | Generation by blocks of units: a 48-unit course gets its assessments and content with the configured model (owner, 11 Nov 2026; before S09c2 part 2) | S09c, D34 |
 | S10 | 8 | Course validation: release and delivery views — **milestone M2: authoring to delivery** | S09c |
 | S11 | — | Runtime assessor role and evaluation adapter (G7); course membership (D25) (done: PR #131) | S10, D25, G7 / D4 |
-| S11b | — | Studio flow fixes from the SE-AI case study: an existing course id as delivery course (#132), pending activation and membership proposals (#133); batch membership (D36) | S11, D36 (decided) |
-| S12 | 5 | Learner API, including the learner's own courses | S11, D19, D20 |
-| S13 | 5 | Learner app: my courses, course view, practice — **milestone M3: learner practice end to end** | S12 |
+| S11b | — | Studio flow fixes from the SE-AI case study: an existing course id as delivery course (#132), pending activation and membership proposals (#133); batch membership (D36) (done: PR #139) | S11, D36 (decided) |
+| S12 | 5 | Learner API, including the learner's own courses (#136) | S11 (done), D19 (answered for S12), D20 (decided, projection on #136) |
+| S12b | — | Teams-style enrolment: a course code or link for students, students added by the teacher in the same way, a course version that enrolments leave unchanged, automatic subject keys (D9 revised) (#141) | S12, D37 |
+| S13 | 5 | Learner app: my courses, course view, practice — **milestone M3: learner practice end to end**; the stale rule for evaluation drafts is decided here with the owner | S12, S12b |
 | S13b | — | Review and release readability for the teacher: release views (#125), the next action on long review pages (#134) | S13, the layout owner |
 | S14 | — | Scenario input independent of the AIM-PRO export | D16 |
 | S15 | 6 | Organisation context and guidance | decision 6 details |
 
 Planned order (owner, 17 November 2026, after the SE-AI case study): Chat 30 writes
-the D19 and D36 options for the owner and specifies S12; then S11b; then S12 and
-S13; then S13b. The SE-AI case study (`examples/se-ai/`) is run again, with the
+the D19 and D36 options for the owner and specifies S12 (done, PR #137); then S11b
+(done, PR #139); then S12 (part 1, part 2), S12b (Teams-style enrolment, D37;
+owner, 18 November 2026) and S13; then S13b. The SE-AI case study (`examples/se-ai/`) is run again, with the
 owner's authorization, as a live check at M3.
 
 S14 and S15 are listed so they are not forgotten; they are specified when their
@@ -543,20 +548,57 @@ the owner on 17 November 2026.
 - [ ] One membership proposal adds one or more members (a mapped subject with one of `CONTENT_RESPONSIBLE`, `ASSESSOR`, `LEARNER`, `OBSERVER`; never `ADMINISTRATOR`; no subject twice; none already a member) in one new policy version, through the core, the CLI, the API and the members page; replay and conflicting request ids behave as for one member; application rechecks the installed policy as today.
 - [ ] Studio tests for each state; the S10 and S11 browser tests cover them (the S11 test proposes a second member while one is pending, and adds two members in one proposal).
 
+**Done** in PR #139 (issue #138, handoff `docs/plans/handoffs/chat-31.md`), merged as `5f8db44`.
+
 ### S12 — Learner API
 
 **Goal.** A separate learner process with LEARNING redaction.
 
 **Scope.** Learner request as a job, attempt submission, own progress
-(occurrences and approved states only); the learner's own courses (D19) and
-the learner's view of the validated course (D20: syllabus, material,
-activities, exercises), which changes LEARNING redaction. No authoring code importable.
+(occurrences and approved states only); the learner's own courses (D19, for
+now) and the learner's view of the validated course (D20 and its projection),
+which changes LEARNING redaction. No authoring code importable. Specified on
+#136 (Chat 30); probably two chats: part 1 the process, my courses, course view,
+own progress and isolation; part 2 submission, the learner request as a job and
+the finding 3 test.
 
-**Acceptance.**
+**Acceptance** (confirmed by the owner on #136, 17 November 2026).
 
-- [ ] A learner reaches only their own data (tests across two learners).
-- [ ] Evaluations stay proposed and approved separately.
-- [ ] `python -m evaluation --check` still passes.
+- [ ] **Separate process.** `services/learner_api`, its own FastAPI app, OpenAPI file and `--check`, sharing `services/api_common`; an architecture test shows that no authoring module is importable from it.
+- [ ] **My courses (D19).** The LEARNING contexts with status ACTIVE where the signed-in subject holds `LEARNER` in the installed policy and in its participant record; a member whose membership proposal is still pending is not listed; the source of the list is one function (D37 may change it).
+- [ ] **Course view (D20).** From the validated course of the delivery, never from drafts or proposals: the syllabus structure, outcomes and competences, teaching strategies, materials, and for each assessment its activity, conditions, accepted evidence and rubric criteria and levels. No answer key (a test), no proposal, decision or other participant.
+- [ ] **Own progress.** The learner's own occurrences and evidence, own applied evaluations (each criterion's level and reason, the result) and own approved learning states; never a pending evaluation draft.
+- [ ] **Attempt submission** (`submit`), idempotent by request id; a learner still cannot propose, decide or apply, and a learner request still cannot persist an `Evaluation`: evaluations stay proposed and approved separately.
+- [ ] **Learner request as a job** (teacher and Socratic intents, Socratic option b), run by the job worker; tests use synthetic model responses only.
+- [ ] **Isolation.** Tests across two learners of one delivery, on every Learner API endpoint and on the Authoring API context summary: each learner reaches only their own data (closes the `show` gap of Chat 30). Every read leaves the table digests unchanged.
+- [ ] **Finding 3** recorded in a test: a learner's submit makes a pending evaluation draft stale (today's rule; decided in S13).
+- [ ] The seed (D15) gives a delivery with two synthetic learners. `python -m evaluation --check`, the full offline suite and `python -m aimpro.generate --check` pass.
+
+### S12b — Teams-style enrolment (D37)
+
+**Goal.** A student joins a published course alone, with its code, or is added
+by the teacher, and takes part at once; the course version stays the same
+whatever students enrol, so the teacher's review queue is not disturbed.
+
+**Scope** (issue #141; owner decisions of 18 November 2026: D37, D9 revised).
+A delivery course opened to enrolment with a code in its reviewed policy (only
+a digest of the code stored); a signed-in subject who gives the right code to
+an ACTIVE delivery becomes a `LEARNER` participant, idempotent by request id; a
+student added by the teacher is recorded the same way, as a participant only,
+with no new policy version (this replaces D25/D36 membership for `LEARNER`);
+proposals, approvals and the stale check use a course version that leaves out
+participants and learners' own records, so enrolments never make a pending
+proposal stale (S13 still decides whether a learner's new attempt makes that
+learner's own pending evaluation draft stale; the ALM metamodel is unchanged,
+so the technical record version still changes);
+teaching staff are left as they are for now; automatic subject keys for
+people of the configured issuer outside the identity map; "join with a code"
+in the Learner API; the course code with "reset" and "disable" on the studio's
+members page. Not in S12b: removing a member, promoting a member, a catalogue
+of open courses (later, not yet planned); the learner app screens (S13).
+
+**Acceptance.** Proposed on #141; confirmed with the owner when the step is
+specified.
 
 ### S13 — Learner app (M3)
 
@@ -572,6 +614,8 @@ for decision 1.
 
 - [ ] Browser test: practice, submission and a reviewed evaluation on the seed delivery.
 - [ ] The learner build contains no authoring code (bundle check).
+- [ ] A learner joins the course with its code or link (S12b) before practising.
+- [ ] The stale rule for evaluation drafts (Chat 29 finding 3) is decided with the owner once the learner app is tried.
 
 ### S13b — Review and release readability
 
