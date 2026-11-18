@@ -23,13 +23,16 @@ it holds no real learner or organisation data.
 records the learner's synthetic attempt at the assessment of the seed's
 delivery, through ``submit`` (S11). An attempt is learner history, which
 activation refuses: it is a separate step, once an operator has installed the
-delivery's policy and the delivery is active. The same attempt is recorded once.
+delivery's policy and the delivery is active. The same attempt is recorded once;
+``--learner SUBJECT`` records it for the second learner instead.
 
 State: the authoring context holds an approved and applied syllabus, project,
 assessment, teacher and trainer content, completion rules and release, plus a
 pending Evaluator revision. The delivery context holds the applied import of
 that release. The second delivery context holds a pending import and has the
-learner as a participant.
+learner as a participant. Both delivery contexts have two synthetic learners,
+``learner`` and ``learner-2`` (S12), so a learner's reads can be checked against
+another learner's records.
 """
 
 from __future__ import annotations
@@ -45,7 +48,7 @@ from learning.contracts import EntityRef, Record, Text
 
 
 SEED_FORMAT = 1
-STAFF, LEARNER = 'admin', 'learner'
+STAFF, LEARNER, SECOND_LEARNER = 'admin', 'learner', 'learner-2'
 POLICY_DIR, PREVIEW_DIR, MANIFEST, DATABASE = 'policies', 'policy-previews', 'seed.json', 'alm.sqlite'
 ATTEMPT_REQUEST = 'seed-attempt-1'
 SYNTHETIC_ATTEMPT = ('Synthetic attempt: write a polite reminder to fictional Alex about EXAMPLE-01. '
@@ -64,6 +67,7 @@ class SeedManifest(Record):
     pending_delivery_context: Text
     staff: Text
     learner: Text
+    second_learner: Text
     project_id: Text
     project: EntityRef
     release: EntityRef
@@ -76,6 +80,15 @@ def _write_json(path: Path, text: str) -> None:
         file.write(text + '\n')
 
 
+def seed_policy():
+    """The trusted policy of the seed: the test policy with a second learner, granted as the first one is."""
+    from tests.authoring_cycle_fixtures import trusted_policy
+    policy = trusted_policy()
+    return policy.model_copy(update={'subjects': {**policy.subjects, SECOND_LEARNER: policy.subjects[LEARNER]},
+        'scopes': {name: scope.model_copy(update={'subjects': [*scope.subjects, SECOND_LEARNER]})
+                   if LEARNER in scope.subjects else scope for name, scope in policy.scopes.items()}})
+
+
 def build_seed(output: Path, store_location: Path | str | None = None) -> SeedManifest:
     """Build the synthetic state; ``store_location`` defaults to a new ``alm.sqlite`` in ``output``."""
     for name, value in TELEMETRY_OFF.items():
@@ -84,14 +97,14 @@ def build_seed(output: Path, store_location: Path | str | None = None) -> SeedMa
     from learning.metamodel import load_contract
     from learning.service import LearningService
     from learning.store import LearningStore
-    from tests.authoring_cycle_fixtures import AUTH, DELIVERY, DELIVERY_TWO, ProductionAuthoring, trusted_policy
+    from tests.authoring_cycle_fixtures import AUTH, DELIVERY, DELIVERY_TWO, ProductionAuthoring
 
     output = Path(output)
     if output.exists() and (not output.is_dir() or any(output.iterdir())):
         raise ValueError('Choose a new or empty output directory')
     output.mkdir(parents=True, exist_ok=True)
     database = output / DATABASE if store_location is None else store_location
-    policy = trusted_policy()
+    policy = seed_policy()
     agents = Mock(side_effect=AssertionError('The seed never builds agents'))
     with LearningStore(database) as store:
         service = LearningService(store, load_contract(), policy, agents)
@@ -119,14 +132,19 @@ def build_seed(output: Path, store_location: Path | str | None = None) -> SeedMa
     manifest = SeedManifest(format=SEED_FORMAT, store=DATABASE if store_location is None else None,
         policy_dir=POLICY_DIR, delivery_policy_preview=preview_path, authoring_context=AUTH,
         delivery_context=DELIVERY, pending_delivery_context=DELIVERY_TWO, staff=STAFF, learner=LEARNER,
+        second_learner=SECOND_LEARNER,
         project_id='synthetic-course', project=project, release=release.ref, delivery_policy=preview.policy_ref,
         pending_proposals={AUTH: (pending_evaluator.ref,), DELIVERY_TWO: (pending_import.proposal,)})
     _write_json(output / MANIFEST, manifest.model_dump_json(indent=2))
     return manifest
 
 
-def record_attempt(output: Path, store_location: Path | str | None = None) -> EntityRef:
-    """The learner's synthetic attempt at the delivery's assessment, recorded through ``submit``; its evidence."""
+def record_attempt(output: Path, store_location: Path | str | None = None, learner: str | None = None) -> EntityRef:
+    """A learner's synthetic attempt at the delivery's assessment, recorded through ``submit``; its evidence.
+
+    ``learner`` defaults to the seed's first learner. A request id names one attempt of the context, whoever
+    submits it, so each learner's attempt has its own.
+    """
     for name, value in TELEMETRY_OFF.items():
         os.environ.setdefault(name, value)
     from unittest.mock import Mock
@@ -147,11 +165,12 @@ def record_attempt(output: Path, store_location: Path | str | None = None) -> En
         if policy is None:
             raise ValueError('The delivery policy is not installed')
         service = LearningService(store, load_contract(), policy, agents)
-        context = service._context(manifest.delivery_context, manifest.learner)
+        learner = learner or manifest.learner
+        context = service._context(manifest.delivery_context, learner)
         activity = next(e for e in context.snapshot.active_domain()
                         if e.type == 'ActivityDefinition' and e.fields['intent'] == 'ASSESS')
-        return service.submit(manifest.delivery_context, manifest.learner, activity.ref, SYNTHETIC_ATTEMPT,
-                              ATTEMPT_REQUEST).ref
+        request_id = ATTEMPT_REQUEST if learner == manifest.learner else f'{ATTEMPT_REQUEST}:{learner}'
+        return service.submit(manifest.delivery_context, learner, activity.ref, SYNTHETIC_ATTEMPT, request_id).ref
 
 
 def main(argv=None):
@@ -160,10 +179,11 @@ def main(argv=None):
     parser.add_argument('--db', help='Store location instead of OUTPUT/alm.sqlite: a new SQLite file or a postgresql:// URL')
     parser.add_argument('--attempt', action='store_true',
                         help="Record the learner's synthetic attempt in OUTPUT, an existing seed whose delivery is active")
+    parser.add_argument('--learner', help='With --attempt: the learner who submits it (default: the first learner)')
     args = parser.parse_args(argv)
     if args.attempt:
         try:
-            evidence = record_attempt(args.output, args.db)
+            evidence = record_attempt(args.output, args.db, args.learner)
         except (ValueError, OSError) as error:
             print('Attempt not recorded: ' + str(error), file=sys.stderr)
             return 2

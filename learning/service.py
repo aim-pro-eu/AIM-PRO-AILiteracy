@@ -302,6 +302,18 @@ class LearningService:
         from learning.membership import course_members
         return course_members(self, context_id, subject_key)
 
+    def course_view(self, context_id, subject_key):
+        """The validated course of an active delivery as its learner sees it (D20, S12)."""
+        from learning.learner import course_view
+        with self.store.read_transaction():
+            return course_view(self._context(context_id, subject_key))
+
+    def own_progress(self, context_id, subject_key):
+        """The learner's own occurrences, evidence, applied evaluations and learning states (S12)."""
+        from learning.learner import own_progress
+        with self.store.read_transaction():
+            return own_progress(self.store, self._context(context_id, subject_key))
+
     def generate_project_assessments(self, context_id, subject_key, command, **kwargs):
         from learning.generation import generate_project
         return generate_project(self, context_id, subject_key, 'ASSESSMENT', command, **kwargs)
@@ -355,20 +367,33 @@ class LearningService:
             return proposal_review(self.store, context, proposal_id)
 
     def show(self, context_id, subject_key):
+        """The context, the entities the subject may see and the snapshot findings.
+
+        A learner-only subject sees the context as it is now, its own participant record and its own learning
+        records; the context lists only its own participant, occurrences and states, never another learner's (S12).
+        """
         context = self._context(context_id, subject_key)
         learner_only = self._learner_only(subject_key)
+        root = context.snapshot.context
+        if learner_only:
+            root = root.model_copy(update={'fields': {**root.fields,
+                'participants': [context.participant.ref.model_dump()],
+                **{key: [ref for ref in root.fields[key] if EntityRef.model_validate(ref) in context.snapshot.entities]
+                   for key in ('activityOccurrences', 'learningStates')}}})
         visible = []
         for entity in context.snapshot.entities.values():
+            # Earlier revisions of the context, reachable from the learner's own records, list other learners.
             if learner_only and (entity.type not in {'ExecutionContext','Participant','LearningState','ActivityOccurrence','LearningEvidence'}
-                    or entity.type == 'Participant' and entity.ref != context.participant.ref):
+                    or entity.type == 'Participant' and entity.ref != context.participant.ref
+                    or entity.type == 'ExecutionContext' and entity.ref != root.ref):
                 continue
-            visible.append(entity_data(entity))
+            visible.append(entity_data(root if entity.ref == root.ref else entity))
         if not learner_only:
             known = {(e['type'],e['id'],e['version']) for e in visible}
             for kind in ('ChangeProposal','HumanDecision','StateChange'):
                 visible.extend(entity_data(e) for e in self.store.owned(context_id,kind)
                                if (e.type,e.id,e.version) not in known)
-        return {'context':entity_data(context.snapshot.context), 'entities':visible,
+        return {'context':entity_data(root), 'entities':visible,
                 'findings':[f.model_dump() for f in context.snapshot.findings]}
 
     def request(self, request):

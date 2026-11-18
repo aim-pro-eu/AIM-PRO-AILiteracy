@@ -9,8 +9,9 @@ SNAPSHOT_DIR = Path(__file__).resolve().parents[1] / 'openapi'
 
 
 def snapshots() -> dict[str, str]:
-    from services.authoring_api.app import schema_app
-    apps = {'authoring.json': schema_app}
+    from services.authoring_api.app import schema_app as authoring
+    from services.learner_api.app import schema_app as learner
+    apps = {'authoring.json': authoring, 'learner.json': learner}
     return {name: json.dumps(factory().openapi(), ensure_ascii=False, sort_keys=True, indent=2) + '\n'
             for name, factory in apps.items()}
 

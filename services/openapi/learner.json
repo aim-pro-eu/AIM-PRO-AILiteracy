@@ -1,0 +1,1527 @@
+{
+  "components": {
+    "schemas": {
+      "Activity": {
+        "additionalProperties": false,
+        "properties": {
+          "assessment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expected_evidence": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Expected Evidence",
+            "type": "array"
+          },
+          "format": {
+            "minLength": 1,
+            "title": "Format",
+            "type": "string"
+          },
+          "instruction": {
+            "minLength": 1,
+            "title": "Instruction",
+            "type": "string"
+          },
+          "intent": {
+            "minLength": 1,
+            "title": "Intent",
+            "type": "string"
+          },
+          "materials": {
+            "items": {
+              "$ref": "#/components/schemas/EntityRef"
+            },
+            "title": "Materials",
+            "type": "array"
+          },
+          "outcomes": {
+            "items": {
+              "$ref": "#/components/schemas/EntityRef"
+            },
+            "title": "Outcomes",
+            "type": "array"
+          },
+          "ref": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "strategies": {
+            "items": {
+              "$ref": "#/components/schemas/EntityRef"
+            },
+            "title": "Strategies",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ref",
+          "intent",
+          "format",
+          "instruction",
+          "expected_evidence",
+          "outcomes",
+          "strategies",
+          "materials"
+        ],
+        "title": "Activity",
+        "type": "object"
+      },
+      "Assessment": {
+        "additionalProperties": false,
+        "description": "An assessment as the learner sees it (D20): never its answer key.",
+        "properties": {
+          "accepted_evidence": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Accepted Evidence",
+            "type": "array"
+          },
+          "activities": {
+            "items": {
+              "$ref": "#/components/schemas/EntityRef"
+            },
+            "title": "Activities",
+            "type": "array"
+          },
+          "conditions": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Conditions",
+            "type": "array"
+          },
+          "outcomes": {
+            "items": {
+              "$ref": "#/components/schemas/EntityRef"
+            },
+            "title": "Outcomes",
+            "type": "array"
+          },
+          "ref": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "rubric": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Rubric"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "ref",
+          "activities",
+          "outcomes",
+          "conditions",
+          "accepted_evidence"
+        ],
+        "title": "Assessment",
+        "type": "object"
+      },
+      "Competence": {
+        "additionalProperties": false,
+        "description": "An ALM ``Topic`` that a learning outcome addresses; the studio shows it as a competence.",
+        "properties": {
+          "definition": {
+            "minLength": 1,
+            "title": "Definition",
+            "type": "string"
+          },
+          "name": {
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "ref": {
+            "$ref": "#/components/schemas/EntityRef"
+          }
+        },
+        "required": [
+          "ref",
+          "name",
+          "definition"
+        ],
+        "title": "Competence",
+        "type": "object"
+      },
+      "CourseList": {
+        "additionalProperties": false,
+        "properties": {
+          "courses": {
+            "items": {
+              "$ref": "#/components/schemas/LearnerCourse"
+            },
+            "title": "Courses",
+            "type": "array"
+          }
+        },
+        "required": [
+          "courses"
+        ],
+        "title": "CourseList",
+        "type": "object"
+      },
+      "CourseView": {
+        "additionalProperties": false,
+        "description": "The validated course of a delivery as its learners see it (D20).",
+        "properties": {
+          "assessments": {
+            "items": {
+              "$ref": "#/components/schemas/Assessment"
+            },
+            "title": "Assessments",
+            "type": "array"
+          },
+          "competences": {
+            "items": {
+              "$ref": "#/components/schemas/Competence"
+            },
+            "title": "Competences",
+            "type": "array"
+          },
+          "context_id": {
+            "minLength": 1,
+            "title": "Context Id",
+            "type": "string"
+          },
+          "materials": {
+            "items": {
+              "$ref": "#/components/schemas/Material"
+            },
+            "title": "Materials",
+            "type": "array"
+          },
+          "outcomes": {
+            "items": {
+              "$ref": "#/components/schemas/Outcome"
+            },
+            "title": "Outcomes",
+            "type": "array"
+          },
+          "strategies": {
+            "items": {
+              "$ref": "#/components/schemas/Strategy"
+            },
+            "title": "Strategies",
+            "type": "array"
+          },
+          "structure": {
+            "$ref": "#/components/schemas/Node"
+          },
+          "title": {
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "context_id",
+          "title",
+          "outcomes",
+          "competences",
+          "strategies",
+          "structure",
+          "materials",
+          "assessments"
+        ],
+        "title": "CourseView",
+        "type": "object"
+      },
+      "EntityRef": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "type": {
+            "minLength": 1,
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "minLength": 1,
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "id",
+          "version"
+        ],
+        "title": "EntityRef",
+        "type": "object"
+      },
+      "ErrorBody": {
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ValidationIssue"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Detail"
+          },
+          "error": {
+            "title": "Error",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "error",
+          "detail",
+          "request_id"
+        ],
+        "title": "ErrorBody",
+        "type": "object"
+      },
+      "Evaluation": {
+        "additionalProperties": false,
+        "description": "An evaluation of the learner's evidence that a person approved and applied.",
+        "properties": {
+          "assessment": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/EntityRef"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
+          "judgments": {
+            "items": {
+              "$ref": "#/components/schemas/Judgment"
+            },
+            "title": "Judgments",
+            "type": "array"
+          },
+          "mode": {
+            "minLength": 1,
+            "title": "Mode",
+            "type": "string"
+          },
+          "ref": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          }
+        },
+        "required": [
+          "ref",
+          "assessment",
+          "mode",
+          "evidence",
+          "judgments"
+        ],
+        "title": "Evaluation",
+        "type": "object"
+      },
+      "Evidence": {
+        "additionalProperties": false,
+        "description": "What the learner handed in, as it was observed.",
+        "properties": {
+          "activity": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "content_or_locator": {
+            "minLength": 1,
+            "title": "Content Or Locator",
+            "type": "string"
+          },
+          "kind": {
+            "minLength": 1,
+            "title": "Kind",
+            "type": "string"
+          },
+          "observed_at": {
+            "minLength": 1,
+            "title": "Observed At",
+            "type": "string"
+          },
+          "occurrence": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "outcomes": {
+            "items": {
+              "$ref": "#/components/schemas/EntityRef"
+            },
+            "title": "Outcomes",
+            "type": "array"
+          },
+          "ref": {
+            "$ref": "#/components/schemas/EntityRef"
+          }
+        },
+        "required": [
+          "ref",
+          "activity",
+          "occurrence",
+          "outcomes",
+          "kind",
+          "content_or_locator",
+          "observed_at"
+        ],
+        "title": "Evidence",
+        "type": "object"
+      },
+      "HealthView": {
+        "properties": {
+          "status": {
+            "const": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "HealthView",
+        "type": "object"
+      },
+      "Judgment": {
+        "additionalProperties": false,
+        "description": "One rubric criterion of an applied evaluation: its level (none when undetermined) and the reason.",
+        "properties": {
+          "criterion_key": {
+            "minLength": 1,
+            "title": "Criterion Key",
+            "type": "string"
+          },
+          "level_key": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level Key"
+          },
+          "reason": {
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "criterion_key",
+          "reason"
+        ],
+        "title": "Judgment",
+        "type": "object"
+      },
+      "LearnerCourse": {
+        "additionalProperties": false,
+        "description": "A course the learner is enrolled in: its delivery context and the name of its learning design.",
+        "properties": {
+          "context_id": {
+            "minLength": 1,
+            "title": "Context Id",
+            "type": "string"
+          },
+          "title": {
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "context_id",
+          "title"
+        ],
+        "title": "LearnerCourse",
+        "type": "object"
+      },
+      "LearningState": {
+        "additionalProperties": false,
+        "description": "The learner's state for one outcome, derived only from applied evaluations.",
+        "properties": {
+          "basis": {
+            "items": {
+              "$ref": "#/components/schemas/EntityRef"
+            },
+            "title": "Basis",
+            "type": "array"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "progress": {
+            "minLength": 1,
+            "title": "Progress",
+            "type": "string"
+          },
+          "ref": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "verification": {
+            "minLength": 1,
+            "title": "Verification",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ref",
+          "outcome",
+          "progress",
+          "verification",
+          "basis"
+        ],
+        "title": "LearningState",
+        "type": "object"
+      },
+      "LogoutView": {
+        "properties": {
+          "end_session_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Session Url"
+          }
+        },
+        "required": [
+          "end_session_url"
+        ],
+        "title": "LogoutView",
+        "type": "object"
+      },
+      "Material": {
+        "additionalProperties": false,
+        "description": "A resource bound to this delivery by a reviewed binding the learner may read.",
+        "properties": {
+          "content_or_locator": {
+            "minLength": 1,
+            "title": "Content Or Locator",
+            "type": "string"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "ref": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "title": {
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "usage_conditions": {
+            "minLength": 1,
+            "title": "Usage Conditions",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ref",
+          "title",
+          "content_or_locator",
+          "usage_conditions"
+        ],
+        "title": "Material",
+        "type": "object"
+      },
+      "Node": {
+        "additionalProperties": false,
+        "description": "A phase or unit of the syllabus, with its activities and the parts directly inside it, in order.",
+        "properties": {
+          "activities": {
+            "items": {
+              "$ref": "#/components/schemas/Activity"
+            },
+            "title": "Activities",
+            "type": "array"
+          },
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/Node"
+            },
+            "title": "Children",
+            "type": "array"
+          },
+          "composition": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Composition"
+          },
+          "estimated_duration": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Duration"
+          },
+          "kind": {
+            "minLength": 1,
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "outcomes": {
+            "items": {
+              "$ref": "#/components/schemas/EntityRef"
+            },
+            "title": "Outcomes",
+            "type": "array"
+          },
+          "ref": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "strategies": {
+            "items": {
+              "$ref": "#/components/schemas/EntityRef"
+            },
+            "title": "Strategies",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ref",
+          "kind",
+          "name",
+          "outcomes",
+          "strategies",
+          "activities",
+          "children"
+        ],
+        "title": "Node",
+        "type": "object"
+      },
+      "Occurrence": {
+        "additionalProperties": false,
+        "description": "One of the learner's attempts at an activity.",
+        "properties": {
+          "activity": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/EntityRef"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
+          "process_node": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ref": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "status": {
+            "minLength": 1,
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ref",
+          "activity",
+          "status",
+          "evidence"
+        ],
+        "title": "Occurrence",
+        "type": "object"
+      },
+      "Outcome": {
+        "additionalProperties": false,
+        "properties": {
+          "competences": {
+            "items": {
+              "$ref": "#/components/schemas/EntityRef"
+            },
+            "title": "Competences",
+            "type": "array"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "ref": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "statement": {
+            "minLength": 1,
+            "title": "Statement",
+            "type": "string"
+          },
+          "target_level": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Level"
+          }
+        },
+        "required": [
+          "ref",
+          "statement",
+          "competences"
+        ],
+        "title": "Outcome",
+        "type": "object"
+      },
+      "OwnProgress": {
+        "additionalProperties": false,
+        "properties": {
+          "context_id": {
+            "minLength": 1,
+            "title": "Context Id",
+            "type": "string"
+          },
+          "evaluations": {
+            "items": {
+              "$ref": "#/components/schemas/Evaluation"
+            },
+            "title": "Evaluations",
+            "type": "array"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/Evidence"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
+          "learning_states": {
+            "items": {
+              "$ref": "#/components/schemas/LearningState"
+            },
+            "title": "Learning States",
+            "type": "array"
+          },
+          "occurrences": {
+            "items": {
+              "$ref": "#/components/schemas/Occurrence"
+            },
+            "title": "Occurrences",
+            "type": "array"
+          }
+        },
+        "required": [
+          "context_id",
+          "occurrences",
+          "evidence",
+          "evaluations",
+          "learning_states"
+        ],
+        "title": "OwnProgress",
+        "type": "object"
+      },
+      "Rubric": {
+        "additionalProperties": false,
+        "properties": {
+          "criteria": {
+            "items": {
+              "$ref": "#/components/schemas/RubricCriterion"
+            },
+            "title": "Criteria",
+            "type": "array"
+          },
+          "name": {
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "ref": {
+            "$ref": "#/components/schemas/EntityRef"
+          }
+        },
+        "required": [
+          "ref",
+          "name",
+          "criteria"
+        ],
+        "title": "Rubric",
+        "type": "object"
+      },
+      "RubricCriterion": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "minLength": 1,
+            "title": "Description",
+            "type": "string"
+          },
+          "key": {
+            "minLength": 1,
+            "title": "Key",
+            "type": "string"
+          },
+          "levels": {
+            "items": {
+              "$ref": "#/components/schemas/RubricLevel"
+            },
+            "title": "Levels",
+            "type": "array"
+          },
+          "outcomes": {
+            "items": {
+              "$ref": "#/components/schemas/EntityRef"
+            },
+            "title": "Outcomes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "key",
+          "description",
+          "outcomes",
+          "levels"
+        ],
+        "title": "RubricCriterion",
+        "type": "object"
+      },
+      "RubricLevel": {
+        "additionalProperties": false,
+        "properties": {
+          "descriptor": {
+            "minLength": 1,
+            "title": "Descriptor",
+            "type": "string"
+          },
+          "key": {
+            "minLength": 1,
+            "title": "Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "descriptor"
+        ],
+        "title": "RubricLevel",
+        "type": "object"
+      },
+      "SessionView": {
+        "properties": {
+          "csrf_token": {
+            "title": "Csrf Token",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "subject_key": {
+            "title": "Subject Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "subject_key",
+          "csrf_token",
+          "expires_at"
+        ],
+        "title": "SessionView",
+        "type": "object"
+      },
+      "Strategy": {
+        "additionalProperties": false,
+        "description": "A teaching strategy of the course.",
+        "properties": {
+          "constraints": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Constraints",
+            "type": "array"
+          },
+          "family": {
+            "minLength": 1,
+            "title": "Family",
+            "type": "string"
+          },
+          "name": {
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "rationale": {
+            "minLength": 1,
+            "title": "Rationale",
+            "type": "string"
+          },
+          "ref": {
+            "$ref": "#/components/schemas/EntityRef"
+          }
+        },
+        "required": [
+          "ref",
+          "name",
+          "family",
+          "rationale",
+          "constraints"
+        ],
+        "title": "Strategy",
+        "type": "object"
+      },
+      "ValidationIssue": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Loc",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Msg",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationIssue",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "ALM Learner API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/auth/callback": {
+      "get": {
+        "operationId": "callback_auth_callback_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "in": "query",
+            "name": "code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code"
+            }
+          },
+          {
+            "in": "query",
+            "name": "error",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Error"
+            }
+          }
+        ],
+        "responses": {
+          "303": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not authorized, unmapped identity or missing CSRF token"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Invalid request or data"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Identity provider unavailable"
+          }
+        },
+        "summary": "Finish the code flow, map the identity and start a server-side session",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/login": {
+      "get": {
+        "operationId": "login_auth_login_get",
+        "parameters": [
+          {
+            "description": "Local path to return to",
+            "in": "query",
+            "name": "return_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Local path to return to",
+              "title": "Return To"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Invalid request or data"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Identity provider unavailable"
+          }
+        },
+        "summary": "Start the OIDC code flow with PKCE at the identity provider",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "operationId": "logout_auth_logout_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogoutView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not authorized, unmapped identity or missing CSRF token"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal error"
+          }
+        },
+        "summary": "End the session; the result is the provider logout URL to visit, if any",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/session": {
+      "get": {
+        "operationId": "session_auth_session_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not authorized, unmapped identity or missing CSRF token"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal error"
+          }
+        },
+        "summary": "The signed-in subject and the CSRF token for writes",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/courses": {
+      "get": {
+        "operationId": "courses_courses_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourseList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal error"
+          }
+        },
+        "summary": "The active courses the signed-in subject is enrolled in as a learner",
+        "tags": [
+          "courses"
+        ]
+      }
+    },
+    "/courses/{context_id}": {
+      "get": {
+        "operationId": "course_courses__context_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "context_id",
+            "required": true,
+            "schema": {
+              "title": "Context Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourseView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not authorized, unmapped identity or missing CSRF token"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not found, or the context is unavailable"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Conflict with the current state; reload and retry"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Invalid request or data"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal error"
+          }
+        },
+        "summary": "The validated course of a delivery as its learners see it; never an answer key",
+        "tags": [
+          "courses"
+        ]
+      }
+    },
+    "/courses/{context_id}/progress": {
+      "get": {
+        "operationId": "progress_courses__context_id__progress_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "context_id",
+            "required": true,
+            "schema": {
+              "title": "Context Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnProgress"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not authorized, unmapped identity or missing CSRF token"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not found, or the context is unavailable"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Conflict with the current state; reload and retry"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Invalid request or data"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal error"
+          }
+        },
+        "summary": "The learner's own attempts, evidence, applied evaluations and learning states",
+        "tags": [
+          "progress"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal error"
+          }
+        },
+        "summary": "Liveness; needs no session",
+        "tags": [
+          "health"
+        ]
+      }
+    }
+  }
+}

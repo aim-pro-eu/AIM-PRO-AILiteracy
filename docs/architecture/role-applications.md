@@ -12,7 +12,8 @@ decisions and application (see [Review endpoints](#review-endpoints-s06)). S04 a
 shell that signs in through the API (see [Front-end workspace](#front-end-workspace)); S07 adds the
 studio review inbox, milestone M1 (see [Studio review inbox](#studio-review-inbox-s07)), and S07b a
 read-only course overview (see [Studio course overview](#studio-course-overview-s07b)). S08 adds the agent job worker, its
-jobs store and the `jobs` module (see [Agent jobs](#agent-jobs)). ALM remains the reference model. Nothing here changes
+jobs store and the `jobs` module (see [Agent jobs](#agent-jobs)). S12 adds the Learner API, a separate process (see
+[Learner API](#learner-api-s12-part-1)). ALM remains the reference model. Nothing here changes
 the ALM metamodel, the store schema or an AIM-PRO/jjodel export.
 
 ## Processes
@@ -30,7 +31,7 @@ flowchart LR
 | Process | Owns | Not allowed |
 | --- | --- | --- |
 | Authoring API (`services/authoring_api`) | staff sessions; projects, proposals, decisions, sources (from S05) | model credentials; direct store or decision internals |
-| Learner API (S12) | learner sessions; requests, attempts, own progress with LEARNING redaction | any authoring module |
+| Learner API (`services/learner_api`, S12) | learner sessions; the learner's courses, course view and own progress (part 1); attempts and requests (part 2) | any authoring module (checked by `tests/services/test_learner_boundaries.py`) |
 | Agent job worker (S08) | model calls, MCP retrieval, generators, orchestrator runs | serving browsers |
 
 `LearningService` and its store own every write. An API process authorizes a
@@ -277,7 +278,7 @@ preview included, stays an operator action.
 | `ALM_API_COOKIE_SECURE` | `true` by default; `false` only for local HTTP |
 | `ALM_API_SESSION_TTL`, `ALM_API_LOGIN_TTL` | seconds; defaults 3600 and 600 |
 | `ALM_API_MODULES` | comma-separated module names; unset selects all |
-| `ALM_STORE` | ALM store: an existing SQLite file or a `postgresql://` URL (kept secret: it may hold a password); required when any authoring module is selected |
+| `ALM_STORE` | ALM store: an existing SQLite file or a `postgresql://` URL (kept secret: it may hold a password); required when any authoring or learner module is selected |
 | `ALM_POLICY_DIR` | directory of trusted policy files (D10); required with `ALM_STORE` |
 | `ALM_JOBS_STORE` | jobs store (D14): a SQLite file, created if missing and never the ALM database, or a `postgresql://` URL (schema `jobs`); required when the `jobs` module is selected |
 | `ALM_API_JOB_POLL_SECONDS`, `ALM_API_JOB_STREAM_SECONDS` | progress stream: seconds between reads (default 1) and lifetime before the client reconnects (default 300) |
@@ -309,8 +310,11 @@ test with its CLI command on the same seeded database
   route function, then closes the store. The service's orchestrator factory
   refuses: the API never builds agents.
 - **Redaction.** A learner-only subject gets exactly what `show` gives it: the
-  context, its own participant record and its own learning records; its pending
-  proposal list is empty. Project and release reads need the `propose` action
+  context as it is now, its own participant record and its own learning
+  records; its pending proposal list is empty. Since S12 the context lists only
+  the subject's own participant, occurrences and learning states, and earlier
+  revisions of the context (reachable from the learner's own records, and
+  listing other learners) are left out. Project and release reads need the `propose` action
   and content authority, as in the CLI.
 - **No writes.** The table digests of the store (row count and SHA-256 per
   table, as the copy tool computes them) are unchanged after every endpoint,
@@ -377,10 +381,13 @@ installed) and `seed.json` (contexts, subjects, exact references).
 | --- | --- |
 | `architecture-authoring` | applied syllabus, project, assessment, teacher and trainer content, completion rules and release; one pending Evaluator revision |
 | `architecture-delivery` | the applied import of that release; its policy is the preview, so it is unavailable until the preview is copied into `policies/` |
-| `architecture-delivery-2` | a pending import of the same release; `learner` is a participant |
+| `architecture-delivery-2` | a pending import of the same release; `learner` and `learner-2` are participants |
 
-The subjects are `admin` (administrator, content responsible, assessor) and
-`learner`, the subject keys of the dev identity map. The map also holds
+The subjects are `admin` (administrator, content responsible, assessor),
+`learner` and `learner-2` (S12: both are learners of both deliveries, so a
+learner's reads are checked against another learner's records). `admin` and
+`learner` are subject keys of the dev identity map; `learner-2` is not mapped
+there yet. The map also holds
 `assessor`, who is in no policy of the seed: a course administrator adds them
 as a member (D25).
 
@@ -389,7 +396,8 @@ learner's synthetic attempt at the assessment of `architecture-delivery`
 through `submit` (S11, dev only). An attempt is learner history, which
 activation refuses, so it is a separate step: the delivery's policy must be
 installed in `policies/` and the delivery active. The same attempt is recorded
-once.
+once. `--learner learner-2` records the second learner's attempt, under its own
+request id.
 
 ## Front-end workspace
 
@@ -1303,6 +1311,65 @@ decisions 1–8). The core is described in
    descriptor (or "not determined") and the agent's reason, and the result.
    The decision and the application are the usual ones; the requester may
    decide.
+
+## Learner API (S12, part 1)
+
+Issue #136; owner decisions of 17 November 2026 (D19 for now, D20 and its
+projection, the `show` gap closed here). A separate process,
+`python -m services.learner_api [--port 58002]`, built by
+`services.learner_api.app.create_app` on the shared skeleton: the same identity
+routes, error shape, request ids, policy directory and settings as the Authoring
+API (`ALM_API_MODULES` selects its modules; `ALM_STORE` and `ALM_POLICY_DIR` are
+required with any of them). Its OpenAPI snapshot is
+`services/openapi/learner.json`, checked by the same `--check`. Every route is a
+read: `Cache-Control: no-store`, and the table digests of the store are
+unchanged after each one.
+
+| Module | Route | Response |
+| --- | --- | --- |
+| `courses` | `GET /courses` | `CourseList`: the courses the subject is enrolled in as a learner, each with its context id and the name of its learning design |
+| `courses` | `GET /courses/{context_id}` | `CourseView`: the validated course of the delivery (D20) |
+| `progress` | `GET /courses/{context_id}/progress` | `OwnProgress`: the learner's own records |
+
+- **My courses (D19).** `learning.learner.enrolled_courses` is the one source
+  of the list, reached through `ContextServices.enrolled`: the LEARNING contexts
+  with status ACTIVE whose installed policy grants the subject `LEARNER` and
+  `read` there, and whose participants include the subject as `LEARNER`. A
+  membership not applied yet changes neither, so its member is not listed.
+  Enrolment by course code (D37, S12b) changes this function.
+- **Course view (D20).** A projection of named fields from the active model of
+  the delivery, which is the release it imported, never a draft or a proposal:
+  the syllabus structure (phases and units in order, each with its activities:
+  instruction, intent, format, expected evidence, outcomes, strategies,
+  materials and assessment), the outcomes with their competences (the ALM
+  topics they address, as the studio shows them), the teaching strategies, the
+  materials (the resources bound by a valid, approved binding in a scope the
+  learner may read: the same check as readiness) and each assessment with its
+  activities, outcomes, conditions, accepted evidence and rubric criteria and
+  levels. Never the answer key; no proposal, decision, participant or learner
+  record is named.
+- **Own progress.** The learner's own occurrences, evidence, applied
+  evaluations (the assessment, mode, each criterion's level and reason, the
+  result) and learning states. Records are matched to the learner's own
+  participant whatever the subject's other roles. An evaluation is listed once
+  a person applied it: a pending draft is only a candidate of its proposal.
+- **Who.** A subject who holds `LEARNER` in the policy and in its participant
+  record, in a LEARNING/ACTIVE delivery. Anyone else is refused: 403 without the
+  role or `read`, 422 "The course is not open to learners" for a draft
+  delivery, 404 `context_unavailable` for a missing context or policy.
+- **Isolation.** Two learners of the seed's delivery, with their attempts, an
+  applied evaluation and a pending draft: each reaches only their own records
+  on every Learner API endpoint and on the Authoring API context summary
+  (`tests/services/test_learner_api.py`).
+- **Process boundary.** A separate interpreter imports the Learner API and
+  serves every endpoint to a signed-in learner; no authoring module (the
+  Authoring API, the jobs package, the CLI, the authoring, project, release,
+  membership, evaluation and review commands, `aimpro`) and no model client is
+  loaded afterwards (`tests/services/test_learner_boundaries.py`).
+- **Not yet.** Attempt submission and the learner request as a job are S12
+  part 2; the learner app and its typed client are S13. Both APIs name their
+  session cookie `alm_session`, so on one host name they replace each other's
+  session: the learner app (S13) needs its own host name or proxy.
 
 ## Local identity smoke test
 

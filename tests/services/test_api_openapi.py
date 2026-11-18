@@ -28,10 +28,10 @@ class OpenApiSnapshotTest(unittest.TestCase):
 
     def test_checked_in_snapshot_matches_the_app(self):
         self.assertEqual(self.run_main('--check'), (0, ''))
-        self.assertEqual(sorted(p.name for p in SNAPSHOT_DIR.glob('*.json')), ['authoring.json'])
+        self.assertEqual(sorted(p.name for p in SNAPSHOT_DIR.glob('*.json')), ['authoring.json', 'learner.json'])
 
-    def schema(self):
-        return json.loads((SNAPSHOT_DIR / 'authoring.json').read_text(encoding='utf-8'))
+    def schema(self, name='authoring.json'):
+        return json.loads((SNAPSHOT_DIR / name).read_text(encoding='utf-8'))
 
     def test_snapshot_lists_the_skeleton_read_only_authoring_review_job_course_export_source_and_syllabus_endpoints(self):
         schema = self.schema()
@@ -84,23 +84,46 @@ class OpenApiSnapshotTest(unittest.TestCase):
                          ['QUEUED', 'RUNNING', 'PROPOSED', 'REJECTED', 'FAILED', 'ABANDONED', 'COMPLETED',
                           'AWAITING_CHOICE', 'ACCEPTED', 'DECLINED'])
 
+    def test_the_learner_snapshot_lists_the_skeleton_and_the_learner_reads_only(self):
+        schema = self.schema('learner.json')
+        self.assertEqual(schema['info']['title'], 'ALM Learner API')
+        self.assertEqual({path: sorted(methods) for path, methods in schema['paths'].items()},
+                         {'/health': ['get'], '/auth/login': ['get'], '/auth/callback': ['get'],
+                          '/auth/session': ['get'], '/auth/logout': ['post'], '/courses': ['get'],
+                          '/courses/{context_id}': ['get'], '/courses/{context_id}/progress': ['get']})
+
+    def test_no_learner_schema_has_an_answer_key_a_proposal_or_a_decision(self):
+        def properties(value):
+            if isinstance(value, dict):
+                yield from value.get('properties', {})
+                for item in value.values():
+                    yield from properties(item)
+            elif isinstance(value, list):
+                for item in value:
+                    yield from properties(item)
+        names = {name.lower() for name in properties(self.schema('learner.json')['components'])}
+        self.assertIn('rubric', names)
+        self.assertEqual({name for name in names if 'answer' in name or 'proposal' in name or 'decision' in name
+                          or 'participant' in name}, set())
+
     def test_every_error_response_documents_the_error_body(self):
-        schema = self.schema()
-        self.assertNotIn('HTTPValidationError', schema['components']['schemas'])
-        self.assertNotIn('ValidationError', schema['components']['schemas'])
-        self.assertEqual(set(schema['components']['schemas']['ErrorBody']['required']), {'error', 'detail', 'request_id'})
-        for path, methods in schema['paths'].items():
-            for method, operation in methods.items():
-                errors = {status: response for status, response in operation['responses'].items() if int(status) >= 400}
-                with self.subTest(f'{method.upper()} {path}'):
-                    self.assertIn('500', errors)
-                    for response in errors.values():
-                        self.assertEqual(response['content']['application/json']['schema'],
-                                         {'$ref': '#/components/schemas/ErrorBody'})
-                    if path.startswith('/contexts/'):
-                        self.assertEqual(sorted(errors), ['401', '403', '404', '409', '422', '500'])
-                    if path.startswith('/auth/') and path != '/auth/login':
-                        self.assertIn('401', errors)
+        for name in ('authoring.json', 'learner.json'):
+            schema = self.schema(name)
+            self.assertNotIn('HTTPValidationError', schema['components']['schemas'])
+            self.assertNotIn('ValidationError', schema['components']['schemas'])
+            self.assertEqual(set(schema['components']['schemas']['ErrorBody']['required']), {'error', 'detail', 'request_id'})
+            for path, methods in schema['paths'].items():
+                for method, operation in methods.items():
+                    errors = {status: response for status, response in operation['responses'].items() if int(status) >= 400}
+                    with self.subTest(f'{name}: {method.upper()} {path}'):
+                        self.assertIn('500', errors)
+                        for response in errors.values():
+                            self.assertEqual(response['content']['application/json']['schema'],
+                                             {'$ref': '#/components/schemas/ErrorBody'})
+                        if path.startswith(('/contexts/', '/courses/')):
+                            self.assertEqual(sorted(errors), ['401', '403', '404', '409', '422', '500'])
+                        if path.startswith('/auth/') and path != '/auth/login':
+                            self.assertIn('401', errors)
 
     def test_rendering_is_deterministic(self):
         self.assertEqual(snapshots(), snapshots())
@@ -113,8 +136,8 @@ class OpenApiSnapshotTest(unittest.TestCase):
                 (d / 'authoring.json').read_text(encoding='utf-8').replace('ALM Authoring API', 'Other'), encoding='utf-8'),
             'reformatted': lambda d: (d / 'authoring.json').write_text(
                 json.dumps(json.loads((d / 'authoring.json').read_text(encoding='utf-8'))), encoding='utf-8'),
-            'missing': lambda d: (d / 'authoring.json').unlink(),
-            'extra': lambda d: (d / 'learner.json').write_text('{}\n', encoding='utf-8'),
+            'missing': lambda d: (d / 'learner.json').unlink(),
+            'extra': lambda d: (d / 'other.json').write_text('{}\n', encoding='utf-8'),
         }
         for name, change in changes.items():
             with self.subTest(name), TemporaryDirectory() as tmp:
@@ -131,8 +154,9 @@ class OpenApiSnapshotTest(unittest.TestCase):
             directory = Path(tmp) / 'openapi'
             self.assertEqual(self.run_main('--output', str(directory)), (0, ''))
             self.assertEqual(self.run_main('--check', '--output', str(directory)), (0, ''))
-            self.assertEqual((directory / 'authoring.json').read_text(encoding='utf-8'),
-                             (SNAPSHOT_DIR / 'authoring.json').read_text(encoding='utf-8'))
+            for name in ('authoring.json', 'learner.json'):
+                self.assertEqual((directory / name).read_text(encoding='utf-8'),
+                                 (SNAPSHOT_DIR / name).read_text(encoding='utf-8'))
             (directory / 'stale.json').write_text('{}\n', encoding='utf-8')
             with self.assertRaises(ValueError):
                 write_snapshots(directory)
