@@ -189,7 +189,7 @@ metamodel.
 | S10 | 8 | Course validation: release and delivery views — **milestone M2: authoring to delivery** | S09c |
 | S11 | — | Runtime assessor role and evaluation adapter (G7); course membership (D25) (done: PR #131) | S10, D25, G7 / D4 |
 | S11b | — | Studio flow fixes from the SE-AI case study: an existing course id as delivery course (#132), pending activation and membership proposals (#133); batch membership (D36) (done: PR #139) | S11, D36 (decided) |
-| S12 | 5 | Learner API, including the learner's own courses (#136) | S11 (done), D19 (answered for S12), D20 (decided, projection on #136) |
+| S12 | 5 | Learner API, including the learner's own courses (#136) (done: PRs #142, #143) | S11 (done), D19 (answered for S12), D20 (decided, projection on #136) |
 | S12b | — | Teams-style enrolment: a course code or link for students, students added by the teacher in the same way, a course version that enrolments leave unchanged, automatic subject keys (D9 revised) (#141) | S12, D37 |
 | S13 | 5 | Learner app: my courses, course view, practice — **milestone M3: learner practice end to end**; the stale rule for evaluation drafts is decided here with the owner | S12, S12b |
 | S13b | — | Review and release readability for the teacher: release views (#125), the next action on long review pages (#134) | S13, the layout owner |
@@ -198,7 +198,7 @@ metamodel.
 
 Planned order (owner, 17 November 2026, after the SE-AI case study): Chat 30 writes
 the D19 and D36 options for the owner and specifies S12 (done, PR #137); then S11b
-(done, PR #139); then S12 (part 1, part 2), S12b (Teams-style enrolment, D37;
+(done, PR #139); then S12 (part 1, part 2; done, PRs #142 and #143), S12b (Teams-style enrolment, D37;
 owner, 18 November 2026) and S13; then S13b. The SE-AI case study (`examples/se-ai/`) is run again, with the
 owner's authorization, as a live check at M3.
 
@@ -564,15 +564,21 @@ the finding 3 test.
 
 **Acceptance** (confirmed by the owner on #136, 17 November 2026).
 
-- [ ] **Separate process.** `services/learner_api`, its own FastAPI app, OpenAPI file and `--check`, sharing `services/api_common`; an architecture test shows that no authoring module is importable from it.
-- [ ] **My courses (D19).** The LEARNING contexts with status ACTIVE where the signed-in subject holds `LEARNER` in the installed policy and in its participant record; a member whose membership proposal is still pending is not listed; the source of the list is one function (D37 may change it).
-- [ ] **Course view (D20).** From the validated course of the delivery, never from drafts or proposals: the syllabus structure, outcomes and competences, teaching strategies, materials, and for each assessment its activity, conditions, accepted evidence and rubric criteria and levels. No answer key (a test), no proposal, decision or other participant.
-- [ ] **Own progress.** The learner's own occurrences and evidence, own applied evaluations (each criterion's level and reason, the result) and own approved learning states; never a pending evaluation draft.
-- [ ] **Attempt submission** (`submit`), idempotent by request id; a learner still cannot propose, decide or apply, and a learner request still cannot persist an `Evaluation`: evaluations stay proposed and approved separately.
-- [ ] **Learner request as a job** (teacher and Socratic intents, Socratic option b), run by the job worker; tests use synthetic model responses only.
-- [ ] **Isolation.** Tests across two learners of one delivery, on every Learner API endpoint and on the Authoring API context summary: each learner reaches only their own data (closes the `show` gap of Chat 30). Every read leaves the table digests unchanged.
-- [ ] **Finding 3** recorded in a test: a learner's submit makes a pending evaluation draft stale (today's rule; decided in S13).
-- [ ] The seed (D15) gives a delivery with two synthetic learners. `python -m evaluation --check`, the full offline suite and `python -m aimpro.generate --check` pass.
+- [x] **Separate process.** `services/learner_api`, its own FastAPI app, OpenAPI file and `--check`, sharing `services/api_common`; an architecture test shows that no authoring module is importable from it.
+- [x] **My courses (D19).** The LEARNING contexts with status ACTIVE where the signed-in subject holds `LEARNER` in the installed policy and in its participant record; a member whose membership proposal is still pending is not listed; the source of the list is one function (D37 may change it).
+- [x] **Course view (D20).** From the validated course of the delivery, never from drafts or proposals: the syllabus structure, outcomes and competences, teaching strategies, materials, and for each assessment its activity, conditions, accepted evidence and rubric criteria and levels. No answer key (a test), no proposal, decision or other participant.
+- [x] **Own progress.** The learner's own occurrences and evidence, own applied evaluations (each criterion's level and reason, the result) and own approved learning states; never a pending evaluation draft.
+- [x] **Attempt submission** (`submit`), idempotent by request id; a learner still cannot propose, decide or apply, and a learner request still cannot persist an `Evaluation`: evaluations stay proposed and approved separately.
+- [x] **Learner request as a job** (teacher and Socratic intents, Socratic option b), run by the job worker; tests use synthetic model responses only.
+- [x] **Isolation.** Tests across two learners of one delivery, on every Learner API endpoint and on the Authoring API context summary: each learner reaches only their own data (closes the `show` gap of Chat 30). Every read leaves the table digests unchanged.
+- [x] **Finding 3** recorded in a test: a learner's submit makes a pending evaluation draft stale (today's rule; decided in S13).
+- [x] The seed (D15) gives a delivery with two synthetic learners. `python -m evaluation --check`, the full offline suite and `python -m aimpro.generate --check` pass.
+
+**Done** in two parts: part 1 in PR #142 (handoff `docs/plans/handoffs/chat-32.md`),
+merged as `66680de`; part 2 in PR #143 (handoff `docs/plans/handoffs/chat-33.md`),
+merged as `f0e7510`. Issue #136 closed. Part 2 also makes `LearningService.request`
+write only the run's own records, and records a learner's attempts and questions
+under the learner's own request id (`learner:{subject}:{id}`, Chat 32 finding 1).
 
 ### S12b — Teams-style enrolment (D37)
 
