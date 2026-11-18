@@ -8,16 +8,16 @@
 // "With the studio" smoke test in docs/architecture/role-applications.md does.
 // Next to it runs the dev-only agent worker with synthetic models
 // (`python -m tests.synthetic_worker`): no model, provider or network. The
-// Learner API runs on 127.0.0.1:58002 with the realm's client alm-learner-api
-// (S12b: a person outside the identity map joins with the course code); it is
-// ready before the Authoring API starts, whose health the tests wait for.
+// Learner API runs on 127.0.0.1:58002 with the realm's client alm-learner-api,
+// whose callback is the learner app's (127.0.0.1:58003, S13); it is ready before
+// the Authoring API starts, whose health the tests wait for.
 
 import { spawn, spawnSync } from 'node:child_process';
 import { copyFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 
 import {
-  API_PORT, COURSE_TEMPLATE, DATABASE, EXPORTS, ISSUER, JOBS, LEARNER_API_PORT, LEARNER_API_URL, PRISTINE, ROOT, SEED,
-  STATE, STUDIO_URL, TELEMETRY_OFF, python,
+  API_PORT, COURSE_TEMPLATE, DATABASE, EXPORTS, ISSUER, JOBS, LEARNER_API_PORT, LEARNER_API_URL, LEARNER_APP_URL, PRISTINE,
+  ROOT, SEED, STATE, STUDIO_URL, TELEMETRY_OFF, python,
 } from './paths.mjs';
 
 if (!process.env.ALM_OIDC_CLIENT_SECRET) {
@@ -77,8 +77,8 @@ start(['-m', 'tests.synthetic_worker', '--poll', '0.2'], {});
 start(['-m', 'services.learner_api', '--port', String(LEARNER_API_PORT)], {
   ...identity,
   ALM_OIDC_CLIENT_ID: 'alm-learner-api',
-  ALM_OIDC_REDIRECT_URI: `${LEARNER_API_URL}/auth/callback`,
-  ALM_OIDC_POST_LOGOUT_REDIRECT_URI: `${LEARNER_API_URL}/`,
+  ALM_OIDC_REDIRECT_URI: `${LEARNER_APP_URL}/auth/callback`,
+  ALM_OIDC_POST_LOGOUT_REDIRECT_URI: `${LEARNER_APP_URL}/`,
 });
 // The tests wait for the Authoring API alone: it starts once the Learner API answers.
 for (let tries = 0; ; tries += 1) {

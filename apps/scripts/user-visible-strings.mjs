@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-const SOURCE_DIRS = ['packages', 'studio'];
+const SOURCE_DIRS = ['packages', 'studio', 'learner'];
 const VISIBLE_ATTRIBUTES = new Set([
   'alt', 'aria-description', 'aria-label', 'aria-placeholder', 'aria-roledescription', 'aria-valuetext',
   'label', 'placeholder', 'title',

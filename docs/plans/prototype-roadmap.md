@@ -667,11 +667,26 @@ practice screen with the Socratic coach (Socratic option b), exercises and
 assessments; progress view. Choosing between alternative next exercises waits
 for decision 1.
 
+**Specification** (owner answers of 18 November 2026, Chat 36). The learner
+app is served under `/learn/` on `127.0.0.1:58003`, its server forwarding the
+Learner API paths to port 58002; the join link is
+`http://127.0.0.1:58003/learn/join?code=…` and the dev realm's client
+`alm-learner-api` registers the learner app's callback. The Learner API names
+its own cookies (`alm_learner_session`, `alm_learner_login`), so the studio and
+the learner app share the host name `127.0.0.1` without replacing each other's
+session. Two parts: part 1 the app and its typed client, sign-in, the join page,
+my courses and the course view (read only), the bundle check and a browser test
+joining through the link; part 2 practice (attempts, the Socratic coach and the
+Teacher as jobs), progress and the browser test from practice to a reviewed
+evaluation. The stale rule for evaluation drafts stays as it is until the owner
+has tried the app (part 2).
+
 **Acceptance.**
 
-- [ ] Browser test: practice, submission and a reviewed evaluation on the seed delivery.
-- [ ] The learner build contains no authoring code (bundle check).
-- [ ] A learner joins the course with its code or link (S12b) before practising.
+- [ ] Browser test: practice, submission and a reviewed evaluation on the seed delivery (part 2).
+- [x] The learner build contains no authoring code (bundle check, part 1).
+- [x] A learner joins the course with its code or link (S12b) before practising (part 1: the join page and `enrolment.spec.ts`).
+- [x] My courses and the course view (D19, D20) in the browser (part 1).
 - [ ] The stale rule for evaluation drafts (Chat 29 finding 3) is decided with the owner once the learner app is tried.
 
 ### S13b — Review and release readability

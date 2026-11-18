@@ -12,6 +12,7 @@ describe('user-visible strings', () => {
   it('scan every component file of the packages and apps', async () => {
     const files = await componentFiles();
     expect(files.some((file) => file.startsWith('studio/src/'))).toBe(true);
+    expect(files.some((file) => file.startsWith('learner/src/'))).toBe(true);
     expect(files.some((file) => file.startsWith('packages/ui/src/'))).toBe(true);
     expect(files.every((file) => !file.includes('/test/'))).toBe(true);
   });

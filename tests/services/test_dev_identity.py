@@ -40,11 +40,13 @@ class DevIdentityTest(unittest.TestCase):
         self.assertNotIn('roles', self.realm)
 
     def test_clients_use_the_code_flow_with_pkce_only(self):
-        # The studio's API on 58000 (through the studio's server) and the Learner API on 58002 (S12b browser test).
+        # Each API through its app's server (D8): the studio on 58000, the learner app on 58003 (S13).
         clients = {client['clientId']: client for client in self.realm['clients']}
         self.assertEqual({name: client['redirectUris'] for name, client in clients.items()},
                          {'alm-authoring-api': ['http://127.0.0.1:58000/auth/callback'],
-                          'alm-learner-api': ['http://127.0.0.1:58002/auth/callback']})
+                          'alm-learner-api': ['http://127.0.0.1:58003/auth/callback']})
+        self.assertEqual({name: client['attributes']['post.logout.redirect.uris'] for name, client in clients.items()},
+                         {'alm-authoring-api': 'http://127.0.0.1:58000/', 'alm-learner-api': 'http://127.0.0.1:58003/'})
         for client in clients.values():
             self.assertEqual((client['publicClient'], client['standardFlowEnabled'], client['implicitFlowEnabled'],
                               client['directAccessGrantsEnabled'], client['serviceAccountsEnabled']),

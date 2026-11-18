@@ -3,8 +3,8 @@ import type { OpenProposal } from '../review/model';
 import type { Inbox } from '../review/reviewApi';
 
 /**
- * The learner app's address, where a join link leads (S13): set when the studio is built, otherwise this site. No page
- * serves the link before the learner app exists; until then students join with the code.
+ * The learner app's address, with its base path, where a join link leads (S13): set when the studio is built
+ * (`http://127.0.0.1:58003/learn` in development), otherwise this site.
  */
 const LEARNER_APP_URL: string = import.meta.env.VITE_ALM_LEARNER_APP_URL ?? '';
 

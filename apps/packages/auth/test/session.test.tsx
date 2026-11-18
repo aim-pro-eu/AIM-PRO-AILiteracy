@@ -1,4 +1,5 @@
 import { createAuthoringClient } from '@alm/api-client';
+import { createLearnerClient } from '@alm/api-client/learner';
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -40,6 +41,19 @@ describe('loginUrl', () => {
 });
 
 describe('createSessionApi', () => {
+  it('serves the learner app with the Learner API client (S13)', async () => {
+    const requests: Request[] = [];
+    const client = createLearnerClient({
+      baseUrl: 'http://learn.test',
+      fetch: async (request: Request) => {
+        requests.push(request);
+        return Response.json(SESSION);
+      },
+    });
+    expect((await createSessionApi(client).readSession()).status).toBe('signed-in');
+    expect(requests[0]?.url).toBe('http://learn.test/auth/session');
+  });
+
   it('reads the signed-in subject and the CSRF token', async () => {
     const { api, requests } = fakeApi({ 'GET /auth/session': [{ status: 200, body: SESSION }] });
     expect(await api.readSession()).toEqual({

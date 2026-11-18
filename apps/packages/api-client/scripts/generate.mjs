@@ -1,26 +1,38 @@
-// Generate, or check, the typed Authoring API client from the OpenAPI snapshot.
+// Generate, or check, the typed API clients from the OpenAPI snapshots: the Authoring API (the studio) and the
+// Learner API (the learner app, S13).
 //
-//   node scripts/generate.mjs            rewrite src/generated/authoring.ts for review
-//   node scripts/generate.mjs --check    exit 1 when the client differs from the snapshot
+//   node scripts/generate.mjs            rewrite src/generated/authoring.ts and learner.ts for review
+//   node scripts/generate.mjs --check    exit 1 when a client differs from its snapshot
 //
-// --schema and --output select other files (used by the tests).
+// --schema and --output select one other pair of files (used by the tests).
 
 import { readFile, writeFile } from 'node:fs/promises';
-import { pathToFileURL } from 'node:url';
+import { basename } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 
 import openapiTS, { astToString } from 'openapi-typescript';
 
-export const SNAPSHOT = new URL('../../../../services/openapi/authoring.json', import.meta.url);
-export const OUTPUT = new URL('../src/generated/authoring.ts', import.meta.url);
+/** @param {string} name */
+const client = (name) => ({
+  name,
+  snapshot: new URL(`../../../../services/openapi/${name}.json`, import.meta.url),
+  output: new URL(`../src/generated/${name}.ts`, import.meta.url),
+});
+const AUTHORING = client('authoring');
+/** Each client and the snapshot it is generated from. */
+export const CLIENTS = [AUTHORING, client('learner')];
+export const SNAPSHOT = AUTHORING.snapshot;
+export const OUTPUT = AUTHORING.output;
 
-const HEADER = `// Generated from services/openapi/authoring.json by
+/** @typedef {string | URL} Location */
+
+/** @param {Location} snapshot */
+const header = (snapshot) => `// Generated from services/openapi/${basename(snapshot instanceof URL ? fileURLToPath(snapshot) : snapshot)} by
 // apps/packages/api-client/scripts/generate.mjs. Do not edit; run
 // \`npm run generate:client\` in apps/ after the snapshot changes.
 
 `;
-
-/** @typedef {string | URL} Location */
 
 /**
  * The client source for a snapshot: the same snapshot always gives the same text.
@@ -28,7 +40,7 @@ const HEADER = `// Generated from services/openapi/authoring.json by
  */
 export async function render(snapshot = SNAPSHOT) {
   const schema = JSON.parse(await readFile(snapshot, 'utf8'));
-  return HEADER + astToString(await openapiTS(schema, { alphabetize: true }));
+  return header(snapshot) + astToString(await openapiTS(schema, { alphabetize: true }));
 }
 
 /**
@@ -59,14 +71,17 @@ async function main() {
   const { values } = parseArgs({
     options: { check: { type: 'boolean' }, schema: { type: 'string' }, output: { type: 'string' } },
   });
-  const snapshot = values.schema ?? SNAPSHOT;
-  const output = values.output ?? OUTPUT;
-  if (!values.check) {
-    await write(snapshot, output);
-  } else if (!await check(snapshot, output)) {
-    process.stderr.write('The generated API client differs from the OpenAPI snapshot; '
-      + 'run `npm run generate:client` in apps/ and review the result.\n');
-    process.exitCode = 1;
+  const pairs = values.schema || values.output
+    ? [{ snapshot: values.schema ?? SNAPSHOT, output: values.output ?? OUTPUT }]
+    : CLIENTS;
+  for (const { snapshot, output } of pairs) {
+    if (!values.check) {
+      await write(snapshot, output);
+    } else if (!await check(snapshot, output)) {
+      process.stderr.write(`The generated API client ${basename(String(output))} differs from its OpenAPI snapshot; `
+        + 'run `npm run generate:client` in apps/ and review the result.\n');
+      process.exitCode = 1;
+    }
   }
 }
 
