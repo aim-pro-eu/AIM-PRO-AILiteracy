@@ -90,7 +90,7 @@ Facts in this table are a snapshot. Every chat re-verifies the ones it uses.
 | D25 | Course membership, option A: the administrator of a course adds a member (any subject of the identity map, as `CONTENT_RESPONSIBLE`, `ASSESSOR`, `LEARNER` or `OBSERVER`; never `ADMINISTRATOR`); the API writes a new trusted policy file (an installed file is never changed or removed, as D23) and records a proposal that adds the member's `Participant` and changes the context's `policies` reference; the member's authority starts when a person applies it (Chat 28, #129) | 16 Nov 2026 |
 | G7 / D4 | D4 is lifted by an assessor-requested evaluation draft (option A): a person with the `ASSESSOR` role asks the runtime evaluator `learner-response-evaluator` for a draft on one observed attempt; control builds the `Evaluation`, checks it with `validate_evaluation` (at most three drafts) and records it as a proposal that a person decides and applies; FORMATIVE and FORMAL; the import configures the EVALUATOR worker (Chat 28–29, #129, PR #131) | 16 Nov 2026 |
 | D19 (partial) | A learner's courses are those they are enrolled in; for now the deliveries where they are `LEARNER` by D25 membership (policy ∩ participant), behind one function that D37 may change. One delivery context per learner is excluded (#136) | 17 Nov 2026 |
-| D37 | Enrolment like Microsoft Teams: students join a published course with a course code (or a link carrying it) and take part at once; the teacher's reviewed choice to open the course with a code is the human decision. Teaching staff are still added by the reviewed membership proposal (D25, D36). A joining student does not make the course's pending proposals stale. Implemented in S12b (#141) | 18 Nov 2026 |
+| D37 | Enrolment like Microsoft Teams: students join a published course with a course code (or a link carrying it) and take part at once; the teacher's reviewed choice to open the course with a code is the human decision. Teaching staff are still added by the reviewed membership proposal (D25, D36). The course is authored independently of its students; once approved, students join or are added, and **the course version stays the same whatever students enrol**: proposals, approvals and the stale check use a course version that leaves out participants and learners' own records, and a student, whether joining with the code or added by the teacher, is recorded as a participant only under the delivery's reviewed learner grant, with no new policy version (this replaces D25/D36 membership for the `LEARNER` role). Staff are left as they are for now. Implemented in S12b (#141) | 18 Nov 2026 |
 | D9 (revised) | A person who signs in through the configured identity provider and is not in the identity map gets a subject key automatically; Keycloak roles still grant nothing and course authority still comes from the trusted policy and the participant record (S12b, #141) | 18 Nov 2026 |
 | D36 | Membership proposals made together (#133): the studio shows the pending membership proposals and warns that one is applied at a time; one membership proposal may add several members (batch); the core does not refuse a proposal while another is pending (options B + batch, S11b) | 17 Nov 2026 |
 | Earlier | Socratic option b; live model runs only with owner authorization; never edit AIM-PRO/jjodel exports | see `docs/architecture/agentic-network-decisions.md` |
@@ -190,7 +190,7 @@ metamodel.
 | S11 | — | Runtime assessor role and evaluation adapter (G7); course membership (D25) (done: PR #131) | S10, D25, G7 / D4 |
 | S11b | — | Studio flow fixes from the SE-AI case study: an existing course id as delivery course (#132), pending activation and membership proposals (#133); batch membership (D36) (done: PR #139) | S11, D36 (decided) |
 | S12 | 5 | Learner API, including the learner's own courses (#136) | S11 (done), D19 (answered for S12), D20 (decided, projection on #136) |
-| S12b | — | Teams-style enrolment: a course code or link for students, automatic subject keys (D9 revised), joining that leaves pending proposals applicable (#141) | S12, D37 |
+| S12b | — | Teams-style enrolment: a course code or link for students, students added by the teacher in the same way, a course version that enrolments leave unchanged, automatic subject keys (D9 revised) (#141) | S12, D37 |
 | S13 | 5 | Learner app: my courses, course view, practice — **milestone M3: learner practice end to end**; the stale rule for evaluation drafts is decided here with the owner | S12, S12b |
 | S13b | — | Review and release readability for the teacher: release views (#125), the next action on long review pages (#134) | S13, the layout owner |
 | S14 | — | Scenario input independent of the AIM-PRO export | D16 |
@@ -576,15 +576,22 @@ the finding 3 test.
 
 ### S12b — Teams-style enrolment (D37)
 
-**Goal.** A student joins a published course alone, with its code, and takes
-part at once; the teacher's review queue is not disturbed.
+**Goal.** A student joins a published course alone, with its code, or is added
+by the teacher, and takes part at once; the course version stays the same
+whatever students enrol, so the teacher's review queue is not disturbed.
 
 **Scope** (issue #141; owner decisions of 18 November 2026: D37, D9 revised).
 A delivery course opened to enrolment with a code in its reviewed policy (only
 a digest of the code stored); a signed-in subject who gives the right code to
 an ACTIVE delivery becomes a `LEARNER` participant, idempotent by request id; a
-joining student does not make the course's pending proposals stale (the
-general rule for evaluation drafts stays in S13); automatic subject keys for
+student added by the teacher is recorded the same way, as a participant only,
+with no new policy version (this replaces D25/D36 membership for `LEARNER`);
+proposals, approvals and the stale check use a course version that leaves out
+participants and learners' own records, so enrolments never make a pending
+proposal stale (S13 still decides whether a learner's new attempt makes that
+learner's own pending evaluation draft stale; the ALM metamodel is unchanged,
+so the technical record version still changes);
+teaching staff are left as they are for now; automatic subject keys for
 people of the configured issuer outside the identity map; "join with a code"
 in the Learner API; the course code with "reset" and "disable" on the studio's
 members page. Not in S12b: removing a member, promoting a member, a catalogue
