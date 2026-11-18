@@ -568,7 +568,9 @@ WCAG 2.1 A and AA rules). `npm run test:browser` in `apps/`:
    database, writes a course template (creator `admin`, source scope `wp3`) and
    an empty export directory, and runs `python -m services.authoring_api --port 58001`
    against the local realm, next to the dev-only synthetic worker
-   (`python -m tests.synthetic_worker`); the Python is `ALM_PYTHON`, else
+   (`python -m tests.synthetic_worker`) and the Learner API
+   (`python -m services.learner_api --port 58002`, client `alm-learner-api`,
+   started first; S12b); the Python is `ALM_PYTHON`, else
    `.venv/bin/python`, else `python3`;
 2. builds the studio and serves it with `vite preview` on `127.0.0.1:58000`;
 3. signs in once as `dev-admin`, `dev-learner` and `dev-assessor` through Keycloak and keeps the session cookies;
@@ -597,7 +599,8 @@ browser recorded.
 | `teacher-views.spec.ts`: every proposal kind in words (S09c2, part 2) | on the seed, every proposal of the authoring context and the delivery imports of both delivery contexts, pending or decided, opened by URL: each has its title (syllabus, project initialization, assessments, teacher and trainer content, completion rules, release, delivery import; never "Proposed change"), the initialization says what it creates, the release lists its parts by kind, the import names its resources and agents, a decided proposal shows no comparison; axe on each; the course page links decided proposals with "Read this proposal" |
 | `cycle.spec.ts`: the rest of the authoring cycle (S09c2) | a new course: upload, Curator, approve and apply the syllabus, initialize and apply the project; the Evaluator form shows the project and course version it sends (read back through the API), the Teacher form says it needs the assessments; axe; another author applies an Evaluator proposal through the API, so the form's job is refused at queue time (409): the form says the course changed and shows the new course version; the Evaluator queued again, its proposal read in its teacher view (rubric; axe), approved and applied; the Teacher form shows the applied assessment it sends; the Teacher and Trainer proposals read with their material texts (axe), approved and applied; the completion rules proposed from the build page, read part by part (axe), approved and applied; the project inspection lists the five artifacts with their receipts and no stale dependency, and every node of the design has a rule |
 | `release.spec.ts`: a release and its delivery course (S10, part 1) | on the seed's authoring context, the build page's release step shows the project model it sends; the release proposed from it, read in its teacher view (its parts; axe), approved and applied; "Inspect this release": nothing stands in the way, seven approvals (the release, its project and five parts), what it freezes, no problem; axe; a delivery course created from the release page opens on the import of that release, its policy file names the creator on that course only, and it is in PREPARATION/DRAFT without a model; axe; the course page lists both releases, and the seeded one inspects with nothing in the way |
-| `assessment.spec.ts`: two members in one proposal (S11b) | a new course; `assessor` as Assessor and `learner` as Student proposed together; the review names both (axe); approved and applied: both members, nothing pending, nobody left to add |
+| `assessment.spec.ts`: two members in one proposal (S11b) | a new course; `assessor` as Assessor and `learner` as Observer proposed together; the review names both (axe); approved and applied: both members, nothing pending, nobody left to add |
+| `enrolment.spec.ts`: joining with the code (S12b) | the seed's opened delivery installed and activated in the studio; the members page creates the code and shows it with the join link (axe); `dev-unmapped`, in a browser of their own, signs in to the Learner API with an `auto-` key and joins with the code alone (typed in capitals with spaces), twice with one result, and then has the course; the administrator sees them as Student, adds `assessor` as a student at once (no proposal listed), resets the code (the old one gets 404) and disables it |
 | `delivery.spec.ts`: a release imported and its activation refused (S10, part 2) | a course created from the home page; on the seeded release page its id is refused as the delivery course, in words, and the page stays (#132); a delivery course created; the import form proposes, for each of the seven requirements, the resource the release pins; axe; the first set to "No resource": "6 of 7"; the import proposed with six resources and its policy preview shown in full, naming the new course; no policy file installed; its teacher view lists six resources and the same preview; axe; approved and applied: the course is unavailable and no policy file was written; the test, as operator, installs the preview; on the course page, activation proposed and refused in words (the unbound requirement, R08; no runtime-role refusal since S11); axe; the course is still PREPARATION/DRAFT with six bindings |
 | `assessment.spec.ts`: an assessor evaluates the seeded attempt (S11) | the test, as operator, installs the seeded delivery's preview; `dev-admin` proposes `assessor` as Observer from the members page, then, while it is pending, as Assessor: both listed under the warning (axe); reads the second as a new member, approves and applies it; the members page lists the first as made on an earlier version; proposes activation; after a reload the course page shows the pending activation with its link and no button; approves and applies it (LEARNING/ACTIVE); the seed records the learner's synthetic attempt (`--attempt`); `dev-assessor`, in their own session, follows "Evaluate the students' submitted attempts" to the one attempt (axe), chooses Formative and asks for a draft; the synthetic worker's runtime assessor proposes it; the draft read in words (the agent `learner-response-evaluator`, the response, one criterion, the result; axe); no learning state before; approved and applied by the assessor: one learning state, one formative evaluation with its human decision |
 | `build.spec.ts`: a syllabus not accepted (issue #112) | upload; the Curator by a query holding the synthetic reviewer's `REJECT_EVERY` marker ends with a proposal; the job list shows the fixed notice; axe; the syllabus view says the review agent accepted no draft, with its reason as model text; axe; approve and apply; the course shows the structure |
@@ -668,8 +671,10 @@ pending ones and warns (S11b, issue #138).
   `members`, one or more `{subject, role}`, by an administrator of the course
   with the CSRF token. Every subject must be in the identity map (422 naming the
   others); the role is one of `CONTENT_RESPONSIBLE`, `ASSESSOR` (both: `read`,
-  `propose`, `decide`, `apply`, `interact`), `LEARNER` (`read`, `interact`,
-  `submit`) or `OBSERVER` (`read`); `ADMINISTRATOR` cannot be granted. A subject
+  `propose`, `decide`, `apply`, `interact`) or `OBSERVER` (`read`);
+  `ADMINISTRATOR` cannot be granted, and `LEARNER` (`read`, `interact`,
+  `submit`) is no longer proposed through the API: students are added at once
+  (S12b, "Teams-style enrolment" below). A subject
   named twice, or one who already takes part, refuses the whole proposal (422).
   The answer names the proposal, each member's `Participant` (`participants`)
   and the new policy. API version 0.16.0 (S11b; the request held one `subject`
@@ -1447,8 +1452,9 @@ writes need the CSRF header, as the Authoring API's writes do; the module
 ## Teams-style enrolment (S12b)
 
 Issue #141; owner decisions of 18 November 2026 (D37, D9 revised, and the
-specification on #141). Part 1: the core and the two APIs. The studio's members
-page, students added by the teacher, the seed and the browser tests are part 2.
+specification on #141). Part 1 (Chat 34): the core and the two APIs. Part 2
+(Chat 35): students added by the teacher, the studio's members page, the seed
+and the browser test.
 
 - **The learner grant.** A trusted policy may hold, per delivery,
   `learners: {<context id>: {actions, scopes}}` (`learning.policies.LearnerGrant`;
@@ -1520,19 +1526,64 @@ page, students added by the teacher, the seed and the browser tests are part 2.
   (`tests/test_enrolment.py`, `tests/services/test_enrolment_api.py`). The
   Learner API imports `learning.enrolment`, which imports no authoring module
   (`tests/services/test_learner_boundaries.py`).
-- **Not yet.** The studio's members page with the code, students added by the
-  teacher (replacing D25/D36 for `LEARNER`), the seed opening its delivery and
-  a browser test (part 2); removing a member, promoting a member, a catalogue of
-  open courses and a limit on join attempts (later). The studio still lists the
-  contexts a subject is named in by the policy, so a learner who joined does
-  not see the course there.
+- **Students added by the teacher (part 2).** `POST /contexts/{context_id}/learners`
+  (Authoring API, module `members`; API version 0.18.0) with `request_id` and
+  `subjects` (one or more, each once), by an administrator with the CSRF token,
+  on a course open to learners (422 otherwise). Each subject is a key of the
+  identity map or an automatic key (`auto-` and 20 hex digits; 422 naming the
+  others): a person reads their key on the studio home page after signing in.
+  Each becomes a `LEARNER` participant at once
+  (`learning.membership.add_learners`), recorded exactly as a join
+  (`learning.enrolment.record_learner`: a `Participant` and one `StateChange`
+  caused by it, a human decision by the administrator), so the course version
+  is unchanged and no proposal or policy version follows. A learner of the
+  course already is left as they are; a member of the staff, or a subject the
+  policy names in the course, refuses the whole list and nothing is recorded.
+  The answer is the member list of `GET .../members`. Students may be added
+  before activation; they take part once the delivery is ACTIVE.
+- **`LEARNER` is no longer proposed.** The membership proposal of the
+  Authoring API offers and accepts the teaching staff's roles only
+  (`CONTENT_RESPONSIBLE`, `ASSESSOR`, `OBSERVER`; 422 for `LEARNER`, "A student
+  is added at once"). The core still reads and applies a `LEARNER` membership
+  recorded before, and learners named in the policy (D25) keep working.
+- **The studio's members page (part 2).** On an imported delivery, a section
+  "Students": before the course is open, "Propose opening the course to
+  students" (or the opening already proposed, with its state and a link to its
+  review, whose teacher view "Open the course to students" names the grant's
+  actions and scopes); once open, the code and the join link with "Reset the
+  code" and "Disable the code" (or "Create a code"), and "Add students": the
+  people of the identity map who are not members, as check boxes, and a field
+  for other keys (separated by spaces, commas or new lines). The join link is
+  `<learner app>/join?code=…`, the learner app's address set at build time
+  (`VITE_ALM_LEARNER_APP_URL`), otherwise the studio's own origin; no page
+  serves it before the learner app (S13), and the page says so. The staff
+  section is "Add teaching staff". A pending proposal is labelled stale only
+  when the course itself changed since it was made: the studio follows the
+  `StateChange` records back from the context's version, as the core does, so
+  a join or an added student leaves it awaiting review.
+- **No "unmapped" page.** Every person of the configured issuer has a subject
+  key, so the studio's page for an identity outside the map is gone; a `403`
+  from `/auth/session` is shown as the service being unavailable. A person with
+  no course reads their key on the home page.
+- **The seed (D15) opens its delivery.** `tests/seed.py` proposes and applies
+  the opening of `architecture-delivery` right after its import, under the
+  import's preview: the delivery's policy (`delivery_policy`,
+  `delivery_policy_preview` in `seed.json`) is that opened version, which the
+  operator installs as before. It creates no code: the code needs the host
+  secret. `build_seed(..., open_delivery=False)` keeps the import's preview.
+- **Not yet.** Removing a member, promoting a member, a catalogue of open
+  courses and a limit on join attempts (later); the learner app's join page
+  (S13). The studio still lists the contexts a subject is named in by the
+  policy, so a learner who joined does not see the course there.
 
 ## Local identity smoke test
 
 `compose.identity.yml` runs Keycloak 26.8.1 (pinned by digest) with the realm
 `alm-dev` from `infra/keycloak/alm-dev-realm.json`, imported at every start. The
-realm has one confidential client, `alm-authoring-api` (code flow with S256 PKCE
-only), and four synthetic users: `dev-admin` and `dev-learner`, mapped to the
+realm has two confidential clients (code flow with S256 PKCE only):
+`alm-authoring-api`, redirecting to port 58000, and `alm-learner-api`, redirecting
+to port 58002 (S12b: the browser test signs in to the Learner API; a Keycloak
+started before S12b part 2 must be restarted to import it); and four synthetic users: `dev-admin` and `dev-learner`, mapped to the
 subjects `admin` and `learner` of `tests/fixtures/alm/trusted-policy.json` by
 `infra/keycloak/identity-map.dev.json`; `dev-assessor`, mapped to `assessor`, a
 subject in no policy that a course administrator adds as a member (D25, S11);
@@ -1572,8 +1623,8 @@ In a browser:
    403; with `headers: {'X-CSRF-Token': '<csrf_token>'}` it returns
    `end_session_url`. Opening that URL ends the Keycloak session and returns to
    `http://127.0.0.1:58000/`. `/auth/session` is then 401.
-4. Sign in as `dev-unmapped`. Expected: 403 `Identity is not mapped to a policy
-   subject`, and `/auth/session` stays 401.
+4. Sign in as `dev-unmapped`. Expected: `/auth/session` has an automatic key,
+   `auto-` and 20 hex digits, the same at every sign-in (D9 revised, S12b).
 5. Signed in as `dev-admin`, open `/contexts/architecture-authoring/pending-proposals`.
    Expected: one proposal with its candidates and `review_payload_key`.
    `/contexts/architecture-delivery` is 404 `context_unavailable` until the
@@ -1599,8 +1650,8 @@ cd apps && npm ci --ignore-scripts && npm run dev --workspace @alm/studio   # ht
 3. Press "Sign out". Expected: the provider session ends and the browser returns
    to `/studio/` with "Sign in to the studio"; signing in again asks for the
    password.
-4. Sign in as `dev-unmapped`. Expected: the callback answers 403 `Identity is not
-   mapped to a policy subject`; `/studio/` still offers sign-in.
+4. Sign in as `dev-unmapped`. Expected: the banner shows "Signed in as auto-…";
+   the home page has no course and shows that key, to give to a teacher (S12b).
 5. Signed in as `dev-admin`, enter `architecture-authoring` under "Open a review
    inbox". Expected: one proposal under "Awaiting a decision"; open it, approve
    it with a reason, then press "Apply the change". Expected: "Decision
@@ -1611,5 +1662,6 @@ cd apps && npm ci --ignore-scripts && npm run dev --workspace @alm/studio   # ht
    (`docs/plans/handoffs/chat-15.md`) has the full owner test script.
 
 Stop with `docker compose -f compose.identity.yml down`. The issuer contains the
-port 58080 and the client accepts only the redirect on port 58000; changing
-either needs the realm file and the identity map changed with it.
+port 58080 and the clients accept only the redirects on ports 58000 (studio)
+and 58002 (Learner API); changing either needs the realm file and the identity
+map changed with it.

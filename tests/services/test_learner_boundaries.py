@@ -18,7 +18,6 @@ import subprocess
 import sys
 import unittest
 
-from learning.membership import EnrolmentCommand
 from tests.authoring_cycle_fixtures import DELIVERY
 from tests.services.course_fixtures import ENROLMENT_SECRET
 from tests.services.oidc_fixtures import ISSUER, NO_NETWORK, write_identity_map
@@ -82,11 +81,7 @@ class LearnerProcessTest(unittest.TestCase):
         with seed.contexts.open(DELIVERY) as service:
             activity = next(e.ref for e in service._context(DELIVERY, 'learner').snapshot.active_domain()
                             if e.type == 'ActivityDefinition' and e.fields['intent'] == 'ASSESS')
-            opening = service.propose_enrolment(DELIVERY, seed.manifest.staff,
-                EnrolmentCommand(base_context=service.store.read_context(DELIVERY).ref), request_id='open-1',
-                install=lambda policy: seed.policies.install('open-1.json', policy))
-        seed.apply(opening.proposal, 'open-1')
-        with seed.contexts.open(DELIVERY) as service:
+            # The seed opened its delivery to learners (S12b part 2).
             code = service.reset_enrolment_code(DELIVERY, seed.manifest.staff, secret=ENROLMENT_SECRET.encode()).code
         posts = [('/enrolments', {'request_id': 'join-1', 'code': code}),
                  (f'/courses/{DELIVERY}/attempts', {'request_id': 'attempt-1', 'activity': activity.model_dump(),

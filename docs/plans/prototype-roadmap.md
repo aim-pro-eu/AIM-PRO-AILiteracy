@@ -624,6 +624,19 @@ added by the teacher join at once, without a proposal, under the learner grant.
 Two parts: part 1 the core and the APIs; part 2 the studio members page,
 students added by the teacher, the seed and the browser test.
 
+**Part 2 specification** (owner answers of 18 November 2026, Chat 35, recorded
+on #141). Students added by the teacher are chosen among the people of the
+identity map who are not members, or typed as keys (of the map or `auto-`); a
+person reads their own key in the studio. The join link is
+`<learner app>/join?code=…`, the learner app's address set when the studio is
+built (otherwise the studio's origin), shown as text: no page serves it before
+S13, and the page says so. The browser test runs the Learner API in the test
+stack (port 58002, its own client in the dev realm): a person outside the map
+signs in there and joins with the code. The studio's "unmapped" page goes; a
+person with no course sees their key on the home page. The Authoring API no
+longer offers or accepts `LEARNER` in a membership proposal (the core still
+applies one recorded before).
+
 **Acceptance** (confirmed on #141, 18 November 2026).
 
 Part 1:

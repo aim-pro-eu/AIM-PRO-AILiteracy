@@ -9,11 +9,9 @@
   "session": {
     "loading": "Checking your session…",
     "signIn": "Sign in",
-    "signInAgain": "Sign in again",
     "signOut": "Sign out",
     "signedInAs": "Signed in as {{subject}}",
     "signOutFailed": "Sign-out did not complete. Reload the page and try again.",
-    "unmapped": "Your account is not linked to a subject of the learning policy. Ask an administrator to add it to the identity map.",
     "unavailable": "The studio cannot reach the authoring service. Try again in a moment.",
     "retry": "Try again"
   },
@@ -29,6 +27,7 @@
     "coursesFailed": "Your courses could not be loaded. Try again in a moment.",
     "coursesRetry": "Try again",
     "coursesEmpty": "You have no course yet. Create one below.",
+    "yourKey": "Your key is {{subject}}. To be added to a course, give it to a teacher of that course.",
     "courseMeta": "{{mode}} · {{status}} · Your roles: {{roles}}",
     "openReview": "Review inbox",
     "mode": {
@@ -294,6 +293,14 @@
         "joins": "{{subject}} joins this course as {{roles}}.",
         "policy_one": "The course’s new trusted policy that grants this role is already installed, as a new file; the course uses it only once this proposal is approved and applied. Until then, nothing changes for this person.",
         "policy_other": "The course’s new trusted policy that grants these roles is already installed, as a new file; the course uses it only once this proposal is approved and applied. Until then, nothing changes for these people."
+      },
+      "titleEnrolment": "Open the course to students",
+      "enrolment": {
+        "heading": "Students of this course",
+        "intro": "Approving opens this course to students. Once it is applied, an administrator creates its code: whoever joins with it, or is added as a student, takes part at once, with no further review and no new policy version.",
+        "grant": "What every student may do: {{actions}}. Sources they read: {{scopes}}.",
+        "noScope": "none",
+        "policy": "The course’s new trusted policy with this grant is already installed, as a new file; the course uses it only once this proposal is approved and applied. Until then, nobody joins."
       },
       "titleEvaluation": "Evaluate a student’s attempt",
       "evaluation": {
@@ -868,9 +875,43 @@
       "heading": "Members",
       "item": "{{subject}}: {{roles}}"
     },
+    "students": {
+      "heading": "Students",
+      "notOpen": "Students cannot join this course yet. Opening it to students is a reviewed change of its policy, made once: after it is approved and applied, you create a code that students join with, and you can add students yourself.",
+      "propose": "Propose opening the course to students",
+      "proposed": "Opening the course to students is proposed. Nothing has changed yet: the proposal awaits review in this course.",
+      "pending": "Opening the course to students: {{state}}.",
+      "review": "Review the opening",
+      "stale": "made on an earlier version of the course, it can no longer be applied; propose the opening again",
+      "refused": "The course cannot be opened to students: {{detail}}",
+      "failed": "The opening could not be proposed. Try again: the retry repeats the same request.",
+      "open": "The course is open to students: they join with its code, or you add them below. They take part at once, with no new review.",
+      "code": "Course code",
+      "link": "Join link",
+      "linkNote": "Students will open this link in the learner app, which is not available yet: until then they join with the code.",
+      "noCode": "The course has no code: students cannot join by themselves. Create one to let them join.",
+      "create": "Create a code",
+      "reset": "Reset the code",
+      "disable": "Disable the code",
+      "codeNote": "A reset gives a new code at once and the previous one stops working; disabling the code stops joining. Students who joined stay.",
+      "codeFailed": "The code could not be changed. Try again.",
+      "loadFailed": "Whether the course is open to students could not be read. Reload the page to try again.",
+      "add": {
+        "heading": "Add students",
+        "intro": "Choose people known to the sign-in service, or enter the keys of others: a person reads their key on the studio home page after signing in. They take part at once, as students.",
+        "person": "Add {{subject}} as a student",
+        "keys": "Other keys",
+        "keysHint": "One or more keys, separated by spaces, commas or new lines.",
+        "submit_one": "Add the student",
+        "submit_other": "Add the students",
+        "added": "Added as students: {{subjects}}. They take part at once.",
+        "refused": "The students cannot be added: {{detail}}",
+        "failed": "The students could not be added. Try again: the retry repeats the same request."
+      }
+    },
     "add": {
-      "heading": "Add members",
-      "intro": "Choose a role for each person known to the sign-in service who joins the course. The studio proposes them together, in one proposal; they join the course only once it is approved and applied in the review inbox.",
+      "heading": "Add teaching staff",
+      "intro": "Choose a role for each person known to the sign-in service who joins the teaching staff. The studio proposes them together, in one proposal; they join the course only once it is approved and applied in the review inbox. Students are not proposed: they join with the course code or are added in the section on students.",
       "nobody": "Everyone known to the sign-in service is already a member of this course.",
       "role": "Role of {{subject}}",
       "none": "Not added",

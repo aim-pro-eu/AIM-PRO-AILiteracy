@@ -18,6 +18,8 @@ export type ImportProposal = Schemas['ImportProposal'];
 export type MemberList = Schemas['MemberList'];
 export type MemberRole = Schemas['NewMember']['role'];
 export type MembershipProposal = Schemas['MembershipProposal'];
+export type EnrolmentView = Schemas['EnrolmentView'];
+export type EnrolmentProposal = Schemas['EnrolmentProposal'];
 export type ActivationOutcome = Schemas['ActivationOutcome'];
 export type SourceDiscovery = Schemas['SourceDiscoveryView'];
 export type SourcePreparation = Schemas['SourcePreparationView'];
@@ -138,6 +140,18 @@ export interface BuildApi {
   proposeMembership(contextId: string, csrfToken: string, command: {
     requestId: string; baseContext: EntityRef; members: { subject: string; role: MemberRole }[];
   }): Promise<MembershipProposal>;
+  /** Whether the course is open to students and its current code; for its administrators (D37). */
+  enrolment(contextId: string): Promise<EnrolmentView>;
+  /** Propose opening the course to students: its learner grant in a new policy version, to review. */
+  proposeEnrolment(contextId: string, csrfToken: string, command: {
+    requestId: string; baseContext: EntityRef;
+  }): Promise<EnrolmentProposal>;
+  /** Create or reset the code of an open course, at once; the previous code stops working. */
+  resetEnrolmentCode(contextId: string, csrfToken: string): Promise<EnrolmentView>;
+  /** Disable the code, at once; the students stay. */
+  disableEnrolmentCode(contextId: string, csrfToken: string): Promise<EnrolmentView>;
+  /** Add students at once, under the learner grant, with no proposal (D37); the members after it. */
+  addLearners(contextId: string, csrfToken: string, command: { requestId: string; subjects: string[] }): Promise<MemberList>;
   /** Ask the runtime assessor for a draft evaluation of one observed attempt; the same request id returns the same job. */
   queueEvaluation(contextId: string, csrfToken: string, requestId: string, command: {
     evidence: EntityRef; mode: EvaluationMode;
@@ -378,6 +392,40 @@ export function createBuildApi(client: AuthoringClient): BuildApi {
         params: { path: { context_id: contextId } },
         headers: writing(csrfToken),
         body: { request_id: requestId, base_context: baseContext, members },
+      }));
+    },
+
+    async enrolment(contextId) {
+      return settle(() => client.GET('/contexts/{context_id}/enrolment', { params: { path: { context_id: contextId } } }));
+    },
+
+    async proposeEnrolment(contextId, csrfToken, { requestId, baseContext }) {
+      return settle(() => client.POST('/contexts/{context_id}/enrolment', {
+        params: { path: { context_id: contextId } },
+        headers: writing(csrfToken),
+        body: { request_id: requestId, base_context: baseContext },
+      }));
+    },
+
+    async resetEnrolmentCode(contextId, csrfToken) {
+      return settle(() => client.POST('/contexts/{context_id}/enrolment/code', {
+        params: { path: { context_id: contextId } },
+        headers: writing(csrfToken),
+      }));
+    },
+
+    async disableEnrolmentCode(contextId, csrfToken) {
+      return settle(() => client.DELETE('/contexts/{context_id}/enrolment/code', {
+        params: { path: { context_id: contextId } },
+        headers: writing(csrfToken),
+      }));
+    },
+
+    async addLearners(contextId, csrfToken, { requestId, subjects }) {
+      return settle(() => client.POST('/contexts/{context_id}/learners', {
+        params: { path: { context_id: contextId } },
+        headers: writing(csrfToken),
+        body: { request_id: requestId, subjects },
       }));
     },
 

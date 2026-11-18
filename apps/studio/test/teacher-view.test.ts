@@ -37,6 +37,18 @@ describe('teacher view', () => {
     expect(view.changes).toEqual([]);
   });
 
+  it('describes opening a delivery to students: the actions and scopes of its learner grant (D37, S12b)', () => {
+    const policy = { policy_ref: ref('PolicySet', 'course:ctx', 'p3'), subjects: {}, scopes: {}, rule_bindings: [],
+      learners: { ctx: { actions: ['read', 'interact', 'submit'], scopes: ['ctx:delivery'] } } };
+    const view = teacherView([entity('PolicySet', 'course:ctx', 'p3', { sourceScopes: ['wp3'],
+      permissions: ['Trusted local configuration', `Reviewed course enrolment policy: ${JSON.stringify(policy)}`] }),
+    CONTEXT], []);
+    expect(view.kind).toBe('enrolment');
+    expect(view.enrolment).toEqual({ actions: ['read', 'interact', 'submit'], scopes: ['ctx:delivery'] });
+    expect(view.delivery).toBeNull();
+    expect(view.changes).toEqual([]);
+  });
+
   it('describes every member of one membership proposal (D36)', () => {
     const view = teacherView([CONTEXT, ...([['assessor', 'ASSESSOR'], ['learner', 'LEARNER']] as const).map(([subject, role]) =>
       entity('Participant', `ctx:participant:${subject}`, 'p2', { subjectKey: subject, roles: [role], learningNeeds: [] })),

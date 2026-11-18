@@ -4,8 +4,9 @@ The administrator of the seed's active delivery opens it to learners through
 the Authoring API (a reviewed policy change, applied as the review endpoints
 would) and creates, resets and disables its code. People outside the identity
 map sign in with an automatic subject key and join with the code alone through
-the Learner API; each reaches only their own records. The identity provider is
-in memory and the network is blocked except for the PostgreSQL test service.
+the Learner API; each reaches only their own records. The administrator also
+adds students at once, by a key of the identity map or an automatic key (part
+2). The identity provider is in memory and the network is blocked except for the PostgreSQL test service.
 """
 
 import hashlib
@@ -31,14 +32,14 @@ from tests.store_backends import block_network, on_both_backends
 from tests.test_learner_reads import LearnerSeed
 
 
-MAPPED = {'admin': MAPPED_SUBJECT, 'learner': 'kc-user-learner'}
+MAPPED = {'admin': MAPPED_SUBJECT, 'learner': 'kc-user-learner', 'pupil': 'kc-user-pupil'}
 STUDENTS = ('kc-user-student-1', 'kc-user-student-2')
 
 
 class EnrolmentApiCase(unittest.TestCase):
     def setUp(self):
         block_network(self, NO_NETWORK)
-        self.seed = LearnerSeed(self, 'enrolment-api.sqlite').activate()
+        self.seed = LearnerSeed(self, 'enrolment-api.sqlite', open_delivery=False).activate()
         self.provider = FakeProvider()
         identities = write_identity_map(self.seed.root, *({'issuer': ISSUER, 'subject': subject, 'subject_key': key}
                                                           for key, subject in MAPPED.items()))
@@ -83,6 +84,10 @@ class EnrolmentApiCase(unittest.TestCase):
 
     def code(self):
         return self.send(self.staff, 'POST', f'/contexts/{DELIVERY}/enrolment/code')['code']
+
+    def add(self, subjects, request_id='add-1', status=200, client=None, csrf=True):
+        return self.send(client or self.staff, 'POST', f'/contexts/{DELIVERY}/learners',
+                         {'request_id': request_id, 'subjects': subjects}, status, csrf)
 
     def join(self, client, code, request_id='join-1', status=200, csrf=True):
         return self.send(client, 'POST', '/enrolments', {'request_id': request_id, 'code': code}, status, csrf)
@@ -195,6 +200,46 @@ class LearnerEnrolmentTest(EnrolmentApiCase):
             self.assertEqual(progress['evidence'], [evidence])
             self.assertEqual(len(progress['occurrences']), 1)
         self.assertNotEqual(submitted[0]['ref'], submitted[1]['ref'])
+
+
+@on_both_backends
+class AddedLearnersApiTest(EnrolmentApiCase):
+    def test_an_administrator_adds_a_mapped_person_and_an_automatic_key_at_once(self):
+        self.open_course()
+        before = self.files()
+        student = auto_subject_key(ISSUER, STUDENTS[0])
+        body = self.add(['pupil', student])
+        self.assertEqual(body['roles'], ['CONTENT_RESPONSIBLE', 'ASSESSOR', 'OBSERVER'])
+        members = {member['subject']: member['roles'] for member in body['members']}
+        self.assertEqual((members['pupil'], members[student]), (['LEARNER'], ['LEARNER']))
+        self.assertNotIn('pupil', body['addable'])
+        self.assertEqual(self.get(self.staff, f'/contexts/{DELIVERY}/members'), body)
+        # No proposal and no new policy version.
+        self.assertEqual(self.files(), before)
+        self.assertEqual(self.get(self.staff, f'/contexts/{DELIVERY}/pending-proposals'), {'proposals': []})
+        for subject in (MAPPED['pupil'], STUDENTS[0]):
+            client = self.signed_in(self.learning, subject)
+            self.assertEqual([c['context_id'] for c in self.get(client, '/courses')['courses']], [DELIVERY])
+        digests = self.seed.digests()
+        self.assertEqual(self.add(['pupil', student]), body)
+        self.assertEqual(self.seed.digests(), digests)
+
+    def test_only_keys_of_the_map_or_automatic_keys_of_people_not_on_the_staff_are_added(self):
+        before = self.seed.digests()
+        detail = self.add(['pupil'], status=422)['detail']
+        self.assertIn('not open to learners', detail)
+        self.open_course()
+        before = self.seed.digests()
+        for subjects, words in ((['pupil', 'stranger'], 'stranger'), (['auto-123'], 'auto-123'),
+                                (['pupil', 'admin'], 'admin is already a member')):
+            with self.subTest(subjects):
+                self.assertIn(words, self.add(subjects, status=422)['detail'])
+        self.add([], status=422)
+        self.add(['pupil', 'pupil'], status=422)
+        learner = self.signed_in(self.studio, MAPPED['learner'])
+        self.add(['pupil'], client=learner, status=403)
+        self.add(['pupil'], csrf=False, status=403)
+        self.assertEqual(self.seed.digests(), before)
 
 
 if __name__ == '__main__':

@@ -203,6 +203,20 @@ function Membership({ membership }: { membership: NonNullable<View['membership']
   );
 }
 
+/** Opening a delivery to students (D37): what every student may do once it is applied, and how they take part. */
+function Enrolment({ enrolment }: { enrolment: NonNullable<View['enrolment']> }) {
+  const { t } = useTranslation();
+  return (
+    <section aria-labelledby="teacher-enrolment">
+      <h2 id="teacher-enrolment">{t('review.teacher.enrolment.heading')}</h2>
+      <p>{t('review.teacher.enrolment.intro')}</p>
+      <p data-testid="enrolment-grant">{t('review.teacher.enrolment.grant', { actions: enrolment.actions.join(', '),
+        scopes: enrolment.scopes.join(', ') || t('review.teacher.enrolment.noScope') })}</p>
+      <p>{t('review.teacher.enrolment.policy')}</p>
+    </section>
+  );
+}
+
 const MODES = { FORMATIVE: 'review.teacher.evaluation.mode.FORMATIVE', FORMAL: 'review.teacher.evaluation.mode.FORMAL' } as const;
 
 /** The evaluation of a student's attempt (S11): what the student did, each criterion's judgment, the result, who drafted it. */
@@ -241,6 +255,7 @@ export function TeacherView({ view, issues }: { view: View; issues: PlainIssues 
   if (view.project) return <><Project project={view.project} /><Issues issues={issues} /></>;
   if (view.release) return <><Release release={view.release} /><Issues issues={issues} /></>;
   if (view.membership) return <><Membership membership={view.membership} /><Issues issues={issues} /></>;
+  if (view.enrolment) return <><Enrolment enrolment={view.enrolment} /><Issues issues={issues} /></>;
   if (view.evaluation) return <><Evaluation evaluation={view.evaluation} /><Issues issues={issues} /></>;
   return (
     <>

@@ -7,9 +7,8 @@ import { Outlet } from 'react-router';
 import { SessionMenu } from '../features/session/SessionMenu';
 import { SignInPage } from '../features/session/SignInPage';
 import { UnavailablePage } from '../features/session/UnavailablePage';
-import { UnmappedPage } from '../features/session/UnmappedPage';
 
-/** Frame of every studio page; a page is shown only to a signed-in, mapped subject. */
+/** Frame of every studio page; a page is shown only to a signed-in subject. */
 export function StudioShell() {
   const { t } = useTranslation();
   const { state } = useSession();
@@ -25,9 +24,6 @@ export function StudioShell() {
       break;
     case 'signed-out':
       content = <SignInPage />;
-      break;
-    case 'unmapped':
-      content = <UnmappedPage />;
       break;
     case 'error':
       content = <UnavailablePage />;

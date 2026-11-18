@@ -51,6 +51,7 @@ class OpenApiSnapshotTest(unittest.TestCase):
                           '/contexts/{context_id}/delivery-imports': ['post'],
                           '/contexts/{context_id}/activations': ['post'],
                           '/contexts/{context_id}/members': ['get', 'post'],
+                          '/contexts/{context_id}/learners': ['post'],
                           '/contexts/{context_id}/enrolment': ['get', 'post'],
                           '/contexts/{context_id}/enrolment/code': ['delete', 'post'],
                           '/contexts/{context_id}/designs/{design_id}/versions/{version}/syllabus': ['get'],

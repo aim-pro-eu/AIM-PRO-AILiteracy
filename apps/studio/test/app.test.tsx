@@ -56,11 +56,11 @@ describe('studio shell', () => {
     expect(screen.getByRole('alert').textContent).toBe(en.session.signOutFailed);
   });
 
-  it('explains an identity that is not mapped to a policy subject', async () => {
-    await renderStudio({ 'GET /auth/session': [{ status: 403 }] });
-    expect((await screen.findByRole('alert')).textContent).toBe(en.session.unmapped);
-    expect(screen.getByRole('button', { name: en.session.signInAgain })).toBeTruthy();
-  });
+  it('treats a refused session as an unavailable service: a person outside the map has a key of their own (S12b)',
+    async () => {
+      await renderStudio({ 'GET /auth/session': [{ status: 403 }] });
+      expect((await screen.findByRole('alert')).textContent).toBe(en.session.unavailable);
+    });
 
   it('reports an unavailable API and retries', async () => {
     await renderStudio({ 'GET /auth/session': [{ status: 502 }, { status: 200, body: SESSION }] });

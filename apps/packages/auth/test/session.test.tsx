@@ -49,15 +49,16 @@ describe('createSessionApi', () => {
     expect(requests[0]?.credentials).toBe('same-origin');
   });
 
-  it('maps 401 to signed out and 403 to an unmapped identity', async () => {
-    const { api } = fakeApi({ 'GET /auth/session': [{ status: 401 }, { status: 403 }] });
+  it('maps 401 to signed out', async () => {
+    const { api } = fakeApi({ 'GET /auth/session': [{ status: 401 }] });
     expect(await api.readSession()).toEqual({ status: 'signed-out' });
-    expect(await api.readSession()).toEqual({ status: 'unmapped' });
   });
 
-  it('raises a SessionError with the status for any other answer', async () => {
-    const { api } = fakeApi({ 'GET /auth/session': [{ status: 502 }] });
+  it('raises a SessionError with the status for any other answer, 403 included', async () => {
+    // Every person of the configured issuer has a subject key (D9 revised, S12b): a 403 is not expected.
+    const { api } = fakeApi({ 'GET /auth/session': [{ status: 502 }, { status: 403 }] });
     await expect(api.readSession()).rejects.toEqual(new SessionError(502));
+    await expect(api.readSession()).rejects.toEqual(new SessionError(403));
   });
 
   it('signs out with the CSRF header and returns the provider logout URL', async () => {

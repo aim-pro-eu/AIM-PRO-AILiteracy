@@ -1,3 +1,4 @@
+import { useSession } from '@alm/auth';
 import { Button, StatusMessage } from '@alm/ui';
 import { useCallback, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -39,6 +40,7 @@ function CourseList() {
   const { t } = useTranslation();
   const id = useId();
   const { api } = useBuildServices();
+  const { state } = useSession();
   const [courses, setCourses] = useState<CourseEntry[] | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -61,7 +63,15 @@ function CourseList() {
       </>
     );
   } else if (courses === null) body = <StatusMessage>{t('home.coursesLoading')}</StatusMessage>;
-  else if (courses.length === 0) body = <p className="alm-muted">{t('home.coursesEmpty')}</p>;
+  else if (courses.length === 0) {
+    // A person outside the identity map has an automatic key (S12b): a teacher adds them with it.
+    body = (
+      <>
+        <p className="alm-muted">{t('home.coursesEmpty')}</p>
+        {state.status === 'signed-in' ? <p>{t('home.yourKey', { subject: state.session.subjectKey })}</p> : null}
+      </>
+    );
+  }
   else {
     body = (
       <ul data-testid="course-list">

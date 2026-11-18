@@ -62,7 +62,8 @@ class SeedTest(unittest.TestCase):
 
             applied = [p for p in store.owned(AUTH, 'ChangeProposal') if p.fields['status'] == 'APPLIED']
             self.assertGreaterEqual(len(applied), 7)
-            self.assertEqual([p.fields['status'] for p in store.owned(DELIVERY, 'ChangeProposal')], ['APPLIED'])
+            # The import, then the opening to learners (S12b).
+            self.assertEqual([p.fields['status'] for p in store.owned(DELIVERY, 'ChangeProposal')], ['APPLIED'] * 2)
             inspection = service.inspect_authoring_project(AUTH, 'admin', manifest.project_id)
             self.assertEqual(inspection.project, manifest.project)
             self.assertIsNotNone(inspection.receipt)
@@ -79,6 +80,24 @@ class SeedTest(unittest.TestCase):
             self.assertIn('ASSESS', {c.fields.get('intent') for c in evaluator if c.type == 'ActivityDefinition'})
             imported = proposal_candidates(store, store.read(manifest.pending_proposals[DELIVERY_TWO][0], owner=DELIVERY_TWO))
             self.assertIn(DELIVERY_TWO, {c.id for c in imported if c.type == 'ExecutionContext'})
+
+    def test_the_seed_opens_its_delivery_to_learners_without_a_code(self):
+        manifest = build_seed(self.output, self.location)
+        preview = TrustedPolicy.model_validate_json((self.output / manifest.delivery_policy_preview).read_bytes())
+        # The delivery's policy is the reviewed opening of the import's preview: the delivery's learner grant only.
+        self.assertEqual(set(preview.learners), {DELIVERY})
+        self.assertEqual(preview.learners[DELIVERY].actions, ['read', 'interact', 'submit'])
+        with LearningStore(self.location) as store:
+            self.assertEqual(store.read_context(DELIVERY).fields['policies'], preview.policy_ref.model_dump())
+            # The code needs the host secret, which the seed does not know: an administrator creates it.
+            self.assertIsNone(store.enrolment_code(DELIVERY))
+            self.assertTrue(any(p.fields['proposedChange'].startswith('Open this course to learners')
+                                for p in store.owned(DELIVERY, 'ChangeProposal')))
+        closed = build_seed(self.root / 'closed', new_store_location(self, str(self.root), 'closed.sqlite'),
+                            open_delivery=False)
+        imported = TrustedPolicy.model_validate_json((self.root / 'closed' / closed.delivery_policy_preview).read_bytes())
+        self.assertEqual(imported.learners, {})
+        self.assertEqual((set(preview.subjects), set(preview.scopes)), (set(imported.subjects), set(imported.scopes)))
 
     def test_both_deliveries_have_two_synthetic_learners(self):
         manifest = build_seed(self.output, self.location)

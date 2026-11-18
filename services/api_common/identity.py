@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
+import re
 from typing import Literal
 
 from pydantic import model_validator
@@ -26,6 +27,11 @@ def auto_subject_key(issuer: str, subject: str) -> str:
     """The automatic subject key of (``issuer``, ``subject``); both values are length-prefixed, so none is ambiguous."""
     digest = hashlib.sha256(f'{len(issuer)}:{issuer}{len(subject)}:{subject}'.encode()).hexdigest()
     return AUTO_PREFIX + digest[:20]
+
+
+def is_auto_subject_key(key: str) -> bool:
+    """Whether ``key`` has the form of an automatic subject key; it names no one until that person signs in."""
+    return re.fullmatch(re.escape(AUTO_PREFIX) + '[0-9a-f]{20}', key) is not None
 
 
 class MappedIdentity(Record):
