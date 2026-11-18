@@ -241,6 +241,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/contexts/{context_id}/enrolment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether this course is open to learners and its current code; for its administrators */
+        get: operations["enrolment_contexts__context_id__enrolment_get"];
+        put?: never;
+        /** Propose opening this delivery to learners: a new trusted policy version with its learner grant */
+        post: operations["propose_enrolment_contexts__context_id__enrolment_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/contexts/{context_id}/enrolment/code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create or reset the code of an open course, at once; the previous code stops working */
+        post: operations["reset_code_contexts__context_id__enrolment_code_post"];
+        /** Disable the code of this course, at once; its learners stay */
+        delete: operations["disable_code_contexts__context_id__enrolment_code_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/contexts/{context_id}/generation-reviews/{request_id}": {
         parameters: {
             query?: never;
@@ -995,6 +1031,32 @@ export interface components {
         EditedSyllabus: {
             proposal: components["schemas"]["EntityRef"];
         };
+        /** EnrolmentProposal */
+        EnrolmentProposal: {
+            policy: components["schemas"]["TrustedPolicy"];
+            proposal: components["schemas"]["EntityRef"];
+        };
+        /**
+         * EnrolmentRequest
+         * @description ``propose-enrolment``: open the course to learners from the base context, with the ALM request id.
+         */
+        EnrolmentRequest: {
+            base_context: components["schemas"]["EntityRef"];
+            /** Request Id */
+            request_id: string;
+        };
+        /**
+         * EnrolmentView
+         * @description Whether a course is open to learners and its current code, for its administrators; no code when disabled.
+         */
+        EnrolmentView: {
+            /** Code */
+            code?: string | null;
+            /** Context Id */
+            context_id: string;
+            /** Open */
+            open: boolean;
+        };
         /** Entity */
         Entity: {
             /** Fields */
@@ -1398,6 +1460,17 @@ export interface components {
             validated_objects: {
                 [key: string]: unknown;
             }[];
+        };
+        /**
+         * LearnerGrant
+         * @description A delivery's reviewed grant to its learners (D37, S12b): what every participant who is only a learner there,
+         *     and whom the policy does not name in it, may do, and the scopes they read.
+         */
+        LearnerGrant: {
+            /** Actions */
+            actions: ("read" | "interact" | "submit")[];
+            /** Scopes */
+            scopes?: string[];
         };
         /** LogoutView */
         LogoutView: {
@@ -2361,6 +2434,10 @@ export interface components {
         };
         /** TrustedPolicy */
         TrustedPolicy: {
+            /** Learners */
+            learners?: {
+                [key: string]: components["schemas"]["LearnerGrant"];
+            };
             policy_ref: components["schemas"]["EntityRef"];
             /** Rule Bindings */
             rule_bindings?: components["schemas"]["RuleBinding"][];
@@ -3329,6 +3406,314 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApprovedSyllabus"];
+                };
+            };
+            /** @description No valid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not authorized, unmapped identity or missing CSRF token */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not found, or the context is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Conflict with the current state; reload and retry */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Invalid request or data */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Internal error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    enrolment_contexts__context_id__enrolment_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                context_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnrolmentView"];
+                };
+            };
+            /** @description No valid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not authorized, unmapped identity or missing CSRF token */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not found, or the context is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Conflict with the current state; reload and retry */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Invalid request or data */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Internal error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    propose_enrolment_contexts__context_id__enrolment_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                context_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EnrolmentRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnrolmentProposal"];
+                };
+            };
+            /** @description No valid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not authorized, unmapped identity or missing CSRF token */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not found, or the context is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Conflict with the current state; reload and retry */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Invalid request or data */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Internal error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    reset_code_contexts__context_id__enrolment_code_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                context_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnrolmentView"];
+                };
+            };
+            /** @description No valid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not authorized, unmapped identity or missing CSRF token */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not found, or the context is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Conflict with the current state; reload and retry */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Invalid request or data */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Internal error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    disable_code_contexts__context_id__enrolment_code_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                context_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnrolmentView"];
                 };
             };
             /** @description No valid session */

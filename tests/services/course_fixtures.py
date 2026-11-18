@@ -20,6 +20,10 @@ def new_export_directory(directory):
     return exports
 
 
+ENROLMENT_SECRET = 'synthetic-enrolment-secret-for-api-tests'
+
+
 def module_settings(directory):
-    """The settings of the ``courses`` and ``exports`` modules, which every all-modules deployment needs."""
-    return {'aimpro_exports': new_export_directory(directory), 'course_template': write_course_template(directory)}
+    """The settings of the ``courses``, ``exports`` and ``enrolment`` modules, which every all-modules deployment needs."""
+    return {'aimpro_exports': new_export_directory(directory), 'course_template': write_course_template(directory),
+            'enrolment_secret': ENROLMENT_SECRET}

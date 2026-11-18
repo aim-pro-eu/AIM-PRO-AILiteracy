@@ -24,6 +24,7 @@ from uuid import uuid4
 from fastapi import Depends, Request, Response
 
 from learning.contracts import Entity, EntityRef
+from learning.enrolment import join_course
 from learning.learner import LearnerCourse, enrolled_courses
 from learning.metamodel import load_contract
 from learning.policies import TrustedPolicy
@@ -137,6 +138,13 @@ class ContextServices:
         installed = self.policies.installed()
         with LearningStore(self.store) as store:
             return enrolled_courses(store, lambda ref: self.policies.find(ref, installed), subject_key)
+
+    def join(self, subject_key: str, code: str, request_id: str, *, secret: bytes) -> LearnerCourse:
+        """The subject joins the course whose current code is ``code`` (D37, S12b), with its installed policy."""
+        installed = self.policies.installed()
+        with LearningStore(self.store) as store:
+            return join_course(store, lambda ref: self.policies.find(ref, installed), subject_key, code, request_id,
+                               secret=secret)
 
     def bootstrap(self, context_id: str, subject_key: str, policy: TrustedPolicy):
         """Create the context with ``policy``, as the CLI ``bootstrap`` does; returns its root."""

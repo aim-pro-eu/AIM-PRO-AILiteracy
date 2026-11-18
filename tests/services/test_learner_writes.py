@@ -29,7 +29,7 @@ from services.jobs.store import JobStore, StatusEvent
 from services.jobs.worker import Worker
 from services.learner_api.app import create_app
 from tests.authoring_cycle_fixtures import AUTH, DELIVERY, DELIVERY_TWO
-from tests.services.course_fixtures import module_settings
+from tests.services.course_fixtures import ENROLMENT_SECRET, module_settings
 from tests.services.job_fixtures import new_jobs_location
 from tests.services.oidc_fixtures import (ISSUER, MAPPED_SUBJECT, NO_NETWORK, FakeProvider, auth_settings, log_in,
                                           write_identity_map)
@@ -78,7 +78,7 @@ class LearnerWritesCase(unittest.TestCase):
                                                           for key, subject in SUBJECTS.items()))
         self.settings = ApiSettings(auth=auth_settings(), identity_map=identities, store=str(self.seed.location),
                                     policy_dir=self.seed.output / self.seed.manifest.policy_dir,
-                                    jobs_store=str(self.jobs_location))
+                                    jobs_store=str(self.jobs_location), enrolment_secret=ENROLMENT_SECRET)
         self.app = create_app(self.settings, transport=self.provider.transport)
         self.clients = {key: self.signed_in(self.app, subject) for key, subject in SUBJECTS.items()}
         self.agents = SyntheticAgents()
@@ -207,7 +207,7 @@ class AttemptSubmissionTest(LearnerWritesCase):
         writes = {(method, path) for path, methods in self.app.openapi()['paths'].items()
                   for method in methods if method != 'get' and not path.startswith('/auth')}
         self.assertEqual(writes, {('post', '/courses/{context_id}/attempts'),
-                                  ('post', '/courses/{context_id}/questions')})
+                                  ('post', '/courses/{context_id}/questions'), ('post', '/enrolments')})
         first, _ = self.seed.attempts()
         proposal = self.seed.draft(first, 'draft-first')
         with self.seed.contexts.open(DELIVERY) as service:

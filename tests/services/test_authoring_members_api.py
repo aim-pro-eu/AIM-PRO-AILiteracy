@@ -16,7 +16,7 @@ from learning.policies import TrustedPolicy
 from services.api_common.settings import ApiSettings
 from services.authoring_api.app import create_app
 from tests.seed import build_seed
-from tests.services.course_fixtures import new_export_directory, write_course_template
+from tests.services.course_fixtures import ENROLMENT_SECRET, new_export_directory, write_course_template
 from tests.services.oidc_fixtures import ISSUER, MAPPED_SUBJECT, NO_NETWORK, FakeProvider, auth_settings, write_identity_map
 from tests.services.test_authoring_review_api import LEARNER_SUBJECT, ReviewApiCase
 from tests.store_backends import block_network, new_store_location, on_both_backends
@@ -44,7 +44,7 @@ class MembersApiTest(ReviewApiCase):
         settings = ApiSettings(auth=auth_settings(), identity_map=identities, store=str(self.location),
                                policy_dir=self.policies, jobs_store=str(self.root / 'jobs.sqlite'),
                                aimpro_exports=new_export_directory(self.root),
-                               course_template=write_course_template(self.root))
+                               course_template=write_course_template(self.root), enrolment_secret=ENROLMENT_SECRET)
         self.app = create_app(settings, transport=self.provider.transport)
         self.staff = self.signed_in(MAPPED_SUBJECT)
         self.learner = self.signed_in(LEARNER_SUBJECT)

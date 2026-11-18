@@ -90,6 +90,70 @@ def approval_valid(entity: Entity, snapshot: Snapshot, policy: TrustedPolicy) ->
         return False
 
 
+# What enrolment and learning change without changing the course (D37, S12b): a proposal reviewed against the
+# course stays applicable when only these changed since its base. An evaluation draft is judged against the
+# learners' records too, so for it only the participants are left out (Chat 29 finding 3; decided in S13).
+LEARNER_FIELDS = ("participants", "activityOccurrences", "learningStates")
+
+
+# The causes of the changes that enrolment and learning record: a learner joining, a learner's attempt.
+LEARNER_CAUSES = {"participants": "Participant", "activityOccurrences": "LearningEvidence"}
+
+
+def left_out(candidates: tuple[Entity, ...]) -> tuple[str, ...]:
+    return ("participants",) if any(c.type == "Evaluation" for c in candidates) else LEARNER_FIELDS
+
+
+def course_version(root: Entity, excluded: tuple[str, ...] = LEARNER_FIELDS) -> str:
+    """The version of the course in a context record: a digest of its fields without ``excluded``."""
+    return hashlib.sha256(canonical({k: v for k, v in root.fields.items() if k not in excluded}).encode()).hexdigest()
+
+
+def _same_course(store: LearningStore, root: Entity, base: str, excluded: tuple[str, ...]) -> Entity | None:
+    """The context record at ``base`` when the course is the same in it as in ``root``; otherwise ``None``.
+
+    Every change since ``base`` must be a learner's event of an excluded field (a join, an attempt), never an
+    applied proposal, and the two records must agree outside the excluded fields.
+    """
+    causes = {LEARNER_CAUSES[name] for name in excluded if name in LEARNER_CAUSES}
+    changes = {change.fields["newVersion"]: change for change in store.owned(root.id, "StateChange")}
+    version = root.version
+    while version != base:
+        change = changes.pop(version, None)
+        if change is None or change.fields["cause"]["type"] not in causes:
+            return None
+        version = change.fields["baseVersion"]
+    try:
+        recorded = store.read(EntityRef(type="ExecutionContext", id=root.id, version=base), owner=root.id)
+    except ValueError:
+        return None
+    return recorded if course_version(recorded, excluded) == course_version(root, excluded) else None
+
+
+def _rebased(candidates: tuple[Entity, ...], base: Entity, root: Entity, excluded: tuple[str, ...]) -> tuple[Entity, ...]:
+    """The candidates with a context record that keeps what was recorded in ``excluded`` since ``base``.
+
+    Each excluded list is merged: the items of ``root`` the candidate does not remove, then the ones it adds.
+    """
+    def merged(name, candidate):
+        before = [canonical(item) for item in base.fields[name]]
+        proposed = [canonical(item) for item in candidate.fields[name]]
+        kept = [item for item in root.fields[name] if canonical(item) in proposed or canonical(item) not in before]
+        present = {canonical(item) for item in kept}
+        return [*kept, *(item for item in candidate.fields[name] if canonical(item) not in before
+                         and canonical(item) not in present)]
+
+    def rebase(candidate):
+        if candidate.type != "ExecutionContext":
+            return candidate
+        fields = {**candidate.fields, **{name: merged(name, candidate) for name in excluded}}
+        if fields == candidate.fields:
+            return candidate
+        # Another record of the context than the reviewed one: its own version.
+        return candidate.model_copy(update={"version": uuid4().hex, "fields": fields})
+    return tuple(rebase(candidate) for candidate in candidates)
+
+
 def _validate_candidates(context: RunContext, candidates: tuple[Entity, ...]) -> Snapshot:
     if not candidates or len({c.ref for c in candidates}) != len(candidates):
         raise ValueError("Proposal requires unique structured candidates")
@@ -106,8 +170,11 @@ def _validate_candidates(context: RunContext, candidates: tuple[Entity, ...]) ->
         if candidate.ref in entities and entity_data(entities[candidate.ref]) != entity_data(candidate):
             raise ValueError("A changed candidate requires a new version")
         entities[candidate.ref] = candidate
+    def resolved(ref):
+        # A candidate names its context as it was when proposed; a later record of it changed no course (S12b).
+        return ref in entities or ref.type == "ExecutionContext" and ref.id == context.snapshot.context.id
     for candidate in candidates:
-        if any(ref not in entities for ref in references(candidate.fields)):
+        if not all(resolved(ref) for ref in references(candidate.fields)):
             raise ValueError("Candidate contains an unresolved or unauthorized reference")
     root = next((c for c in candidates if c.type == "ExecutionContext"), context.snapshot.context)
     snapshot = replace(context.snapshot, context=root, entities=entities, findings=())
@@ -241,9 +308,13 @@ def apply_proposal(store: LearningStore, context: RunContext, proposal: EntityRe
         raise ValueError("Approval does not cover this payload")
     root = store.read_context(context.snapshot.context.id)
     if root.version != current.fields["baseContextVersion"]:
-        stale = current.model_copy(update={"version": uuid4().hex, "fields": {**current.fields, "status": "STALE"}})
-        store.record_event(operation_id, stale)
-        raise StateConflict("Proposal base is stale")
+        excluded = left_out(candidates)
+        base = _same_course(store, root, current.fields["baseContextVersion"], excluded)
+        if base is None:
+            stale = current.model_copy(update={"version": uuid4().hex, "fields": {**current.fields, "status": "STALE"}})
+            store.record_event(operation_id, stale)
+            raise StateConflict("Proposal base is stale")
+        candidates = _rebased(candidates, base, root, excluded)
     _validate_candidates(context, candidates)
     applied = []
     for candidate in candidates:

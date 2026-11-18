@@ -19,7 +19,8 @@ from learning.authoring import (ProjectManifest, ReleaseManifest, ReviewReceipt,
 from learning.context import LearningRequest, RunContext, load_context, references
 from learning.contracts import EntityRef, Finding, Record, Text, entity_data, make_entity
 from learning.decisions import create_proposal, save_proposal
-from learning.membership import MEMBERSHIP_POLICY, validate_membership_application
+from learning.membership import (REVIEWED_POLICIES, validate_enrolment_application,
+                                 validate_membership_application)
 from learning.metamodel import validate_entity
 from learning.planning import ROLE_CONTRACTS
 from learning.policies import RuleBinding, ScopeGrant, TrustedPolicy
@@ -33,7 +34,8 @@ DELIVERY_PREFIX = 'authoring-delivery:'
 POLICY_PREVIEW = 'Proposed trusted local policy configuration: '
 HISTORY = ('ActivityOccurrence', 'LearningEvidence', 'LearningState', 'Evaluation')
 DELIVERY_FIELDS = ('models', 'learningDesign', 'policies', 'resourceBindings', 'mode', 'status')
-COMMANDS = ('PROPOSE_RELEASE', 'PROPOSE_DELIVERY_IMPORT', 'PROPOSE_ACTIVATION', 'PROPOSE_MEMBERSHIP')
+COMMANDS = ('PROPOSE_RELEASE', 'PROPOSE_DELIVERY_IMPORT', 'PROPOSE_ACTIVATION', 'PROPOSE_MEMBERSHIP',
+            'PROPOSE_ENROLMENT')
 # Runtime roles an import may configure. The EVALUATOR drafts the evaluations an assessor requests
 # (learning/evaluation.py; G7, S11), which lifts D4.
 RUNTIME_WORKERS = {'TEACHER': 'lesson-explainer', 'TRAINER': 'guided-practice-coach',
@@ -530,7 +532,7 @@ def activation_findings(store, context):
     policy = snapshot.get(root.fields['policies'])
     installed = canonical(context.policy.model_dump(mode='json'))
     # The reviewed import preview, or a reviewed membership version derived from it (D25).
-    if not {POLICY_PREVIEW + installed, MEMBERSHIP_POLICY + installed} & set(policy.fields['permissions']):
+    if not {POLICY_PREVIEW + installed, *(marker + installed for marker in REVIEWED_POLICIES)} & set(policy.fields['permissions']):
         findings.append(Finding(code='RELEASE_POLICY_NOT_INSTALLED', target=policy.id,
             reason='The installed trusted policy differs from the reviewed import preview.',
             resolution='Install the exact approved policy preview file before activation.'))
@@ -610,9 +612,9 @@ def _reserved_change(context, candidates):
     def entries(value):
         return [r for r in value.fields['models'] if r['id'].startswith((RELEASE_PREFIX, DELIVERY_PREFIX))]
     imported = any(r['id'].startswith(DELIVERY_PREFIX) for r in root.fields['models'])
-    # Only the membership command records a reviewed membership policy, which activation accepts.
+    # Only the membership and enrolment commands record a reviewed policy version, which activation accepts.
     claimed = set(context.snapshot.get(root.fields['policies']).fields['permissions'])
-    membership = any(c.type == 'PolicySet' and any(p.startswith(MEMBERSHIP_POLICY) and p not in claimed
+    membership = any(c.type == 'PolicySet' and any(p.startswith(REVIEWED_POLICIES) and p not in claimed
                                                    for p in c.fields['permissions']) for c in candidates)
     return (any(_reserved(c) for c in candidates) or membership or entries(root) != entries(updated) or
             bool(_foreign_projects(entities, updated) - _foreign_projects(entities, root)) or
@@ -634,6 +636,9 @@ def validate_release_application(store, context, proposal, candidates):
     _authorize(context)
     if operation == 'PROPOSE_MEMBERSHIP':
         validate_membership_application(context, command, result, candidates)
+        return
+    if operation == 'PROPOSE_ENROLMENT':
+        validate_enrolment_application(context, command, result, candidates)
         return
     updated = next((c for c in candidates if c.type == 'ExecutionContext'), root)
     if operation == 'PROPOSE_RELEASE':

@@ -1,10 +1,10 @@
 """What a learner reads (S12, #136): their courses (D19), the course view (D20) and their own progress.
 
-A learner's courses are, for now, the active deliveries where they hold
-``LEARNER`` both in the installed trusted policy and in their participant
-record: a D25 membership that is applied, never one still pending.
-:func:`enrolled_courses` is the only source of that list, so D37 (enrolment by
-course code, S12b) changes it there.
+A learner's courses are the active deliveries where they hold ``LEARNER`` both
+in the installed trusted policy and in their participant record: a D25
+membership that is applied, never one still pending, or a participant who is
+only a learner under the delivery's learner grant (D37: joined with the course
+code, S12b). :func:`enrolled_courses` is the only source of that list.
 
 The course view and the progress are projections: named fields copied from
 the active model of an ACTIVE delivery and from the learner's own records,
@@ -36,7 +36,7 @@ from learning.context import LearningRequest
 from learning.contracts import Entity, EntityRef, Finding, Record, Text
 from learning.decisions import approval_valid
 from learning.outputs import Citation
-from learning.policies import AuthorizationError, TrustedPolicy, authorize, scope_allows
+from learning.policies import AuthorizationError, TrustedPolicy, authorize, scope_allows, with_learner
 
 
 LEARNER = 'LEARNER'
@@ -243,11 +243,12 @@ def _learner_grant(policy: TrustedPolicy | None, subject_key: str, context_id: s
 
 def enrolled_courses(store, policy_of: Callable[[EntityRef], TrustedPolicy | None],
                      subject_key: str) -> tuple[LearnerCourse, ...]:
-    """The courses of a learner (D19, for now), by context id; the one source of the list (D37 may change it).
+    """The courses of a learner (D19, D37), by context id; the one source of the list.
 
-    A LEARNING context with status ACTIVE whose installed policy (``policy_of`` its ``policies`` reference) grants
-    the subject ``LEARNER`` and ``read`` there, and whose participants include the subject as ``LEARNER``. A
-    membership not applied yet changes neither, so its member is not listed.
+    A LEARNING context with status ACTIVE whose participants include the subject as ``LEARNER`` and whose installed
+    policy (``policy_of`` its ``policies`` reference) grants the subject ``LEARNER`` and ``read`` there: by name,
+    or by the delivery's learner grant to a participant who is only a learner. A membership not applied yet
+    changes neither, so its member is not listed.
     """
     found = []
     with store.read_transaction():
@@ -255,10 +256,14 @@ def enrolled_courses(store, policy_of: Callable[[EntityRef], TrustedPolicy | Non
             root = store.read_context(context_id)
             if (root.fields['mode'], root.fields['status']) != ('LEARNING', 'ACTIVE'):
                 continue
-            if not _learner_grant(policy_of(EntityRef.model_validate(root.fields['policies'])), subject_key, context_id):
-                continue
             participants = [store.read(ref, owner=context_id) for ref in _refs(root.fields['participants'])]
-            if not any(p.fields['subjectKey'] == subject_key and LEARNER in p.fields['roles'] for p in participants):
+            mine = next((p for p in participants if p.fields['subjectKey'] == subject_key), None)
+            if mine is None or LEARNER not in mine.fields['roles']:
+                continue
+            policy = policy_of(EntityRef.model_validate(root.fields['policies']))
+            if policy is not None and mine.fields['roles'] == [LEARNER]:
+                policy = with_learner(policy, context_id, subject_key)
+            if not _learner_grant(policy, subject_key, context_id):
                 continue
             design = store.read(EntityRef.model_validate(root.fields['learningDesign']), owner=context_id)
             found.append(LearnerCourse(context_id=context_id, title=design.fields['name']))

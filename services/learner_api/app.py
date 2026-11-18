@@ -1,9 +1,10 @@
-"""Learner API app: the shared skeleton plus the learner modules selected by configuration (S12).
+"""Learner API app: the shared skeleton plus the learner modules selected by configuration (S12, S12b).
 
 A separate process from the Authoring API: it imports no authoring module, and
 every route reads the learner's courses and the learner's own records only, or
-writes the learner's own attempt or question (S12 part 2). A question is queued
-in the jobs store for the job worker; this process builds no agent.
+writes the learner's own attempt or question (S12 part 2) or joins a course with
+its code (S12b). A question is queued in the jobs store for the job worker; this
+process builds no agent.
 """
 
 from __future__ import annotations
@@ -17,12 +18,12 @@ from services.api_common.contexts import ContextServices, PolicyDirectory
 from services.api_common.identity import IdentityMap, load_identity_map
 from services.api_common.registry import ConfigurationError, ModuleRegistry
 from services.api_common.settings import ApiSettings, AuthSettings
-from services.learner_api import attempts, courses, progress, questions
+from services.learner_api import attempts, courses, enrolments, progress, questions
 
 
 TITLE = 'ALM Learner API'
-VERSION = '0.2.0'
-REGISTRY = ModuleRegistry((courses.MODULE, progress.MODULE, attempts.MODULE, questions.MODULE))
+VERSION = '0.3.0'
+REGISTRY = ModuleRegistry((courses.MODULE, progress.MODULE, attempts.MODULE, questions.MODULE, enrolments.MODULE))
 
 
 def create_app(settings: ApiSettings | None = None, *, transport: httpx.BaseTransport | None = None) -> FastAPI:
@@ -35,10 +36,13 @@ def create_app(settings: ApiSettings | None = None, *, transport: httpx.BaseTran
         contexts = ContextServices(settings.store.get_secret_value(), PolicyDirectory(settings.policy_dir))
     if questions.MODULE in modules and settings.jobs_store is None:
         raise ConfigurationError('The questions module needs ALM_JOBS_STORE')
+    if enrolments.MODULE in modules and settings.enrolment_secret is None:
+        raise ConfigurationError('The enrolments module needs ALM_ENROLMENT_SECRET')
     authenticator = Authenticator(settings.auth, load_identity_map(settings.identity_map), transport=transport)
     app = build_app(TITLE, VERSION, modules, authenticator)
     app.state.contexts = contexts
     questions.configure(app, settings)
+    enrolments.configure(app, settings)
     return app
 
 

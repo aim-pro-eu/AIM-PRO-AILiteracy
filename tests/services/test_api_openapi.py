@@ -51,6 +51,8 @@ class OpenApiSnapshotTest(unittest.TestCase):
                           '/contexts/{context_id}/delivery-imports': ['post'],
                           '/contexts/{context_id}/activations': ['post'],
                           '/contexts/{context_id}/members': ['get', 'post'],
+                          '/contexts/{context_id}/enrolment': ['get', 'post'],
+                          '/contexts/{context_id}/enrolment/code': ['delete', 'post'],
                           '/contexts/{context_id}/designs/{design_id}/versions/{version}/syllabus': ['get'],
                           resource + '/project-syllabus': ['get'], resource + '/release': ['get'],
                           '/contexts/{context_id}/jobs': ['get', 'post'], job: ['get'], job + '/events': ['get'],
@@ -92,7 +94,8 @@ class OpenApiSnapshotTest(unittest.TestCase):
                           '/auth/session': ['get'], '/auth/logout': ['post'], '/courses': ['get'],
                           '/courses/{context_id}': ['get'], '/courses/{context_id}/progress': ['get'],
                           '/courses/{context_id}/attempts': ['post'], '/courses/{context_id}/questions': ['get', 'post'],
-                          '/courses/{context_id}/questions/{request_id}': ['get']})
+                          '/courses/{context_id}/questions/{request_id}': ['get'],
+                          '/enrolments': ['post']})
         self.assertEqual(schema['components']['schemas']['Question']['properties']['intent']['enum'],
                          ['EXPLAIN', 'SOCRATIC_GUIDANCE'])
 

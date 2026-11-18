@@ -603,8 +603,46 @@ in the Learner API; the course code with "reset" and "disable" on the studio's
 members page. Not in S12b: removing a member, promoting a member, a catalogue
 of open courses (later, not yet planned); the learner app screens (S13).
 
-**Acceptance.** Proposed on #141; confirmed with the owner when the step is
-specified.
+**Specification** (owner answers of 18 November 2026, Chat 34, recorded on
+#141). Opening a delivery to learners is one reviewed policy change, made once:
+a new policy version with the delivery's *learner grant* (the learners' actions
+and the delivery's scopes), proposed, decided and applied as D25. The code is
+not in the policy: an administrator creates, resets and disables it at once;
+it is derived from a host secret (`ALM_ENROLMENT_SECRET`) and a nonce of the
+course, the store keeps the nonce and the code's digest, and administrators
+see the code whenever they open the members page. The code alone finds the
+course (a link `/join?code=…`); a wrong, reset or disabled code gets one answer
+and records nothing. Course version: a proposal stays applicable when every
+change since its base is a learner's event (a join or an attempt, never an
+applied proposal) and the context record is unchanged outside `participants`,
+`activityOccurrences` and `learningStates`; for an evaluation draft only joins
+and `participants` count, so a learner's attempt still makes it stale (finding
+3, decided in S13). Automatic
+subject keys: `auto-` and 20 hex digits of SHA-256 over (issuer, `sub`), with
+no write; the identity map may not use the prefix; valid in both APIs. Students
+added by the teacher join at once, without a proposal, under the learner grant.
+Two parts: part 1 the core and the APIs; part 2 the studio members page,
+students added by the teacher, the seed and the browser test.
+
+**Acceptance** (confirmed on #141, 18 November 2026).
+
+Part 1:
+
+- [ ] **Learner grant.** A participant with only `LEARNER` in a delivery whose installed policy has the grant reads, interacts and submits there exactly as a learner named in the policy (D25 learners keep working) and reads the grant's scopes; learners never gain `propose`, `decide` or `apply`.
+- [ ] **Opening is reviewed.** A new policy file (never changing an installed one) and a proposal that changes only the policy reference; nothing is open until a person applies it; application rechecks that exactly that policy is installed.
+- [ ] **The code.** Created, read, reset and disabled by an administrator of an open delivery; only the nonce and the digest stored; a reset or disabled code is refused; learners and other staff cannot read or change it.
+- [ ] **Joining with the code.** A `LEARNER` participant of that ACTIVE delivery at once, idempotent by the learner's request id; joining again returns the same course; a wrong, reset or disabled code, or a course not ACTIVE, records nothing and answers the same way; the course is in "my courses".
+- [ ] **Course version.** Joining leaves every pending proposal applicable, a pending evaluation draft included; applying a proposal never drops a participant or a learner's record recorded after it was made; a learner's attempt still makes a pending evaluation draft stale; a proposal recorded before S12b still applies when nothing changed since.
+- [ ] **Automatic keys.** Stable `auto-` keys for people of the configured issuer outside the identity map; a map entry using the prefix is refused; a mapped person keeps their key.
+- [ ] **APIs.** Learner API "join with a code"; Authoring API: propose opening, read, reset and disable the code; OpenAPI snapshots regenerated.
+- [ ] **Isolation.** Two learners join with the code and stay isolated; staff membership (D25, D36) unchanged.
+- [ ] Full offline suite, `python -m aimpro.generate --check`, `python -m services.api_common.openapi --check`, `python -m evaluation --check` and the studio checks pass.
+
+Part 2:
+
+- [ ] **Studio members page.** Propose opening, see the code and the join link, reset and disable it.
+- [ ] **Students added by the teacher**, at once, under the learner grant, with no new policy version (replaces D25/D36 for `LEARNER`).
+- [ ] The seed (D15) opens its delivery; a browser test joins with the code.
 
 ### S13 — Learner app (M3)
 

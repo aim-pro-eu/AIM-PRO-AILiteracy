@@ -11,14 +11,15 @@ from services.api_common.contexts import ContextServices, PolicyDirectory
 from services.api_common.identity import IdentityMap, load_identity_map
 from services.api_common.registry import ConfigurationError, ModuleRegistry
 from services.api_common.settings import ApiSettings, AuthSettings
-from services.authoring_api import (context_summary, courses, exports, jobs, members, projects, releases, review, sources,
-                                   syllabus)
+from services.authoring_api import (context_summary, courses, enrolment, exports, jobs, members, projects, releases,
+                                   review, sources, syllabus)
 
 
 TITLE = 'ALM Authoring API'
-VERSION = '0.16.0'
+VERSION = '0.17.0'
 REGISTRY = ModuleRegistry((context_summary.MODULE, review.MODULE, projects.MODULE, releases.MODULE, jobs.MODULE,
-                           courses.MODULE, exports.MODULE, sources.MODULE, syllabus.MODULE, members.MODULE))
+                           courses.MODULE, exports.MODULE, sources.MODULE, syllabus.MODULE, members.MODULE,
+                           enrolment.MODULE))
 
 
 def create_app(settings: ApiSettings | None = None, *, transport: httpx.BaseTransport | None = None) -> FastAPI:
@@ -38,12 +39,15 @@ def create_app(settings: ApiSettings | None = None, *, transport: httpx.BaseTran
         courses.load_template(settings.course_template)
     if exports.MODULE in modules and (settings.aimpro_exports is None or not settings.aimpro_exports.is_dir()):
         raise ConfigurationError('The exports module needs ALM_AIMPRO_EXPORTS, an existing directory')
+    if enrolment.MODULE in modules and settings.enrolment_secret is None:
+        raise ConfigurationError('The enrolment module needs ALM_ENROLMENT_SECRET')
     authenticator = Authenticator(settings.auth, load_identity_map(settings.identity_map), transport=transport)
     app = build_app(TITLE, VERSION, modules, authenticator)
     app.state.contexts = contexts
     jobs.configure(app, settings)
     courses.configure(app, settings)
     exports.configure(app, settings)
+    enrolment.configure(app, settings)
     return app
 
 

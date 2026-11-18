@@ -134,7 +134,7 @@ class AuthoringConfigurationTest(unittest.TestCase):
 
     def test_every_authoring_module_is_registered(self):
         self.assertEqual(REGISTRY.names, ('contexts', 'review', 'projects', 'releases', 'jobs', 'courses', 'exports',
-                                          'sources', 'syllabus', 'members'))
+                                          'sources', 'syllabus', 'members', 'enrolment'))
 
 
 class ModuleBoundaryTest(unittest.TestCase):

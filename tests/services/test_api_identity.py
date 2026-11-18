@@ -14,7 +14,7 @@ from pydantic import ValidationError
 
 from services.api_common.auth import (CSRF_HEADER, LOGIN_COOKIE, SESSION_COOKIE, Principal,
                                       csrf_protected, current_principal)
-from services.api_common.identity import IdentityMap, load_identity_map
+from services.api_common.identity import AUTO_PREFIX, IdentityMap, auto_subject_key, load_identity_map
 from services.api_common.registry import ApiModule
 from tests.services.oidc_fixtures import (CLIENT_ID, CLIENT_SECRET, ISSUER, MAPPED_SUBJECT,
                                           NO_NETWORK, POST_LOGOUT_REDIRECT_URI, REDIRECT_URI,
@@ -138,16 +138,30 @@ class LoginTest(unittest.TestCase):
         self.clock.now -= 10
         self.assert_refused(self.client.get('/auth/session'), 401, 'unauthenticated')
 
-    def test_unmapped_identity_is_forbidden_and_gets_no_session(self):
+    def test_an_identity_outside_the_map_gets_a_stable_automatic_key(self):
+        # D9 revised (S12b): a person of the configured issuer outside the map gets a key, which grants nothing.
         response = log_in(self.client, self.provider, subject=UNMAPPED_SUBJECT)
-        self.assert_refused(response, 403, 'forbidden')
+        self.assertEqual(response.status_code, 303, response.text)
         self.assertNotIn(UNMAPPED_SUBJECT, response.text)
-        self.assert_refused(self.client.get('/auth/session'), 401, 'unauthenticated')
+        session = self.client.get('/auth/session')
+        key = session.json()['subject_key']
+        self.assertRegex(key, r'^auto-[0-9a-f]{20}$')
+        self.assertEqual(key, auto_subject_key(ISSUER, UNMAPPED_SUBJECT))
+        self.assertNotIn(UNMAPPED_SUBJECT, session.text)
+        again = api_client(self.provider, (probe_module(),), clock=self.clock)
+        self.assertEqual(log_in(again, self.provider, subject=UNMAPPED_SUBJECT).status_code, 303)
+        self.assertEqual(again.get('/probe').json(), {'subject_key': key})
+        # A mapped person keeps their map key.
+        self.assertEqual(log_in(again, self.provider).status_code, 303)
+        self.assertEqual(again.get('/probe').json(), {'subject_key': 'admin'})
 
     def test_same_subject_from_another_issuer_is_not_mapped(self):
         other = FakeProvider('https://other-idp.test/realms/alm')
         client = api_client(other, clock=self.clock, issuer=other.issuer)
-        self.assert_refused(log_in(client, other), 403, 'forbidden')
+        self.assertEqual(log_in(client, other).status_code, 303)
+        key = client.get('/auth/session').json()['subject_key']
+        self.assertEqual(key, auto_subject_key(other.issuer, MAPPED_SUBJECT))
+        self.assertNotEqual(key, auto_subject_key(ISSUER, MAPPED_SUBJECT))
 
     def test_invalid_id_tokens_are_refused(self):
         foreign = new_key()
@@ -268,6 +282,13 @@ class CsrfAndLogoutTest(unittest.TestCase):
 
 
 class IdentityMapTest(unittest.TestCase):
+    def test_automatic_keys_are_stable_and_differ_by_issuer_and_subject(self):
+        key = auto_subject_key(ISSUER, 'a')
+        self.assertRegex(key, r'^auto-[0-9a-f]{20}$')
+        self.assertEqual(auto_subject_key(ISSUER, 'a'), key)
+        self.assertEqual(len({key, auto_subject_key(ISSUER, 'b'), auto_subject_key(ISSUER + '/', 'a'),
+                              auto_subject_key(ISSUER[:-1], ISSUER[-1] + 'a')}), 4)
+
     def test_loads_the_host_identity_map(self):
         with TemporaryDirectory() as directory:
             identities = load_identity_map(write_identity_map(
@@ -285,6 +306,8 @@ class IdentityMapTest(unittest.TestCase):
             'unknown field': {'format': 1, 'identities': [{**entry, 'roles': ['ADMINISTRATOR']}]},
             'unknown format': {'format': 2, 'identities': [entry]},
             'blank subject key': {'format': 1, 'identities': [{**entry, 'subject_key': ' '}]},
+            'automatic key': {'format': 1, 'identities': [{**entry, 'subject_key': AUTO_PREFIX + '0' * 20}]},
+            'automatic prefix': {'format': 1, 'identities': [{**entry, 'subject_key': AUTO_PREFIX + 'admin'}]},
         }.items():
             with self.subTest(name):
                 with self.assertRaises(ValidationError):

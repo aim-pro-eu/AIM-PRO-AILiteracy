@@ -36,6 +36,7 @@ class StoreTest(unittest.TestCase):
         with db:
             db.execute("DROP TABLE operations")
             db.execute("DROP TABLE requests")
+            db.execute("DROP TABLE enrolment_codes")
             db.execute("CREATE TABLE operations (id TEXT PRIMARY KEY, owner TEXT NOT NULL, fingerprint TEXT NOT NULL, result TEXT NOT NULL)")
             db.execute("CREATE TABLE requests (id TEXT PRIMARY KEY, owner TEXT NOT NULL, payload TEXT NOT NULL, result TEXT)")
             db.execute("PRAGMA user_version=1")
@@ -100,7 +101,7 @@ class StoreTest(unittest.TestCase):
 
     @sqlite_only
     def test_new_database_keys_requests_and_operations_by_owner_then_id(self):
-        self.assertEqual(self.store.db.execute("PRAGMA user_version").fetchone()[0], 2)
+        self.assertEqual(self.store.db.execute("PRAGMA user_version").fetchone()[0], 3)
         for table in ("requests", "operations"):
             columns = self.store.db.execute(f"PRAGMA table_info({table})").fetchall()
             self.assertEqual([column[1] for column in sorted(columns, key=lambda column: column[5]) if column[5]],
@@ -122,7 +123,7 @@ class StoreTest(unittest.TestCase):
         with patch("learning.store.sqlite3.connect",
                    side_effect=lambda *args, **kwargs: connect(*args, factory=InterleavedConnection, **kwargs)):
             with LearningStore(path) as opened:
-                self.assertEqual(opened.db.execute("PRAGMA user_version").fetchone()[0], 2)
+                self.assertEqual(opened.db.execute("PRAGMA user_version").fetchone()[0], 3)
                 opened.claim_request("req", "session", "payload")
         with LearningStore(path) as reopened:
             with self.assertRaises(StateConflict):
@@ -161,7 +162,8 @@ class StoreTest(unittest.TestCase):
             db.execute("INSERT INTO operations VALUES (?,?,?,?)",
                        ("shared", "session", "fingerprint", canonical(entity_data(change))))
         with LearningStore(path) as migrated:
-            self.assertEqual(migrated.db.execute("PRAGMA user_version").fetchone()[0], 2)
+            self.assertEqual(migrated.db.execute("PRAGMA user_version").fetchone()[0], 3)
+            self.assertIsNone(migrated.enrolment_code("session"))
             self.assertEqual(migrated.read_context("session").version, "1")
             self.assertEqual(migrated.claim_request("shared", "session", "payload"), {"content": "done"})
             self.assertEqual(migrated.operation_result("shared", "session"), change)
@@ -176,6 +178,49 @@ class StoreTest(unittest.TestCase):
             self.assertEqual(backup.execute("SELECT fingerprint FROM operations WHERE id='shared'").fetchone()[0],
                              "fingerprint")
             self.assertEqual(backup.execute("SELECT version FROM contexts WHERE id='session'").fetchone()[0], "1")
+
+    @sqlite_only
+    def test_v2_migration_adds_the_enrolment_codes_and_keeps_every_row(self):
+        change, updated = self.change()
+        self.store.commit_change(change, (updated,), expected_version="1", operation_id="op")
+        self.store.claim_request("req", "session", "payload")
+        path = Path(self.temp.name) / "v2.sqlite"
+        db = sqlite3.connect(path)
+        self.addCleanup(db.close)
+        self.store.db.backup(db)
+        with db:
+            db.execute("DROP TABLE enrolment_codes")
+            db.execute("PRAGMA user_version=2")
+        before = {table: db.execute(f"SELECT * FROM {table} ORDER BY rowid").fetchall()
+                  for table in ("entities", "contexts", "operations", "requests")}
+        with LearningStore(path) as migrated:
+            self.assertEqual(migrated.db.execute("PRAGMA user_version").fetchone()[0], 3)
+            self.assertEqual({table: [tuple(row) for row in migrated.db.execute(f"SELECT * FROM {table} ORDER BY rowid")]
+                              for table in before}, before)
+            self.assertIsNone(migrated.enrolment_code("session"))
+            migrated.set_enrolment_code("session", "nonce", "digest", "admin")
+            self.assertEqual(migrated.enrolment_context("digest"), "session")
+
+    def test_an_enrolment_code_is_kept_per_context_by_its_nonce_and_digest(self):
+        self.assertIsNone(self.store.enrolment_code("session"))
+        self.assertIsNone(self.store.enrolment_context("digest-1"))
+        self.store.set_enrolment_code("session", "nonce-1", "digest-1", "admin")
+        first = self.store.enrolment_code("session")
+        self.assertEqual((first.nonce, first.digest, first.responsible), ("nonce-1", "digest-1", "admin"))
+        self.assertTrue(first.changed_at)
+        self.assertEqual(self.store.enrolment_context("digest-1"), "session")
+        self.store.set_enrolment_code("session", "nonce-2", "digest-2", "admin")
+        self.assertEqual(self.store.enrolment_code("session").digest, "digest-2")
+        self.assertIsNone(self.store.enrolment_context("digest-1"))
+        # One digest names one context at most.
+        with self.assertRaises(StateConflict):
+            self.store.set_enrolment_code("other", "nonce-3", "digest-2", "admin")
+        self.assertEqual(self.store.enrolment_context("digest-2"), "session")
+        self.store.remove_enrolment_code("session")
+        self.assertIsNone(self.store.enrolment_code("session"))
+        self.assertIsNone(self.store.enrolment_context("digest-2"))
+        self.store.remove_enrolment_code("session")
+        self.assertIn("enrolment_codes", self.store.table_digests())
 
     @sqlite_only
     def test_migration_does_not_overwrite_existing_backup(self):

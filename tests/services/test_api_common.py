@@ -238,6 +238,15 @@ class SettingsTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             ApiSettings.from_env({**self.ENV, 'ALM_API_SESSION_TTL': '0'})
 
+    def test_reads_the_enrolment_secret_which_must_be_long_enough(self):
+        secret = 'a-synthetic-enrolment-secret-of-40-chars'
+        settings = ApiSettings.from_env({**self.ENV, 'ALM_ENROLMENT_SECRET': secret})
+        self.assertEqual(settings.enrolment_secret.get_secret_value(), secret)
+        self.assertNotIn(secret, repr(settings))
+        self.assertIsNone(ApiSettings.from_env(self.ENV).enrolment_secret)
+        with self.assertRaises(ValueError):
+            ApiSettings.from_env({**self.ENV, 'ALM_ENROLMENT_SECRET': 'too-short'})
+
 
 if __name__ == '__main__':
     unittest.main()

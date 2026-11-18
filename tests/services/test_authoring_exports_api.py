@@ -25,7 +25,7 @@ from services.authoring_api.app import create_app
 from services.jobs.store import JobStore
 from tests.authoring_cycle_fixtures import AUTH
 from tests.seed import build_seed
-from tests.services.course_fixtures import new_export_directory, write_course_template
+from tests.services.course_fixtures import ENROLMENT_SECRET, new_export_directory, write_course_template
 from tests.services.oidc_fixtures import ISSUER, MAPPED_SUBJECT, NO_NETWORK, FakeProvider, auth_settings, write_identity_map
 from tests.services.test_authoring_review_api import LEARNER_SUBJECT, ReviewApiCase
 from tests.store_backends import block_network
@@ -58,7 +58,7 @@ class ExportsApiCase(ReviewApiCase):
         settings = ApiSettings(auth=auth_settings(), identity_map=identities, store=str(self.location),
                                policy_dir=self.policies, jobs_store=str(self.jobs_location),
                                aimpro_exports=self.exports, export_max_bytes=LIMIT,
-                               course_template=write_course_template(self.root))
+                               course_template=write_course_template(self.root), enrolment_secret=ENROLMENT_SECRET)
         self.app = create_app(settings, transport=self.provider.transport)
         self.staff = self.signed_in(MAPPED_SUBJECT)
         self.learner = self.signed_in(LEARNER_SUBJECT)
@@ -258,7 +258,7 @@ class ExportSettingsTest(unittest.TestCase):
             seed = build_seed(root / 'seed', root / 'seed.sqlite')
             values = dict(auth=auth_settings(), identity_map=identities, store=str(root / 'seed.sqlite'),
                           policy_dir=root / 'seed' / seed.policy_dir, jobs_store=str(root / 'jobs.sqlite'),
-                          course_template=write_course_template(root))
+                          course_template=write_course_template(root), enrolment_secret=ENROLMENT_SECRET)
             for exports in (None, root / 'missing'):
                 with self.subTest(exports=exports), self.assertRaisesRegex(ConfigurationError, 'ALM_AIMPRO_EXPORTS'):
                     create_app(ApiSettings(**values, aimpro_exports=exports))

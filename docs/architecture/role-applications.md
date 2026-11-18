@@ -236,8 +236,19 @@ subject keys:
 
 The map grants nothing. Provider roles and groups are ignored; what a subject may
 do is decided by the trusted policy, as for the CLI `--subject`. A pair listed
-twice or an unknown field refuses the whole file. The issuer is compared
-exactly, without URL normalization.
+twice, an unknown field or a subject key starting with `auto-` refuses the whole
+file. The issuer is compared exactly, without URL normalization.
+
+Since S12b (D9 revised, #141) a person of the configured issuer
+(`ALM_OIDC_ISSUER`) who is not in the map signs in with an automatic subject
+key: `auto-` and the first 20 hex digits of SHA-256 over the issuer and `sub`
+(each length-prefixed), computed at every sign-in, so the same person always
+gets the same key and nothing is written. A mapped person keeps their map key;
+adding someone to the map later gives them the mapped key instead, with none of
+the records of their automatic one. An automatic key grants nothing either: in
+the studio such a person has no course and cannot create one; a learner gains a
+course by joining it with its code (see [Enrolment](#teams-style-enrolment-s12b)).
+No name or e-mail is kept: the staff see the key only.
 
 ### Policy resolution (D10, from S05)
 
@@ -288,6 +299,7 @@ preview included, stays an operator action.
 | `ALM_COURSE_TEMPLATE` | course template (S09a): who may create courses and the source scopes of a new course; read on every request, never written; required when the `courses` module is selected |
 | `ALM_AIMPRO_EXPORTS` | directory of uploaded AIM-PRO exports, the one the worker reads; must exist; required when the `exports` module is selected |
 | `ALM_API_EXPORT_MAX_BYTES` | largest accepted upload, in bytes (default 10485760, 10 MiB) |
+| `ALM_ENROLMENT_SECRET` | host secret the course codes are derived from (S12b), at least 32 characters; required when the `enrolment` module (Authoring API) or the `enrolments` module (Learner API) is selected; both APIs need the same value, and changing it changes every course's code |
 
 `ALM_API_MODULES=` (empty) runs the identity routes alone, without a store. The
 API never creates a SQLite database: a missing file refuses to start.
@@ -1325,10 +1337,11 @@ routes, error shape, request ids, policy directory and settings as the Authoring
 API (`ALM_API_MODULES` selects its modules; `ALM_STORE` and `ALM_POLICY_DIR` are
 required with any of them). Its OpenAPI snapshot is
 `services/openapi/learner.json`, checked by the same `--check`; version 0.2.0
-with part 2. Every response is `Cache-Control: no-store`; every read leaves the
-table digests of the store unchanged. The two writes (part 2) need the CSRF
-header, as the Authoring API's writes do; the module `questions` also needs
-`ALM_JOBS_STORE`.
+with part 2, 0.3.0 with joining (S12b). Every response is `Cache-Control:
+no-store`; every read leaves the table digests of the store unchanged. The
+writes need the CSRF header, as the Authoring API's writes do; the module
+`questions` also needs `ALM_JOBS_STORE`, and `enrolments` needs
+`ALM_ENROLMENT_SECRET`.
 
 | Module | Route | Response |
 | --- | --- | --- |
@@ -1339,13 +1352,15 @@ header, as the Authoring API's writes do; the module `questions` also needs
 | `questions` | `POST /courses/{context_id}/questions` | `QuestionView`: a question to the Teacher or the Socratic coach, queued as a job |
 | `questions` | `GET /courses/{context_id}/questions` | `QuestionList`: the learner's own questions in the course, newest first |
 | `questions` | `GET /courses/{context_id}/questions/{request_id}` | `QuestionView`: one of them, with the response once its run has ended |
+| `enrolments` | `POST /enrolments` | `LearnerCourse`: the course the subject joined with its code (S12b) |
 
-- **My courses (D19).** `learning.learner.enrolled_courses` is the one source
-  of the list, reached through `ContextServices.enrolled`: the LEARNING contexts
-  with status ACTIVE whose installed policy grants the subject `LEARNER` and
-  `read` there, and whose participants include the subject as `LEARNER`. A
-  membership not applied yet changes neither, so its member is not listed.
-  Enrolment by course code (D37, S12b) changes this function.
+- **My courses (D19, D37).** `learning.learner.enrolled_courses` is the one
+  source of the list, reached through `ContextServices.enrolled`: the LEARNING
+  contexts with status ACTIVE whose participants include the subject as
+  `LEARNER` and whose installed policy grants the subject `LEARNER` and `read`
+  there, by name or by the delivery's learner grant to a participant who is only
+  a learner (S12b). A membership not applied yet changes neither, so its member
+  is not listed.
 - **Course view (D20).** A projection of named fields from the active model of
   the delivery, which is the release it imported, never a draft or a proposal:
   the syllabus structure (phases and units in order, each with its activities:
@@ -1380,8 +1395,8 @@ header, as the Authoring API's writes do; the module `questions` also needs
   and attempt again return the same evidence and write nothing; another attempt
   or activity under that id is a 409. Submitting proposes, decides and
   evaluates nothing. As today (Chat 29 finding 3, decided in S13), a submit
-  changes the context version, so a pending evaluation draft becomes stale when
-  it is applied.
+  makes a pending evaluation draft stale when it is applied; since S12b it no
+  longer makes any other proposal stale (see the course version below).
 - **The learner request as a job (part 2).** `POST .../questions` checks that
   the subject is a learner of the active course with `interact`
   (`LearningService.authorize_learner_requests`) and queues the job
@@ -1428,6 +1443,89 @@ header, as the Authoring API's writes do; the module `questions` also needs
   other's session: the learner app (S13) needs its own host name or proxy. A
   progress stream of a question, and an administrator abandoning a learner's
   question, are not offered yet.
+
+## Teams-style enrolment (S12b)
+
+Issue #141; owner decisions of 18 November 2026 (D37, D9 revised, and the
+specification on #141). Part 1: the core and the two APIs. The studio's members
+page, students added by the teacher, the seed and the browser tests are part 2.
+
+- **The learner grant.** A trusted policy may hold, per delivery,
+  `learners: {<context id>: {actions, scopes}}` (`learning.policies.LearnerGrant`;
+  only `read`, `interact` and `submit`). A participant who is only `LEARNER`
+  there, and whom the policy does not name in that context, acts exactly as a
+  learner named in the policy: `LearningService.policy_for` (through
+  `learning.enrolment.learner_policy`) gives every check the installed policy
+  with that subject granted, and adds the subject to the grant's scopes. A
+  policy without a grant serializes as before, so recorded policy texts are
+  unchanged. Authority still comes from the trusted policy and the participant
+  record; learners named in the policy (D25) keep working.
+- **Opening is reviewed, once.** `POST /contexts/{context_id}/enrolment`
+  (Authoring API, module `enrolment`) with `request_id` and `base_context`, by
+  an administrator with the CSRF token, on a context holding an imported
+  delivery: the command (`learning.membership.propose_enrolment`, operation
+  `PROPOSE_ENROLMENT`) copies the installed policy as one new version with the
+  delivery's grant (the learners' actions and the scopes of this context alone),
+  the API installs it as a new file, and the proposal changes only the context's
+  `policies` reference (its `PolicySet` ends with `Reviewed course enrolment
+  policy:` and the canonical policy, which activation accepts as it accepts a
+  membership version). A person decides and applies it; application rechecks
+  that exactly that policy is installed. A course already open is refused
+  (422). A delivery may be opened before or after activation; learners join
+  only once it is ACTIVE.
+- **The code.** Once the course is open, its administrators read it
+  (`GET /contexts/{context_id}/enrolment`: `open` and `code`), create or reset
+  it (`POST .../enrolment/code`) and disable it (`DELETE .../enrolment/code`),
+  at once and without a proposal; anyone else gets 403, and a code before the
+  course is open is refused (422). The code is 8 characters of the base32
+  alphabet, an HMAC of `ALM_ENROLMENT_SECRET` over the context id and a random
+  nonce. The ALM store keeps, per context, the nonce, the code's digest (an
+  HMAC of the code with the same secret), who changed it and when, in the table
+  `enrolment_codes` (store schema version 3; outside the ALM metamodel), never
+  the code. A reset draws a new nonce, so the old code stops working; disabling
+  removes the row; the course's learners stay.
+- **Joining (Learner API, module `enrolments`).** `POST /enrolments` with
+  `request_id` (the learner's own id) and `code`, with the CSRF token. The code
+  alone finds the course, as in Teams: case, spaces and hyphens do not matter;
+  a join link can carry it (the learner app, S13). The subject becomes a
+  `LEARNER` participant of that LEARNING/ACTIVE delivery at once
+  (`learning.enrolment.join_course`): a new `Participant` and the context with
+  it, one `StateChange` caused by the participant, an observed event by the
+  subject; no proposal and no new policy version. The same request, or a
+  learner of the course joining again, returns the same `LearnerCourse` and
+  writes nothing. A wrong, reset or disabled code, or a course not open or not
+  active, gets one answer, 404 "No open course has this code", and records
+  nothing; a member of the course's staff, or a subject the policy names there,
+  does not join as a learner (409). The code is checked again under the store's
+  write lock; joins that meet a concurrent change of the context are retried.
+- **The course version.** Proposals are still recorded with the context's
+  technical version as their base. At application, a proposal whose base is
+  not the current version is stale unless the course is the same: every change
+  recorded since the base is a learner's event (a join, caused by a
+  `Participant`, or an attempt, caused by its `LearningEvidence`; never an
+  applied proposal), and the context record at the base and the current one
+  agree without `participants`, `activityOccurrences` and `learningStates`
+  (`learning.decisions.course_version`). For an evaluation draft only joins and
+  `participants` count, so a learner's new attempt still makes it stale (Chat 29
+  finding 3, decided in S13). When only
+  those fields changed, the proposal's context record is applied with them
+  merged: the participants and learners' records recorded since are kept, and
+  the applied record gets its own version. A candidate may name an earlier
+  record of its own context. A staff membership naming a subject who joined
+  meanwhile is refused at application. Joining therefore never makes a pending
+  proposal stale; a staff membership or an opening still does, since it
+  changes `policies`.
+- **Isolation.** Two people outside the identity map join with the code; with
+  the same request ids each submits and reads only their own records
+  (`tests/test_enrolment.py`, `tests/services/test_enrolment_api.py`). The
+  Learner API imports `learning.enrolment`, which imports no authoring module
+  (`tests/services/test_learner_boundaries.py`).
+- **Not yet.** The studio's members page with the code, students added by the
+  teacher (replacing D25/D36 for `LEARNER`), the seed opening its delivery and
+  a browser test (part 2); removing a member, promoting a member, a catalogue of
+  open courses and a limit on join attempts (later). The studio still lists the
+  contexts a subject is named in by the policy, so a learner who joined does
+  not see the course there.
 
 ## Local identity smoke test
 
