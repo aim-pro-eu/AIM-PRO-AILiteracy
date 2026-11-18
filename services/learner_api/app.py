@@ -1,7 +1,9 @@
 """Learner API app: the shared skeleton plus the learner modules selected by configuration (S12).
 
 A separate process from the Authoring API: it imports no authoring module, and
-every route reads the learner's courses and the learner's own records only.
+every route reads the learner's courses and the learner's own records only, or
+writes the learner's own attempt or question (S12 part 2). A question is queued
+in the jobs store for the job worker; this process builds no agent.
 """
 
 from __future__ import annotations
@@ -15,12 +17,12 @@ from services.api_common.contexts import ContextServices, PolicyDirectory
 from services.api_common.identity import IdentityMap, load_identity_map
 from services.api_common.registry import ConfigurationError, ModuleRegistry
 from services.api_common.settings import ApiSettings, AuthSettings
-from services.learner_api import courses, progress
+from services.learner_api import attempts, courses, progress, questions
 
 
 TITLE = 'ALM Learner API'
-VERSION = '0.1.0'
-REGISTRY = ModuleRegistry((courses.MODULE, progress.MODULE))
+VERSION = '0.2.0'
+REGISTRY = ModuleRegistry((courses.MODULE, progress.MODULE, attempts.MODULE, questions.MODULE))
 
 
 def create_app(settings: ApiSettings | None = None, *, transport: httpx.BaseTransport | None = None) -> FastAPI:
@@ -31,9 +33,12 @@ def create_app(settings: ApiSettings | None = None, *, transport: httpx.BaseTran
         if settings.store is None or settings.policy_dir is None:
             raise ConfigurationError('Learner modules need ALM_STORE and ALM_POLICY_DIR')
         contexts = ContextServices(settings.store.get_secret_value(), PolicyDirectory(settings.policy_dir))
+    if questions.MODULE in modules and settings.jobs_store is None:
+        raise ConfigurationError('The questions module needs ALM_JOBS_STORE')
     authenticator = Authenticator(settings.auth, load_identity_map(settings.identity_map), transport=transport)
     app = build_app(TITLE, VERSION, modules, authenticator)
     app.state.contexts = contexts
+    questions.configure(app, settings)
     return app
 
 

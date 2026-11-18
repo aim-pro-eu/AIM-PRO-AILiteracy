@@ -32,6 +32,10 @@ An evaluation job (S11) asks the runtime assessor for a draft evaluation of one
 observed attempt; it is queued only by a subject with the ``ASSESSOR`` role
 (403 otherwise), and the draft is a pending proposal for a person with
 assessment authority to decide.
+
+A learner's question (S12) is a job of the Learner API: this module neither
+lists nor reads it, so the staff never see a learner's question or its answer
+here (404).
 """
 
 from __future__ import annotations
@@ -51,6 +55,7 @@ from services.api_common.contexts import READ_ERRORS, WRITE_ERRORS, context_read
 from services.api_common.errors import stream_error_responses
 from services.api_common.registry import ApiModule
 from services.jobs.kinds import AssessmentJob, EvaluationJob, JobCommand, TeacherJob, TrainerJob, unaccepted_sources
+from services.jobs.learner import LEARNER_REQUEST
 from services.jobs.store import ENDED, JobRecord, JobStatus, JobStore, StatusEvent
 
 
@@ -122,7 +127,7 @@ def _jobs(request: Request) -> JobStore:
 
 def _job(jobs: JobStore, context_id: str, request_id: str) -> JobRecord:
     job = jobs.get(context_id, request_id)
-    if job is None:
+    if job is None or job.kind == LEARNER_REQUEST:
         raise HTTPException(404, 'Job not found')
     return job
 
@@ -166,7 +171,7 @@ def listing(context_id: str, request: Request, limit: int = Query(50, ge=1, le=2
     with open_context(request, context_id) as service:
         service.authorize_jobs(context_id, principal.subject_key)
     with _jobs(request) as jobs:
-        return JobList(jobs=tuple(_view(job, jobs) for job in jobs.list(context_id, limit)))
+        return JobList(jobs=tuple(_view(job, jobs) for job in jobs.list(context_id, limit, excluded_kinds=(LEARNER_REQUEST,))))
 
 
 @router.get('/contexts/{context_id}/jobs/{request_id}', response_model=JobView, responses=READ_ERRORS,

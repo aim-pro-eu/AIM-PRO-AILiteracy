@@ -14,12 +14,14 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from learning.learner import LearnerCourse
+from learning.store import LearningStore
 from services.api_common.registry import ConfigurationError
 from services.api_common.settings import ApiSettings
 from services.authoring_api.app import create_app as authoring_app
 from services.learner_api.app import REGISTRY, create_app
 from tests.authoring_cycle_fixtures import AUTH, DELIVERY, DELIVERY_TWO
 from tests.services.course_fixtures import module_settings
+from tests.services.job_fixtures import new_jobs_location
 from tests.services.oidc_fixtures import (ISSUER, MAPPED_SUBJECT, NO_NETWORK, FakeProvider, auth_settings, log_in,
                                           write_identity_map)
 from tests.store_backends import block_network, on_both_backends
@@ -39,7 +41,8 @@ class LearnerApiTest(unittest.TestCase):
         identities = write_identity_map(self.seed.root, *({'issuer': ISSUER, 'subject': subject, 'subject_key': key}
                                                           for key, subject in SUBJECTS.items()))
         self.settings = ApiSettings(auth=auth_settings(), identity_map=identities, store=str(self.seed.location),
-                                    policy_dir=self.seed.output / self.seed.manifest.policy_dir)
+                                    policy_dir=self.seed.output / self.seed.manifest.policy_dir,
+                                    jobs_store=str(new_jobs_location(self, str(self.seed.root))))
         self.app = create_app(self.settings, transport=self.provider.transport)
         self.clients = {key: self.signed_in(self.app, subject) for key, subject in SUBJECTS.items()}
 
@@ -58,9 +61,11 @@ class LearnerApiTest(unittest.TestCase):
     def endpoints(self, context_id=DELIVERY):
         return ['/courses', f'/courses/{context_id}', f'/courses/{context_id}/progress']
 
-    def test_every_route_is_a_read_and_the_tests_cover_each_one(self):
+    def test_every_read_route_is_covered_here(self):
+        # The writes (attempts and questions) and the question reads are covered in test_learner_writes.
         routes = {(method, path) for path, methods in self.app.openapi()['paths'].items()
-                  for method in methods if not path.startswith(('/auth', '/health'))}
+                  for method in methods if not path.startswith(('/auth', '/health', '/courses/{context_id}/questions'))
+                  and method == 'get'}
         self.assertEqual(routes, {('get', '/courses'), ('get', '/courses/{context_id}'),
                                   ('get', '/courses/{context_id}/progress')})
         self.assertEqual(len(self.endpoints()), len(routes))
@@ -142,7 +147,7 @@ class LearnerConfigurationTest(unittest.TestCase):
         self.identities = write_identity_map(self.root)
 
     def test_the_learner_modules_are_registered(self):
-        self.assertEqual(REGISTRY.names, ('courses', 'progress'))
+        self.assertEqual(REGISTRY.names, ('courses', 'progress', 'attempts', 'questions'))
 
     def test_learner_modules_need_a_store_and_a_policy_directory(self):
         settings = ApiSettings(auth=auth_settings(), identity_map=self.identities)
@@ -150,6 +155,17 @@ class LearnerConfigurationTest(unittest.TestCase):
             create_app(settings, transport=FakeProvider().transport)
         identity_only = create_app(settings.model_copy(update={'modules': ()}), transport=FakeProvider().transport)
         self.assertEqual(TestClient(identity_only).get('/courses').status_code, 404)
+
+    def test_the_questions_module_needs_a_jobs_store(self):
+        store = self.root / 'alm.sqlite'
+        LearningStore(store).close()
+        settings = ApiSettings(auth=auth_settings(), identity_map=self.identities, store=str(store),
+                               policy_dir=self.root)
+        with self.assertRaisesRegex(ConfigurationError, 'ALM_JOBS_STORE'):
+            create_app(settings, transport=FakeProvider().transport)
+        reads = create_app(settings.model_copy(update={'modules': ('courses', 'progress', 'attempts')}),
+                           transport=FakeProvider().transport)
+        self.assertEqual(TestClient(reads).get(f'/courses/{DELIVERY}/questions').status_code, 404)
 
 
 if __name__ == '__main__':

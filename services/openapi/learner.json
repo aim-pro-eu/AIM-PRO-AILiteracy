@@ -75,6 +75,57 @@
         "title": "Activity",
         "type": "object"
       },
+      "Answer": {
+        "additionalProperties": false,
+        "description": "The response to a learner's question as the learner reads it: never a proposal, a decision or a state.",
+        "properties": {
+          "citations": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Citation"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
+          "content": {
+            "minLength": 1,
+            "title": "Content",
+            "type": "string"
+          },
+          "coverage": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/EntityRef"
+            },
+            "title": "Coverage",
+            "type": "array"
+          },
+          "findings": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Finding"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "kind": {
+            "enum": [
+              "ANSWER",
+              "CLARIFICATION",
+              "PARTIAL_RESULT",
+              "FAILURE"
+            ],
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "content"
+        ],
+        "title": "Answer",
+        "type": "object"
+      },
       "Assessment": {
         "additionalProperties": false,
         "description": "An assessment as the learner sees it (D20): never its answer key.",
@@ -131,6 +182,64 @@
           "accepted_evidence"
         ],
         "title": "Assessment",
+        "type": "object"
+      },
+      "AttemptSubmission": {
+        "additionalProperties": false,
+        "description": "The learner's attempt at one activity, under the learner's own request id.",
+        "properties": {
+          "activity": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "content": {
+            "minLength": 1,
+            "title": "Content",
+            "type": "string"
+          },
+          "request_id": {
+            "description": "The learner's own request id",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "activity",
+          "content"
+        ],
+        "title": "AttemptSubmission",
+        "type": "object"
+      },
+      "Citation": {
+        "additionalProperties": false,
+        "properties": {
+          "locator": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locator"
+          },
+          "source": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "supportedClaim": {
+            "minLength": 1,
+            "title": "Supportedclaim",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "supportedClaim"
+        ],
+        "title": "Citation",
         "type": "object"
       },
       "Competence": {
@@ -400,6 +509,49 @@
           "observed_at"
         ],
         "title": "Evidence",
+        "type": "object"
+      },
+      "Finding": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "minLength": 1,
+            "title": "Code",
+            "type": "string"
+          },
+          "reason": {
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "resolution": {
+            "default": "Correct the data or provide the required configuration.",
+            "minLength": 1,
+            "title": "Resolution",
+            "type": "string"
+          },
+          "severity": {
+            "default": "BLOCKING",
+            "enum": [
+              "BLOCKING",
+              "WARNING",
+              "INFORMATION"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "target": {
+            "minLength": 1,
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "target",
+          "reason"
+        ],
+        "title": "Finding",
         "type": "object"
       },
       "HealthView": {
@@ -796,6 +948,166 @@
         "title": "OwnProgress",
         "type": "object"
       },
+      "Question": {
+        "additionalProperties": false,
+        "description": "A learner's question: to the Teacher (``EXPLAIN``) or to the Socratic coach (``SOCRATIC_GUIDANCE``).\n\nThe coach follows Socratic option b: its worker may read sources that hold the solution, and only what it\nreturns is judged. A problem stays with the coach until the learner switches from it explicitly.",
+        "properties": {
+          "activities": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/EntityRef"
+            },
+            "title": "Activities",
+            "type": "array"
+          },
+          "intent": {
+            "default": "EXPLAIN",
+            "enum": [
+              "EXPLAIN",
+              "SOCRATIC_GUIDANCE"
+            ],
+            "title": "Intent",
+            "type": "string"
+          },
+          "problem_key": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Problem Key"
+          },
+          "switch_from_socratic": {
+            "default": false,
+            "title": "Switch From Socratic",
+            "type": "boolean"
+          },
+          "text": {
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "Question",
+        "type": "object"
+      },
+      "QuestionList": {
+        "additionalProperties": false,
+        "description": "The learner's own questions in a course, newest first.",
+        "properties": {
+          "questions": {
+            "items": {
+              "$ref": "#/components/schemas/QuestionView"
+            },
+            "title": "Questions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "questions"
+        ],
+        "title": "QuestionList",
+        "type": "object"
+      },
+      "QuestionRequest": {
+        "additionalProperties": false,
+        "description": "A question under the learner's own request id.",
+        "properties": {
+          "question": {
+            "$ref": "#/components/schemas/Question"
+          },
+          "request_id": {
+            "description": "The learner's own request id",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "question"
+        ],
+        "title": "QuestionRequest",
+        "type": "object"
+      },
+      "QuestionView": {
+        "additionalProperties": false,
+        "description": "A learner's question: its status and, once its run has ended, the response or the reason it has none.",
+        "properties": {
+          "created": {
+            "minLength": 1,
+            "title": "Created",
+            "type": "string"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "question": {
+            "$ref": "#/components/schemas/Question"
+          },
+          "request_id": {
+            "minLength": 1,
+            "title": "Request Id",
+            "type": "string"
+          },
+          "response": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Answer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "PROPOSED",
+              "REJECTED",
+              "FAILED",
+              "ABANDONED",
+              "COMPLETED",
+              "AWAITING_CHOICE",
+              "ACCEPTED",
+              "DECLINED"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "updated": {
+            "minLength": 1,
+            "title": "Updated",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "question",
+          "status",
+          "created",
+          "updated"
+        ],
+        "title": "QuestionView",
+        "type": "object"
+      },
       "Rubric": {
         "additionalProperties": false,
         "properties": {
@@ -983,7 +1295,7 @@
   },
   "info": {
     "title": "ALM Learner API",
-    "version": "0.1.0"
+    "version": "0.2.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -1400,6 +1712,108 @@
         ]
       }
     },
+    "/courses/{context_id}/attempts": {
+      "post": {
+        "operationId": "submit_courses__context_id__attempts_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "context_id",
+            "required": true,
+            "schema": {
+              "title": "Context Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttemptSubmission"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Evidence"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not authorized, unmapped identity or missing CSRF token"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not found, or the context is unavailable"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Conflict with the current state; reload and retry"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Invalid request or data"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal error"
+          }
+        },
+        "summary": "Submit the learner's attempt; the same request id and attempt return the same evidence, another attempt 409",
+        "tags": [
+          "attempts"
+        ]
+      }
+    },
     "/courses/{context_id}/progress": {
       "get": {
         "operationId": "progress_courses__context_id__progress_get",
@@ -1489,6 +1903,311 @@
         "summary": "The learner's own attempts, evidence, applied evaluations and learning states",
         "tags": [
           "progress"
+        ]
+      }
+    },
+    "/courses/{context_id}/questions": {
+      "get": {
+        "operationId": "listing_courses__context_id__questions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "context_id",
+            "required": true,
+            "schema": {
+              "title": "Context Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not authorized, unmapped identity or missing CSRF token"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not found, or the context is unavailable"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Conflict with the current state; reload and retry"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Invalid request or data"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal error"
+          }
+        },
+        "summary": "The learner's own questions in the course, newest first, with their status",
+        "tags": [
+          "questions"
+        ]
+      },
+      "post": {
+        "operationId": "ask_courses__context_id__questions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "context_id",
+            "required": true,
+            "schema": {
+              "title": "Context Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuestionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not authorized, unmapped identity or missing CSRF token"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not found, or the context is unavailable"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Conflict with the current state; reload and retry"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Invalid request or data"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal error"
+          }
+        },
+        "summary": "Ask the Teacher or the Socratic coach; the same request id and question return the same job, another question 409",
+        "tags": [
+          "questions"
+        ]
+      }
+    },
+    "/courses/{context_id}/questions/{request_id}": {
+      "get": {
+        "operationId": "read_courses__context_id__questions__request_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "context_id",
+            "required": true,
+            "schema": {
+              "title": "Context Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not authorized, unmapped identity or missing CSRF token"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not found, or the context is unavailable"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Conflict with the current state; reload and retry"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Invalid request or data"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal error"
+          }
+        },
+        "summary": "One of the learner's own questions with its status and, once answered, the response",
+        "tags": [
+          "questions"
         ]
       }
     },

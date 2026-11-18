@@ -256,6 +256,29 @@ class ServiceTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             service.request(request.model_copy(update={'text':'Different payload'}))
 
+    def test_a_run_writes_only_its_plan_tasks_and_results(self):
+        # A learner request never persists an Evaluation or any other record (S12): only the run's own are written.
+        from smoke import prepare_demo
+        topic=record('Topic','run-topic',{'name':'Probe','definition':'Synthetic'})
+        engine=Mock(last_records=(topic,),last_proposals=[])
+        engine.run.return_value=LearningResponse(kind='ANSWER',content='Synthetic')
+        service=prepare_demo(self.store,lambda:engine)
+        root=self.store.read_context('demo')
+        before=self.store.table_digests()
+        response=service.request(LearningRequest(request_id='run-records',context_ref=root.ref,subject_key='learner',text='Probe'))
+        self.assertEqual(response.kind,'FAILURE')
+        self.assertEqual({name for name, digest in self.store.table_digests().items() if digest!=before[name]},{'requests'})
+
+    def test_the_orchestrator_factory_may_be_given_per_request(self):
+        from smoke import prepare_demo
+        engine=Mock(last_records=(),last_proposals=[])
+        engine.run.return_value=LearningResponse(kind='ANSWER',content='Synthetic')
+        service=prepare_demo(self.store,Mock(side_effect=AssertionError('The service factory is not used')))
+        root=self.store.read_context('demo')
+        response=service.request(LearningRequest(request_id='given',context_ref=root.ref,subject_key='learner',text='Probe'),
+                                 orchestrator_factory=lambda:engine)
+        self.assertEqual(response.kind,'ANSWER')
+
     def test_cleanup_failure_preserves_terminal_result_and_replay(self):
         from smoke import prepare_demo
         engine=Mock(last_records=(),last_proposals=())

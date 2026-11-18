@@ -17,6 +17,8 @@ from learning.validation import validate_snapshot, check_readiness
 
 
 ABANDONED_CONTENT = 'Request abandoned by an administrator.'
+# What a run of the learning agents records besides proposals; never an Evaluation or a learner's state (S12).
+RUN_RECORDS = frozenset({'TaskPlan', 'WorkerTask', 'TaskResult'})
 
 
 class LearningService:
@@ -103,6 +105,29 @@ class LearningService:
 
     def submit(self, context_id, subject_key, activity, content, request_id):
         return record_attempt(self.store, self._context(context_id, subject_key), activity, content, request_id=request_id)
+
+    def submit_attempt(self, context_id, subject_key, activity, content, *, request_id):
+        """A learner's attempt through the Learner API (S12), under the learner's own request id."""
+        from learning.learner import submit_attempt
+        return submit_attempt(self.store, self._context(context_id, subject_key), activity, content, request_id)
+
+    def authorize_learner_requests(self, context_id, subject_key):
+        """Check that the subject may ask questions here as a learner of an active course; records nothing."""
+        from learning.learner import learner_context
+        context = learner_context(self._context(context_id, subject_key))
+        authorize(self.policy, subject_key, 'interact', context.snapshot.context.ref)
+
+    def ask(self, context_id, subject_key, question, *, request_id, orchestrator_factory):
+        """A learner's question, run as :meth:`request` with ``orchestrator_factory`` (the learner request job, S12)."""
+        from learning.learner import question_request
+        request = question_request(self._context(context_id, subject_key), question, request_id)
+        return self.request(request, orchestrator_factory=orchestrator_factory)
+
+    def learner_answer(self, context_id, subject_key, request_id):
+        """The recorded response to the learner's own question under ``request_id``, or ``None``."""
+        from learning.learner import own_answer
+        with self.store.read_transaction():
+            return own_answer(self.store, self._context(context_id, subject_key), request_id)
 
     def generate_aimpro(self, context_id, subject_key, project, *, request_id, lead_factory,
                         scenario='SCN01', competencies='elena_usecase_competencies', root_id=None,
@@ -396,7 +421,12 @@ class LearningService:
         return {'context':entity_data(root), 'entities':visible,
                 'findings':[f.model_dump() for f in context.snapshot.findings]}
 
-    def request(self, request):
+    def request(self, request, *, orchestrator_factory=None):
+        """Run the request with the learning agents; ``orchestrator_factory`` replaces the service's own.
+
+        Only the run's own records (:data:`RUN_RECORDS`) and its proposals are written; a run handing back any
+        other record fails and writes nothing but its failure.
+        """
         context = self._context(request.context_ref.id, request.subject_key, request)
         authorize(self.policy, request.subject_key, 'interact', request.context_ref)
         payload = canonical(request.model_dump(mode='json'))
@@ -441,8 +471,10 @@ class LearningService:
             return LearningResponse.model_validate(cached)
         orchestrator = None
         try:
-            orchestrator = self.orchestrator_factory()
+            orchestrator = (orchestrator_factory or self.orchestrator_factory)()
             response = orchestrator.run(request, context=context)
+            if any(record.type not in RUN_RECORDS for record in orchestrator.last_records):
+                raise ValueError('A run records only its plan, tasks and results')
             proposals = []
             for task_ref, proposed in (orchestrator.last_proposals if response.kind != 'FAILURE' else ()):
                 candidates = tuple(candidate.model_copy(update={'provenance':candidate.provenance.model_copy(update={

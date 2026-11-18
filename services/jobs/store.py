@@ -203,13 +203,29 @@ class JobStore:
             row = self._row(context_id, request_id)
         return None if row is None else self._record(row)
 
-    def list(self, context_id: str, limit: int = 50) -> tuple[JobRecord, ...]:
-        """The jobs of a context, newest first, at most ``limit``."""
+    def list(self, context_id: str, limit: int = 50, *, subject_key: str | None = None,
+             kinds: tuple[str, ...] | None = None, excluded_kinds: tuple[str, ...] = ()) -> tuple[JobRecord, ...]:
+        """The jobs of a context, newest first, at most ``limit``.
+
+        Only the jobs of ``subject_key`` and of ``kinds`` when given, never those of ``excluded_kinds``.
+        """
         if not 1 <= limit <= 200:
             raise ValueError('Invalid job list limit')
+        where, parameters = ['context_id=?'], [context_id]
+        if subject_key is not None:
+            where.append('subject_key=?')
+            parameters.append(subject_key)
+        if kinds is not None:
+            if not kinds:
+                return ()
+            where.append(f"kind IN ({','.join('?' * len(kinds))})")
+            parameters.extend(kinds)
+        if excluded_kinds:
+            where.append(f"kind NOT IN ({','.join('?' * len(excluded_kinds))})")
+            parameters.extend(excluded_kinds)
         with self._lock:
-            rows = self._execute(f'SELECT {_COLUMNS} FROM {{p}}jobs WHERE context_id=? ORDER BY seq DESC LIMIT ?',
-                                 (context_id, limit)).fetchall()
+            rows = self._execute(f"SELECT {_COLUMNS} FROM {{p}}jobs WHERE {' AND '.join(where)} "
+                                 'ORDER BY seq DESC LIMIT ?', (*parameters, limit)).fetchall()
         return tuple(self._record(row) for row in rows)
 
     def claim(self) -> JobRecord | None:

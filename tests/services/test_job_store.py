@@ -189,6 +189,21 @@ class JobStoreTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.jobs.list('c1', limit=0)
 
+    def test_the_list_keeps_one_subjects_jobs_or_some_kinds(self):
+        other = {**COMMAND, 'kind': 'learner-request'}
+        self.submit('r1')
+        self.submit('r2', subject='learner', command=other)
+        self.submit('r3', subject='learner')
+        self.submit('r4', subject='learner-2', command=other)
+        ids = lambda **kwargs: [j.request_id for j in self.jobs.list('c1', **kwargs)]
+        self.assertEqual(ids(subject_key='learner'), ['r3', 'r2'])
+        self.assertEqual(ids(kinds=('learner-request',)), ['r4', 'r2'])
+        self.assertEqual(ids(subject_key='learner', kinds=('learner-request',)), ['r2'])
+        self.assertEqual(ids(kinds=(COMMAND['kind'],), limit=1), ['r3'])
+        self.assertEqual(ids(kinds=()), [])
+        self.assertEqual(ids(excluded_kinds=('learner-request',)), ['r3', 'r1'])
+        self.assertEqual(ids(subject_key='learner', excluded_kinds=('learner-request',)), ['r3'])
+
     def test_a_transition_refuses_unknown_statuses_and_jobs(self):
         self.submit()
         with self.assertRaises(ValueError):
