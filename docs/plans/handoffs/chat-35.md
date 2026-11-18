@@ -101,7 +101,7 @@ two-member test proposes `learner` as Observer.
 | `services/openapi/authoring.json`, `apps/packages/api-client/src/generated/authoring.ts` | generated |
 | `tests/seed.py` | the seed opens its delivery (`open_delivery`) |
 | `apps/studio/src/features/members/*`, `course-build/buildApi.ts`, `review/model.ts`, `review/teacher.ts`, `review/TeacherView.tsx`, `home/HomePage.tsx`, `shell/StudioShell.tsx`, `i18n/en.json`; `session/UnmappedPage.tsx` removed; `apps/packages/auth/src/*` | the studio |
-| `apps/e2e/stack/api.mjs`, `paths.mjs`, `apps/e2e/enrolment.spec.ts` (new), `apps/e2e/assessment.spec.ts` | the browser tests |
+| `apps/e2e/stack/api.mjs`, `paths.mjs`, `apps/e2e/enrolment.spec.ts` (new), `apps/e2e/assessment.spec.ts`, `teacher-views.spec.ts` | the browser tests |
 | `infra/keycloak/alm-dev-realm.json` | client `alm-learner-api` |
 | `.github/workflows/aimpro-contracts.yml` | the enrolment test modules in CI |
 | `tests/test_enrolment.py` | students added (5 tests, with PostgreSQL variants), added before activation, not before opening; the seed built without opening |
@@ -113,7 +113,9 @@ two-member test proposes `learner` as Observer.
 
 Order of work: the contract tests were written first and failed (the missing endpoint, `open_delivery`, the missing
 section and strings); then the implementation. The first full run found the boundary probe opening the delivery the
-seed had already opened.
+seed had already opened. The first CI run of the PR failed two browser tests this chat had not updated:
+`teacher-views.spec.ts` (the seed's titles now include "Open the course to students") and the S11b test of
+`assessment.spec.ts` (it still proposed `learner` as Student); both fixed in a second commit.
 
 ## Verification
 

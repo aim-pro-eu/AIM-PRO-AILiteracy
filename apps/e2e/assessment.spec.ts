@@ -108,23 +108,23 @@ test('an assessor added from the studio evaluates the seeded attempt with the ru
 });
 
 // Acceptance (S11b, issue #138, D36): one membership proposal adds several members in one new policy version; the
-// review names each of them, and once applied both are members of the course.
+// review names each of them, and once applied both are members of the course. Students are not proposed (S12b, D37).
 test('an administrator adds two members to a new course in one proposal', async ({ page }) => {
   await newCourse(page, 'class-course');
   await page.goto('/studio/contexts/class-course/members');
   await page.getByLabel(en.members.add.role.replace('{{subject}}', 'assessor')).selectOption('ASSESSOR');
-  await page.getByLabel(en.members.add.role.replace('{{subject}}', 'learner')).selectOption('LEARNER');
+  await page.getByLabel(en.members.add.role.replace('{{subject}}', 'learner')).selectOption('OBSERVER');
   await page.getByRole('button', { name: en.members.add.submit_other }).click();
-  await expect(page.getByText('Proposed: assessor as Assessor; learner as Student.', { exact: false })).toBeVisible();
+  await expect(page.getByText('Proposed: assessor as Assessor; learner as Observer (read only).', { exact: false })).toBeVisible();
   await page.getByRole('link', { name: en.members.add.review }).click();
   await expect(page.getByRole('heading', { name: en.review.teacher.membership.heading_other })).toBeVisible();
   await expect(page.getByText('assessor joins this course as Assessor.')).toBeVisible();
-  await expect(page.getByText('learner joins this course as Student.')).toBeVisible();
+  await expect(page.getByText('learner joins this course as Observer (read only).')).toBeVisible();
   await expectAccessible(page);
   await approveAndApply(page);
   await page.goto('/studio/contexts/class-course/members');
   await expect(page.getByTestId('course-members').getByRole('listitem')).toHaveText([
-    'admin: Administrator, Teacher (content responsible)', 'assessor: Assessor', 'learner: Student']);
+    'admin: Administrator, Teacher (content responsible)', 'assessor: Assessor', 'learner: Observer (read only)']);
   await expect(section(page, en.members.pending.heading)).toHaveCount(0);
   await expect(page.getByText(en.members.add.nobody)).toBeVisible();
 });
