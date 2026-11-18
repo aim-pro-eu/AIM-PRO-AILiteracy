@@ -14,18 +14,64 @@ conditions, accepted evidence and rubric, never its answer key. Progress holds
 the learner's own occurrences, evidence, applied evaluations and learning
 states, never another learner's record or a pending evaluation draft. Reading
 writes nothing.
+
+A learner writes two things (S12 part 2): an attempt at an activity
+(:func:`submit_attempt`) and a question to the Teacher or the Socratic coach
+(:func:`question_request`, run by the job worker). Both are recorded under the
+learner's own request id, scoped by subject (:func:`learner_request_id`), so
+two learners never share one. Neither proposes, decides, applies or records an
+evaluation.
 """
 
 from __future__ import annotations
 
-from typing import Callable, Iterable
+import json
+import re
+from typing import Annotated, Callable, Iterable, Literal
 
-from learning.contracts import Entity, EntityRef, Record, Text
+from pydantic import Field
+
+from learning.assessment import record_attempt
+from learning.context import LearningRequest
+from learning.contracts import Entity, EntityRef, Finding, Record, Text
 from learning.decisions import approval_valid
+from learning.outputs import Citation
 from learning.policies import AuthorizationError, TrustedPolicy, authorize, scope_allows
 
 
 LEARNER = 'LEARNER'
+REQUEST_ID = r'[A-Za-z0-9][A-Za-z0-9._-]{0,63}'
+ClientRequestId = Annotated[str, Field(pattern=f'^{REQUEST_ID}$', description="The learner's own request id")]
+
+
+def learner_request_id(subject_key: str, request_id: str) -> str:
+    """The ALM request id of a learner's own request id: scoped by subject, so two learners never share one.
+
+    A learner's own id has no colon, so the subject and the id are read back unambiguously (Chat 32 finding 1).
+    """
+    return f'learner:{subject_key}:{request_id}'
+
+
+class Answer(Record):
+    """The response to a learner's question as the learner reads it: never a proposal, a decision or a state."""
+    kind: Literal['ANSWER', 'CLARIFICATION', 'PARTIAL_RESULT', 'FAILURE']
+    content: Text
+    citations: tuple[Citation, ...] = ()
+    coverage: tuple[EntityRef, ...] = ()
+    findings: tuple[Finding, ...] = ()
+
+
+class Question(Record):
+    """A learner's question: to the Teacher (``EXPLAIN``) or to the Socratic coach (``SOCRATIC_GUIDANCE``).
+
+    The coach follows Socratic option b: its worker may read sources that hold the solution, and only what it
+    returns is judged. A problem stays with the coach until the learner switches from it explicitly.
+    """
+    text: Text
+    intent: Literal['EXPLAIN', 'SOCRATIC_GUIDANCE'] = 'EXPLAIN'
+    problem_key: Text | None = None
+    switch_from_socratic: bool = False
+    activities: tuple[EntityRef, ...] = ()
 
 
 class LearnerCourse(Record):
@@ -321,6 +367,13 @@ def course_view(context) -> CourseView:
                           for a in assessments.values()))
 
 
+def _evidence(entity: Entity) -> Evidence:
+    return Evidence(ref=entity.ref, activity=EntityRef.model_validate(entity.fields['activity']),
+                    occurrence=EntityRef.model_validate(entity.fields['occurrence']),
+                    outcomes=_refs(entity.fields['outcomes']), kind=entity.fields['kind'],
+                    content_or_locator=entity.fields['contentOrLocator'], observed_at=entity.fields['observedAt'])
+
+
 def own_progress(store, context) -> OwnProgress:
     """The learner's own occurrences, evidence, applied evaluations and learning states in ``context``."""
     learner_context(context)
@@ -347,11 +400,7 @@ def own_progress(store, context) -> OwnProgress:
                                      if o.fields.get('processNode') else None,
                                      status=o.fields['status'], evidence=_refs(o.fields['evidence']))
                           for o in occurrences),
-        evidence=tuple(Evidence(ref=e.ref, activity=EntityRef.model_validate(e.fields['activity']),
-                                occurrence=EntityRef.model_validate(e.fields['occurrence']),
-                                outcomes=_refs(e.fields['outcomes']), kind=e.fields['kind'],
-                                content_or_locator=e.fields['contentOrLocator'], observed_at=e.fields['observedAt'])
-                       for e in evidence),
+        evidence=tuple(_evidence(e) for e in evidence),
         evaluations=tuple(Evaluation(ref=e.ref, assessment=EntityRef.model_validate(e.fields['specification']),
                                      mode=e.fields['mode'], evidence=_refs(e.fields['evidence']),
                                      judgments=tuple(Judgment(criterion_key=j['criterionKey'], level_key=j.get('levelKey'),
@@ -363,3 +412,46 @@ def own_progress(store, context) -> OwnProgress:
                                             progress=s.fields['progress'], verification=s.fields['verification'],
                                             basis=_refs(s.fields['basis']))
                               for s in states))
+
+
+def submit_attempt(store, context, activity, content: str, request_id: str) -> Evidence:
+    """The learner's attempt at an activity of the course, recorded once under their own ``request_id``.
+
+    The same id and attempt again return the same evidence; another attempt under that id is a conflict.
+    """
+    learner_context(context)
+    subject = context.request.subject_key
+    return _evidence(record_attempt(store, context, activity, content,
+                                    request_id=learner_request_id(subject, request_id)))
+
+
+def _own_request_id(subject_key: str, request_id: str) -> bool:
+    prefix = learner_request_id(subject_key, '')
+    return request_id.startswith(prefix) and re.fullmatch(REQUEST_ID, request_id[len(prefix):]) is not None
+
+
+def question_request(context, question: Question, request_id: str) -> LearningRequest:
+    """The ALM request of a learner's question; ``request_id`` is already the learner's scoped id."""
+    learner_context(context)
+    subject, root = context.request.subject_key, context.snapshot.context
+    authorize(context.policy, subject, 'interact', root.ref)
+    if not _own_request_id(subject, request_id):
+        raise ValueError("The request id is not the learner's own")
+    return LearningRequest(request_id=request_id, context_ref=root.ref, subject_key=subject, text=question.text,
+                           activity_refs=question.activities, intent=question.intent, problem_key=question.problem_key,
+                           switch_from_socratic=question.switch_from_socratic)
+
+
+def own_answer(store, context, request_id: str) -> Answer | None:
+    """The recorded response to the learner's own request under the scoped ``request_id``, or ``None``.
+
+    A learner never proposes, so a recorded response is never a proposal; its kind is checked all the same.
+    """
+    learner_context(context)
+    subject = context.request.subject_key
+    record = store.request_record(request_id, context.snapshot.context.id)
+    if (not _own_request_id(subject, request_id) or record is None or record.result is None
+            or json.loads(record.payload).get('subject_key') != subject):
+        return None
+    response = json.loads(record.result)
+    return Answer.model_validate({key: response[key] for key in Answer.model_fields if key in response})

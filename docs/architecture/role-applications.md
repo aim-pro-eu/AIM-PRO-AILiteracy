@@ -13,7 +13,7 @@ shell that signs in through the API (see [Front-end workspace](#front-end-worksp
 studio review inbox, milestone M1 (see [Studio review inbox](#studio-review-inbox-s07)), and S07b a
 read-only course overview (see [Studio course overview](#studio-course-overview-s07b)). S08 adds the agent job worker, its
 jobs store and the `jobs` module (see [Agent jobs](#agent-jobs)). S12 adds the Learner API, a separate process (see
-[Learner API](#learner-api-s12-part-1)). ALM remains the reference model. Nothing here changes
+[Learner API](#learner-api-s12)). ALM remains the reference model. Nothing here changes
 the ALM metamodel, the store schema or an AIM-PRO/jjodel export.
 
 ## Processes
@@ -31,7 +31,7 @@ flowchart LR
 | Process | Owns | Not allowed |
 | --- | --- | --- |
 | Authoring API (`services/authoring_api`) | staff sessions; projects, proposals, decisions, sources (from S05) | model credentials; direct store or decision internals |
-| Learner API (`services/learner_api`, S12) | learner sessions; the learner's courses, course view and own progress (part 1); attempts and requests (part 2) | any authoring module (checked by `tests/services/test_learner_boundaries.py`) |
+| Learner API (`services/learner_api`, S12) | learner sessions; the learner's courses, course view and own progress (part 1); attempts and questions, the learner request as a job (part 2) | any authoring module (checked by `tests/services/test_learner_boundaries.py`) |
 | Agent job worker (S08) | model calls, MCP retrieval, generators, orchestrator runs | serving browsers |
 
 `LearningService` and its store own every write. An API process authorizes a
@@ -50,14 +50,17 @@ applies it through the decision endpoints. Job states: `QUEUED`, `RUNNING`,
 `PROPOSED`, `REJECTED`, `FAILED`, `ABANDONED`; source jobs (S09a2, D22) add
 `COMPLETED` (a discovery), `AWAITING_CHOICE` (a preparation: completed,
 awaiting the teacher's choice) and the teacher's choice, `ACCEPTED` or
-`DECLINED`. They propose nothing. Progress events are the
+`DECLINED`. They propose nothing. A learner's question (S12, `learner-request`)
+also ends `COMPLETED` and proposes nothing; it is queued by the Learner API
+only (see [Learner API](#learner-api-s12)). Progress events are the
 content-free events of `agent_system/events.py`. The ALM `request_id` stays the
 idempotency key: a replayed `request_id` returns the same job.
 
 ### Implementation (S08)
 
 `services/jobs` holds the jobs store, the job kinds and the worker; the
-Authoring API imports only the first two.
+Authoring API imports only the first two, the Learner API only the store and
+`services.jobs.learner`, the learner request job.
 
 - **Jobs store** (`services/jobs/store.py`, D14). A SQLite location is a
   database file of its own, refused if it holds the ALM tables; a PostgreSQL
@@ -280,7 +283,7 @@ preview included, stays an operator action.
 | `ALM_API_MODULES` | comma-separated module names; unset selects all |
 | `ALM_STORE` | ALM store: an existing SQLite file or a `postgresql://` URL (kept secret: it may hold a password); required when any authoring or learner module is selected |
 | `ALM_POLICY_DIR` | directory of trusted policy files (D10); required with `ALM_STORE` |
-| `ALM_JOBS_STORE` | jobs store (D14): a SQLite file, created if missing and never the ALM database, or a `postgresql://` URL (schema `jobs`); required when the `jobs` module is selected |
+| `ALM_JOBS_STORE` | jobs store (D14): a SQLite file, created if missing and never the ALM database, or a `postgresql://` URL (schema `jobs`); required when the `jobs` module (Authoring API) or the `questions` module (Learner API) is selected |
 | `ALM_API_JOB_POLL_SECONDS`, `ALM_API_JOB_STREAM_SECONDS` | progress stream: seconds between reads (default 1) and lifetime before the client reconnects (default 300) |
 | `ALM_COURSE_TEMPLATE` | course template (S09a): who may create courses and the source scopes of a new course; read on every request, never written; required when the `courses` module is selected |
 | `ALM_AIMPRO_EXPORTS` | directory of uploaded AIM-PRO exports, the one the worker reads; must exist; required when the `exports` module is selected |
@@ -1312,7 +1315,7 @@ decisions 1–8). The core is described in
    The decision and the application are the usual ones; the requester may
    decide.
 
-## Learner API (S12, part 1)
+## Learner API (S12)
 
 Issue #136; owner decisions of 17 November 2026 (D19 for now, D20 and its
 projection, the `show` gap closed here). A separate process,
@@ -1321,15 +1324,21 @@ projection, the `show` gap closed here). A separate process,
 routes, error shape, request ids, policy directory and settings as the Authoring
 API (`ALM_API_MODULES` selects its modules; `ALM_STORE` and `ALM_POLICY_DIR` are
 required with any of them). Its OpenAPI snapshot is
-`services/openapi/learner.json`, checked by the same `--check`. Every route is a
-read: `Cache-Control: no-store`, and the table digests of the store are
-unchanged after each one.
+`services/openapi/learner.json`, checked by the same `--check`; version 0.2.0
+with part 2. Every response is `Cache-Control: no-store`; every read leaves the
+table digests of the store unchanged. The two writes (part 2) need the CSRF
+header, as the Authoring API's writes do; the module `questions` also needs
+`ALM_JOBS_STORE`.
 
 | Module | Route | Response |
 | --- | --- | --- |
 | `courses` | `GET /courses` | `CourseList`: the courses the subject is enrolled in as a learner, each with its context id and the name of its learning design |
 | `courses` | `GET /courses/{context_id}` | `CourseView`: the validated course of the delivery (D20) |
 | `progress` | `GET /courses/{context_id}/progress` | `OwnProgress`: the learner's own records |
+| `attempts` | `POST /courses/{context_id}/attempts` | `Evidence`: the learner's attempt at an activity, recorded once under the learner's own request id |
+| `questions` | `POST /courses/{context_id}/questions` | `QuestionView`: a question to the Teacher or the Socratic coach, queued as a job |
+| `questions` | `GET /courses/{context_id}/questions` | `QuestionList`: the learner's own questions in the course, newest first |
+| `questions` | `GET /courses/{context_id}/questions/{request_id}` | `QuestionView`: one of them, with the response once its run has ended |
 
 - **My courses (D19).** `learning.learner.enrolled_courses` is the one source
   of the list, reached through `ContextServices.enrolled`: the LEARNING contexts
@@ -1357,19 +1366,68 @@ unchanged after each one.
   record, in a LEARNING/ACTIVE delivery. Anyone else is refused: 403 without the
   role or `read`, 422 "The course is not open to learners" for a draft
   delivery, 404 `context_unavailable` for a missing context or policy.
+- **The learner's own request ids (part 2).** A learner names each attempt and
+  question with an id of their own (`ClientRequestId`: letters, digits, `.`,
+  `_`, `-`, at most 64, no colon). The API records it under
+  `learning.learner.learner_request_id`, `learner:{subject}:{id}`: two
+  learners never share an id, and a learner never learns which ids another
+  learner used (Chat 32 finding 1). The core is unchanged: an attempt's
+  operation id and a request's id are still per context.
+- **Attempt submission (part 2).** `LearningService.submit_attempt` checks the
+  learner as the reads do, then records the attempt through `record_attempt`
+  (`submit` in the policy, an activity of the active model that is ready): an
+  `ActivityOccurrence` and its `LearningEvidence`, observed events. The same id
+  and attempt again return the same evidence and write nothing; another attempt
+  or activity under that id is a 409. Submitting proposes, decides and
+  evaluates nothing. As today (Chat 29 finding 3, decided in S13), a submit
+  changes the context version, so a pending evaluation draft becomes stale when
+  it is applied.
+- **The learner request as a job (part 2).** `POST .../questions` checks that
+  the subject is a learner of the active course with `interact`
+  (`LearningService.authorize_learner_requests`) and queues the job
+  `learner-request` (`services.jobs.learner`) under the learner's scoped id;
+  the same question again returns the same job, another question under that id
+  is a 409. The worker checks the learner again, then runs
+  `LearningService.ask`: `request` with the learner's `Question` (intent
+  `EXPLAIN` for the Teacher or `SOCRATIC_GUIDANCE` for the Socratic coach, the
+  problem key, an explicit switch from the coach) and the learning agents of its
+  `Resources.orchestrator`. The Socratic policy is option b: the coach's worker
+  may read sources holding the solution, and only what it returns is judged; a
+  problem stays with the coach until the learner switches. The job ends
+  `COMPLETED` (an answer or a clarification), `FAILED` or `ABANDONED`;
+  `REJECTED` when the worker refuses it before any agent. The response stays in
+  the ALM store and only its learner reads it, as an `Answer` (kind, content,
+  citations, coverage, findings; never a proposal). When the run ended before
+  anything was recorded (a clarification such as "The problem remains in
+  Socratic mode", or a refusal) the job's `detail` holds the core's fixed text.
+  The job's events carry no question and no answer.
+- **What a learner request never does.** `request` writes only the run's own
+  records (`TaskPlan`, `WorkerTask`, `TaskResult`) besides its proposals; any
+  other record handed back fails the run and nothing but the failure is
+  written, so a learner request never persists an `Evaluation`. A learner holds
+  no `propose`, so a run that proposes fails for a learner and records no
+  proposal.
+- **The Authoring API and learner questions.** Its `jobs` module neither lists
+  nor reads a `learner-request` job (404), so the staff do not see a learner's
+  question or its answer there.
 - **Isolation.** Two learners of the seed's delivery, with their attempts, an
   applied evaluation and a pending draft: each reaches only their own records
   on every Learner API endpoint and on the Authoring API context summary
-  (`tests/services/test_learner_api.py`).
+  (`tests/services/test_learner_api.py`); with the same request ids, each
+  submits and asks only as themselves and reads only their own attempts and
+  questions (`tests/services/test_learner_writes.py`).
 - **Process boundary.** A separate interpreter imports the Learner API and
-  serves every endpoint to a signed-in learner; no authoring module (the
-  Authoring API, the jobs package, the CLI, the authoring, project, release,
-  membership, evaluation and review commands, `aimpro`) and no model client is
-  loaded afterwards (`tests/services/test_learner_boundaries.py`).
-- **Not yet.** Attempt submission and the learner request as a job are S12
-  part 2; the learner app and its typed client are S13. Both APIs name their
-  session cookie `alm_session`, so on one host name they replace each other's
-  session: the learner app (S13) needs its own host name or proxy.
+  serves every endpoint, the two writes included, to a signed-in learner; no
+  authoring module (the Authoring API, the job kinds, the job worker and its
+  process, the CLI, the authoring, project, release, membership, evaluation and
+  review commands, `aimpro`) and no model client is loaded afterwards
+  (`tests/services/test_learner_boundaries.py`). The Learner API imports the
+  jobs store and `services.jobs.learner` only.
+- **Not yet.** The learner app and its typed client are S13. Both APIs name
+  their session cookie `alm_session`, so on one host name they replace each
+  other's session: the learner app (S13) needs its own host name or proxy. A
+  progress stream of a question, and an administrator abandoning a learner's
+  question, are not offered yet.
 
 ## Local identity smoke test
 

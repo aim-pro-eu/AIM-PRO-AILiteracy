@@ -1,10 +1,13 @@
 """Process boundary of the Learner API (S12): no authoring module is importable from it.
 
 A separate interpreter imports the Learner API, builds its app and serves every
-endpoint to a signed-in learner of the seed's active delivery; afterwards no
-authoring module (the Authoring API, the authoring, release and membership
-commands, the generators and their agents, the job worker, the CLI) and no
-model client is loaded. The Learner API's own files import none of them either.
+endpoint to a signed-in learner of the seed's active delivery, the attempt and
+the question included; afterwards no authoring module (the Authoring API, the
+authoring, release and membership commands, the generators and their agents,
+the job kinds and the job worker, the CLI) and no model client is loaded. The
+Learner API's own files import none of them either. It queues a question in the
+jobs store (``services.jobs.store``) as the learner request job of
+``services.jobs.learner``, which imports no generator.
 """
 
 import ast
@@ -23,7 +26,8 @@ from tests.test_learner_reads import LearnerSeed
 
 
 ROOT = Path(__file__).resolve().parents[2]
-AUTHORING = ('services.authoring_api', 'services.jobs', 'learning.__main__', 'learning.authoring',
+AUTHORING = ('services.authoring_api', 'services.jobs.kinds', 'services.jobs.worker', 'services.jobs.__main__',
+             'learning.__main__', 'learning.authoring',
              'learning.projects', 'learning.releases', 'learning.generation', 'learning.membership',
              'learning.evaluation', 'learning.review', 'aimpro', *MODEL_CLIENTS)
 PROBE = '''
@@ -39,12 +43,16 @@ if served:
     from services.api_common.settings import ApiSettings
     from tests.services.oidc_fixtures import FakeProvider, auth_settings, log_in
     provider = FakeProvider()
+    from services.api_common.auth import CSRF_HEADER
     app = create_app(ApiSettings(auth=auth_settings(), identity_map=Path(served['identities']),
-                                 store=served['store'], policy_dir=Path(served['policies'])),
+                                 store=served['store'], policy_dir=Path(served['policies']),
+                                 jobs_store=served['jobs']),
                      transport=provider.transport)
     client = TestClient(app, base_url='https://testserver', follow_redirects=False)
     log_in(client, provider, served['subject'])
-    statuses = {path: client.get(path).status_code for path in served['paths']}
+    csrf = {CSRF_HEADER: client.get('/auth/session').json()['csrf_token']}
+    statuses = {path: client.post(path, json=body, headers=csrf).status_code for path, body in served['posts']}
+    statuses.update({path: client.get(path).status_code for path in served['paths']})
 print(json.dumps({'loaded': sorted(m for m in sys.modules if any(m == r or m.startswith(r + '.') for r in roots)),
                   'statuses': statuses}))
 '''
@@ -69,11 +77,18 @@ class LearnerProcessTest(unittest.TestCase):
         seed.attempts()
         identities = write_identity_map(seed.root, {'issuer': ISSUER, 'subject': 'kc-user-learner',
                                                     'subject_key': 'learner'})
-        paths = ['/courses', f'/courses/{DELIVERY}', f'/courses/{DELIVERY}/progress']
+        with seed.contexts.open(DELIVERY) as service:
+            activity = next(e.ref for e in service._context(DELIVERY, 'learner').snapshot.active_domain()
+                            if e.type == 'ActivityDefinition' and e.fields['intent'] == 'ASSESS')
+        posts = [(f'/courses/{DELIVERY}/attempts', {'request_id': 'attempt-1', 'activity': activity.model_dump(),
+                                                     'content': 'Synthetic attempt'}),
+                 (f'/courses/{DELIVERY}/questions', {'request_id': 'question-1', 'question': {'text': 'Synthetic'}})]
+        paths = ['/courses', f'/courses/{DELIVERY}', f'/courses/{DELIVERY}/progress', f'/courses/{DELIVERY}/questions',
+                 f'/courses/{DELIVERY}/questions/question-1']
         result = probe({'identities': str(identities), 'store': str(seed.location),
                         'policies': str(seed.output / seed.manifest.policy_dir), 'subject': 'kc-user-learner',
-                        'paths': paths})
-        self.assertEqual(result['statuses'], {path: 200 for path in paths})
+                        'jobs': str(seed.root / 'jobs.sqlite'), 'posts': posts, 'paths': paths})
+        self.assertEqual(result['statuses'], {path: 200 for path in [*(p for p, _ in posts), *paths]})
         self.assertEqual(result['loaded'], [])
 
     def test_the_probe_detects_an_authoring_module(self):
@@ -81,8 +96,9 @@ class LearnerProcessTest(unittest.TestCase):
 
     def test_learner_api_files_import_no_authoring_module(self):
         files = sorted((ROOT / 'services' / 'learner_api').glob('*.py'))
-        self.assertTrue({'app.py', 'courses.py', 'progress.py', '__main__.py'} <= {p.name for p in files})
-        for path in files:
+        self.assertTrue({'app.py', 'courses.py', 'progress.py', 'attempts.py', 'questions.py', '__main__.py'}
+                        <= {p.name for p in files})
+        for path in [*files, ROOT / 'services' / 'jobs' / 'learner.py', ROOT / 'services' / 'jobs' / 'store.py']:
             with self.subTest(path.name):
                 found = [name for name in imports(path) if any(name == f or name.startswith(f + '.') for f in AUTHORING)]
                 self.assertEqual(found, [])

@@ -84,13 +84,17 @@ class OpenApiSnapshotTest(unittest.TestCase):
                          ['QUEUED', 'RUNNING', 'PROPOSED', 'REJECTED', 'FAILED', 'ABANDONED', 'COMPLETED',
                           'AWAITING_CHOICE', 'ACCEPTED', 'DECLINED'])
 
-    def test_the_learner_snapshot_lists_the_skeleton_and_the_learner_reads_only(self):
+    def test_the_learner_snapshot_lists_the_skeleton_and_the_learner_endpoints_only(self):
         schema = self.schema('learner.json')
         self.assertEqual(schema['info']['title'], 'ALM Learner API')
         self.assertEqual({path: sorted(methods) for path, methods in schema['paths'].items()},
                          {'/health': ['get'], '/auth/login': ['get'], '/auth/callback': ['get'],
                           '/auth/session': ['get'], '/auth/logout': ['post'], '/courses': ['get'],
-                          '/courses/{context_id}': ['get'], '/courses/{context_id}/progress': ['get']})
+                          '/courses/{context_id}': ['get'], '/courses/{context_id}/progress': ['get'],
+                          '/courses/{context_id}/attempts': ['post'], '/courses/{context_id}/questions': ['get', 'post'],
+                          '/courses/{context_id}/questions/{request_id}': ['get']})
+        self.assertEqual(schema['components']['schemas']['Question']['properties']['intent']['enum'],
+                         ['EXPLAIN', 'SOCRATIC_GUIDANCE'])
 
     def test_no_learner_schema_has_an_answer_key_a_proposal_or_a_decision(self):
         def properties(value):

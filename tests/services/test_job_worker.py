@@ -565,14 +565,15 @@ class KindsTest(unittest.TestCase):
         self.assertEqual(set(KINDS), {'generate-project-assessments', 'generate-project-teacher',
                                       'generate-project-trainer', 'generate-aimpro-syllabus',
                                       'discover-aimpro-syllabus-sources', 'prepare-aimpro-syllabus-sources',
-                                      'revise-aimpro-syllabus', 'propose-evaluation'})
+                                      'revise-aimpro-syllabus', 'propose-evaluation', 'learner-request'})
         base = ['--db', 'x', '--policy', 'p', '--subject', 's', '--context', 'c']
         arguments = {'generate-aimpro-syllabus': ['x', '--source-scope', 's', '--query', 'q'],
                      'discover-aimpro-syllabus-sources': ['--discovery', 'd'],
                      'prepare-aimpro-syllabus-sources': ['x', '--plan', 'p'],
                      'revise-aimpro-syllabus': ['--proposal', 'p'],
                      'propose-evaluation': ['--evidence', 'e', '--mode', 'FORMAL']}
-        for name in KINDS:
+        # A learner's question (S12) is the CLI ``request`` of a learner, queued by the Learner API only.
+        for name in set(KINDS) - {'learner-request'}:
             with self.subTest(name):
                 self.assertEqual(parse_args([*base, name, *arguments.get(name, ['x']), '--request-id', 'r']).command,
                                  name)

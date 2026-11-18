@@ -28,12 +28,13 @@ from services.jobs.worker import Worker
 
 
 def production_resources(exports: Path | None) -> Resources:
-    """The CLI's model and retrieval factories, and the listener that reports provider calls as progress."""
+    """The CLI's model, agent and retrieval factories, and the listener that reports provider calls as progress."""
     from agent_system.events import install_provider_listener
-    from learning.__main__ import _aimpro_authoring, _aimpro_search, _aimpro_search_client, _runtime_assessor
+    from learning.__main__ import (_aimpro_authoring, _aimpro_search, _aimpro_search_client, _orchestrator,
+                                   _runtime_assessor)
     install_provider_listener()
     return Resources(authoring=_aimpro_authoring, search=_aimpro_search, exports=exports,
-                     search_client=_aimpro_search_client, assessor=_runtime_assessor)
+                     search_client=_aimpro_search_client, assessor=_runtime_assessor, orchestrator=_orchestrator)
 
 
 def main(argv=None) -> int:

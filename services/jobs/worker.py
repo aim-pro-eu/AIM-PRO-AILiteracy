@@ -1,12 +1,15 @@
 """The agent job worker: queued jobs run the existing service methods outside HTTP requests.
 
 The worker claims the oldest queued job, opens its context with the trusted
-policy (D10), checks again that the job's subject may propose there, and runs
+policy (D10), checks again that the job's subject may propose there (a
+learner's question: that the subject is a learner of the active course who
+may interact there), and runs
 the job kind inside an ``agent_system.events`` run bound to the job's event
 sink. The outcome is recorded once:
 
 - ``PROPOSED``: the service recorded a pending proposal, linked from the job;
-- ``COMPLETED``: a source discovery recorded the excerpts it found (no proposal);
+- ``COMPLETED``: a source discovery recorded the excerpts it found (no proposal),
+  or the learning agents answered a learner's question (S12);
 - ``AWAITING_CHOICE``: a source preparation recorded its exact excerpts, which
   the teacher accepts or declines (no proposal);
 - ``REJECTED``: the host refused the command before any model (stale base,
@@ -104,7 +107,10 @@ class Worker:
         sink = JobEventSink(self.jobs, job, strict=self.strict_events)
         try:
             with self.contexts.open(job.context_id) as service:
-                service.authorize_jobs(job.context_id, job.subject_key)
+                if kind.authorize is None:
+                    service.authorize_jobs(job.context_id, job.subject_key)
+                else:
+                    kind.authorize(service, job.context_id, job.subject_key)
                 refused = unaccepted_sources(self.jobs, job.context_id, job.subject_key, command)
                 if refused is not None:
                     return 'REJECTED', (), refused
@@ -123,4 +129,4 @@ class Worker:
         except Exception as error:
             logger.error('Job %s did not complete (%s)', job.request_id, type(error).__name__)
             return 'FAILED', (), 'Internal error'
-        return outcome(response)
+        return (kind.outcome or outcome)(response)

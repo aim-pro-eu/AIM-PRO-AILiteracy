@@ -20,6 +20,10 @@ source plan, which then await the teacher's choice.
 The runtime assessor (S11) drafts an evaluation of one observed attempt of an
 active delivery, for a subject with the ``ASSESSOR`` role; the draft is a
 pending proposal that a person with assessment authority decides and applies.
+
+The learner request (S12, ``services.jobs.learner``) runs a learner's question
+with the learning agents; it is queued by the Learner API only, authorized as
+a learner's question (``interact``, never ``propose``) and proposes nothing.
 """
 
 from __future__ import annotations
@@ -34,15 +38,17 @@ from aimpro.generators import GenerationCommand
 from aimpro.source_selection import SourceDiscovery, SourcePlan
 from learning.evaluation import EvaluationCommand
 from learning.contracts import Record, Text
+from services.jobs import learner
 
 
 class Resources(NamedTuple):
-    """What only the worker holds: the model and retrieval factories and the AIM-PRO export directory."""
+    """What only the worker holds: the model, agent and retrieval factories and the AIM-PRO export directory."""
     authoring: Callable[[], Any]
     search: Callable[[], Any] | None
     exports: Path | None
     search_client: Callable[[], Any] | None = None
     assessor: Callable[[], Any] | None = None
+    orchestrator: Callable[[], Any] | None = None
 
 
 class AssessmentJob(Record):
@@ -127,10 +133,16 @@ JobCommand = Annotated[AssessmentJob | TeacherJob | TrainerJob | SyllabusJob | R
 
 
 class JobKind(NamedTuple):
-    """``run(service, context_id, subject_key, request_id, command, resources)`` returns the service's response."""
+    """``run(service, context_id, subject_key, request_id, command, resources)`` returns the service's response.
+
+    ``authorize(service, context_id, subject_key)`` checks the subject before the run, by default the authority
+    to propose; ``outcome`` maps what ``run`` returned to the job's status, by default the worker's mapping.
+    """
     name: str
     command: type[Record]
     run: Callable[..., Any]
+    authorize: Callable[..., None] | None = None
+    outcome: Callable[[Any], tuple] | None = None
 
 
 def _project(method):
@@ -215,4 +227,5 @@ KINDS = {kind.name: kind for kind in (
     JobKind('discover-aimpro-syllabus-sources', DiscoveryJob, _discovery),
     JobKind('prepare-aimpro-syllabus-sources', PreparationJob, _preparation),
     JobKind('propose-evaluation', EvaluationJob, _evaluation),
+    JobKind(learner.LEARNER_REQUEST, learner.LearnerRequestJob, learner.run, learner.authorize, learner.outcome),
 )}

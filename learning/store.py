@@ -512,6 +512,12 @@ class LearningStore:
                                (owner,))
         return tuple(RequestRecord(row["payload"], row["result"]) for row in rows)
 
+    def request_record(self, request_id: str, owner: str) -> RequestRecord | None:
+        """The request reserved under the id, with its result once confirmed; ``None`` when there is none."""
+        row = self.db.execute("SELECT payload,result FROM requests WHERE owner=? AND id=?",
+                              (owner, request_id)).fetchone()
+        return None if row is None else RequestRecord(row["payload"], row["result"])
+
     def request_result(self, request_id: str, owner: str, payload: str) -> dict | None:
         row = self.db.execute("SELECT payload,result FROM requests WHERE owner=? AND id=?",
                               (owner, request_id)).fetchone()
