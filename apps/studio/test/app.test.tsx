@@ -39,8 +39,10 @@ describe('studio shell', () => {
     });
     const button = await screen.findByRole('button', { name: en.session.signOut });
     await act(async () => button.click());
-    expect(requests.at(-1)?.headers.get('X-CSRF-Token')).toBe('csrf-1');
-    expect(navigate).toHaveBeenCalledWith(END_SESSION);
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith(END_SESSION));
+    // The home page's own reads may land after the sign-out, so the sign-out is found by its route.
+    const logout = requests.find((request) => request.method === 'POST' && new URL(request.url).pathname === '/auth/logout');
+    expect(logout?.headers.get('X-CSRF-Token')).toBe('csrf-1');
   });
 
   it('reports a refused sign-out', async () => {
