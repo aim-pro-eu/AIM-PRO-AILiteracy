@@ -9,8 +9,7 @@ export interface Session {
 
 export type SessionRead =
   | { status: 'signed-in'; session: Session }
-  | { status: 'signed-out' }
-  | { status: 'unmapped' };
+  | { status: 'signed-out' };
 
 /** An answer of the API the session flow does not expect. */
 export class SessionError extends Error {
@@ -49,7 +48,6 @@ export function createSessionApi(client: AuthoringClient): SessionApi {
         };
       }
       if (response.status === 401) return { status: 'signed-out' };
-      if (response.status === 403) return { status: 'unmapped' };
       throw new SessionError(response.status);
     },
 

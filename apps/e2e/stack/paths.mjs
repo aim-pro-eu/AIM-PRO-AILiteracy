@@ -23,6 +23,9 @@ export const ASSESSOR_STATE = `${STATE}auth/assessor.json`;
 
 export const STUDIO_URL = 'http://127.0.0.1:58000';
 export const API_PORT = 58001;
+/** The Learner API (S12, S12b): a person outside the identity map signs in there and joins a course with its code. */
+export const LEARNER_API_PORT = 58002;
+export const LEARNER_API_URL = `http://127.0.0.1:${LEARNER_API_PORT}`;
 export const ISSUER = 'http://127.0.0.1:58080/realms/alm-dev';
 
 /** The seed runs no model, but imports agent code: vendor telemetry stays off. */

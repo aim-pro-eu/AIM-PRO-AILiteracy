@@ -6,6 +6,7 @@ import { Link } from 'react-router';
 
 import type { MemberList, MemberRole } from '../course-build/buildApi';
 import { useBuildServices } from '../course-build/BuildServices';
+import { isImportedDelivery } from '../delivery/delivery';
 import { refOf } from '../review/model';
 import { LoadFailure } from '../review/parts';
 import { coursePath, proposalPath } from '../review/paths';
@@ -14,14 +15,16 @@ import type { Inbox } from '../review/reviewApi';
 import { useCsrfToken } from '../review/ReviewServices';
 import { useInbox } from '../review/useInbox';
 import { pendingMemberships, roleKey } from './roles';
+import { StudentsSection } from './StudentsSection';
 
 /** One membership proposal in words: who joins with which role, as far as the studio reads it. */
 type Proposed = { proposal: string; members: string; state: 'awaiting' | 'approved' | 'stale' };
 
 /**
- * The members of a course and new members (D25): people of the sign-in map, each with one role, proposed together
- * in one proposal (D36). The course changes only when the proposal is decided and applied in the review inbox. The
- * membership proposals not applied yet are listed: once one is applied, the others go stale (#133).
+ * The members of a course and new members of its teaching staff (D25): people of the sign-in map, each with one role,
+ * proposed together in one proposal (D36). The course changes only when the proposal is decided and applied in the
+ * review inbox. The membership proposals not applied yet are listed: once one is applied, the others go stale (#133).
+ * Students of a delivery course join with its code or are added at once, with no proposal (D37, S12b).
  */
 function Members({ inbox }: { inbox: Inbox }) {
   const { t } = useTranslation();
@@ -104,6 +107,9 @@ function Members({ inbox }: { inbox: Inbox }) {
           ))}
         </ul>
       </section>
+      {isImportedDelivery(inbox.context) ? (
+        <StudentsSection inbox={inbox} addable={list.addable} onAdded={setList} />
+      ) : null}
       {pending.length > 0 ? (
         <section aria-labelledby={`${id}-pending`}>
           <h2 id={`${id}-pending`}>{t('members.pending.heading')}</h2>
@@ -150,7 +156,7 @@ function Members({ inbox }: { inbox: Inbox }) {
   );
 }
 
-/** The members page of a course: who takes part, with which role, the membership proposals not applied, new members. */
+/** The members page of a course: who takes part, its students, the membership proposals not applied, new staff. */
 export function MembersPage({ contextId }: { contextId: string }) {
   const { t } = useTranslation();
   const { state, reload } = useInbox(contextId);

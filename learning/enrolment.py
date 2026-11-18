@@ -82,6 +82,28 @@ def learner_policy(store, policy: TrustedPolicy, context_id: str, subject_key: s
     return policy
 
 
+def record_learner(store, root, policy: TrustedPolicy, subject_key: str, *, responsible: str, origin: str,
+                   change: str, operation_id: str, precondition=None) -> None:
+    """Record ``subject_key`` as a ``LEARNER`` participant of the context ``root``, under its learner grant in
+    ``policy``: one participant and one state change it causes, so the course version is unchanged (D37).
+
+    :class:`StateConflict` when the context changed since ``root`` was read.
+    """
+    participant = validate_entity(entity_data(make_entity('Participant', f'{root.id}:participant:{subject_key}',
+        {'subjectKey': subject_key, 'roles': [LEARNER], 'learningNeeds': []},
+        version=uuid4().hex, origin=origin, responsible=responsible)), store.contract)
+    updated = root.model_copy(update={'version': uuid4().hex, 'fields': {**root.fields,
+        'participants': [*root.fields['participants'], participant.ref.model_dump()]}})
+    recorded = make_entity('StateChange', f'change-{uuid4().hex}', {
+        'context': root.ref.model_dump(), 'baseVersion': root.version, 'newVersion': updated.version,
+        'cause': participant.ref.model_dump(),
+        'authorizationBasis': canonical({'learnerGrant': policy.policy_ref.model_dump()}),
+        'change': change, 'recordedAt': datetime.now(timezone.utc).isoformat()},
+        origin=origin, responsible=responsible)
+    store.commit_change(recorded, (participant, updated), expected_version=root.version,
+                        operation_id=operation_id, precondition=precondition)
+
+
 def _course(store, policy_of: Callable[[EntityRef], TrustedPolicy | None], context_id: str):
     """The open, active delivery ``context_id`` with its installed policy, or :class:`EnrolmentRefused`."""
     root = store.read_context(context_id)
@@ -121,26 +143,15 @@ def join_course(store, policy_of: Callable[[EntityRef], TrustedPolicy | None], s
             raise StateConflict(f'{subject_key} is already a member of the course')
         if store.operation_result(operation_id, context_id) is not None:
             return course
-        participant = validate_entity(entity_data(make_entity('Participant', f'{context_id}:participant:{subject_key}',
-            {'subjectKey': subject_key, 'roles': [LEARNER], 'learningNeeds': []},
-            version=uuid4().hex, origin='OBSERVED_EVENT', responsible=subject_key)), store.contract)
-        updated = root.model_copy(update={'version': uuid4().hex, 'fields': {**root.fields,
-            'participants': [*root.fields['participants'], participant.ref.model_dump()]}})
-        change = make_entity('StateChange', f'change-{uuid4().hex}', {
-            'context': root.ref.model_dump(), 'baseVersion': root.version, 'newVersion': updated.version,
-            'cause': participant.ref.model_dump(),
-            'authorizationBasis': canonical({'learnerGrant': policy.policy_ref.model_dump()}),
-            'change': f'{subject_key} joined as LEARNER with the course code',
-            'recordedAt': datetime.now(timezone.utc).isoformat()},
-            origin='OBSERVED_EVENT', responsible=subject_key)
 
         def still_open():
             if store.enrolment_context(digest) != context_id:
                 raise EnrolmentRefused(REFUSED)
 
         try:
-            store.commit_change(change, (participant, updated), expected_version=root.version,
-                                operation_id=operation_id, precondition=still_open)
+            record_learner(store, root, policy, subject_key, responsible=subject_key, origin='OBSERVED_EVENT',
+                           change=f'{subject_key} joined as LEARNER with the course code',
+                           operation_id=operation_id, precondition=still_open)
         except StateConflict:
             # Another learner joined, or the course changed, since it was read: read it again.
             if store.read_context(context_id).version == root.version:

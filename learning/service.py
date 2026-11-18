@@ -349,6 +349,11 @@ class LearningService:
         from learning.membership import disable_enrolment_code
         return disable_enrolment_code(self, context_id, subject_key, secret=secret)
 
+    def add_learners(self, context_id, subject_key, command, *, request_id):
+        """Add students to a course open to learners at once (D37, S12b); the course's members."""
+        from learning.membership import add_learners
+        return add_learners(self, context_id, subject_key, command, request_id)
+
     def members(self, context_id, subject_key):
         from learning.membership import course_members
         return course_members(self, context_id, subject_key)

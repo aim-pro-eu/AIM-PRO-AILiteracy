@@ -380,6 +380,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/contexts/{context_id}/learners": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add students to this course at once, under its learner grant; the same subjects again change nothing */
+        post: operations["add_learners_contexts__context_id__learners_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/contexts/{context_id}/members": {
         parameters: {
             query?: never;
@@ -1472,6 +1489,16 @@ export interface components {
             /** Scopes */
             scopes?: string[];
         };
+        /**
+         * LearnersRequest
+         * @description ``add-learners``: students to add at once, by keys of the identity map or automatic keys.
+         */
+        LearnersRequest: {
+            /** Request Id */
+            request_id: string;
+            /** Subjects */
+            subjects: string[];
+        };
         /** LogoutView */
         LogoutView: {
             /** End Session Url */
@@ -1486,7 +1513,7 @@ export interface components {
         };
         /**
          * MemberList
-         * @description The members of a course, the mapped subjects who may still join, and the roles that may be granted.
+         * @description The members of a course, the mapped subjects who may still join, and the staff roles that may be granted.
          */
         MemberList: {
             /** Addable */
@@ -4263,6 +4290,86 @@ export interface operations {
                 };
                 content: {
                     "text/event-stream": unknown;
+                };
+            };
+            /** @description No valid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not authorized, unmapped identity or missing CSRF token */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not found, or the context is unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Conflict with the current state; reload and retry */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Invalid request or data */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Internal error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    add_learners_contexts__context_id__learners_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                context_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LearnersRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberList"];
                 };
             };
             /** @description No valid session */

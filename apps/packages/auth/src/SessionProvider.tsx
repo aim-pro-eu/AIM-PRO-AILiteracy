@@ -8,7 +8,6 @@ export type SessionState =
   | { status: 'loading' }
   | { status: 'signed-in'; session: Session; signOutFailed: boolean }
   | { status: 'signed-out' }
-  | { status: 'unmapped' }
   | { status: 'error' };
 
 export interface SessionContextValue {

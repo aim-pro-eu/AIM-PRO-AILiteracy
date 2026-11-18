@@ -6,9 +6,10 @@ course code is then created, reset and disabled at once; the store keeps only
 its nonce and digest. A signed-in subject who gives the right code to an ACTIVE
 delivery becomes a ``LEARNER`` participant under that grant, with no new policy
 version. Joining leaves every pending proposal applicable, and applying a
-proposal keeps the participants and learners' records recorded after it. The
-seed's delivery is used; temporary SQLite file or PostgreSQL test schema only;
-no model, provider or network.
+proposal keeps the participants and learners' records recorded after it. An
+administrator also adds students at once, recorded as those who join (part 2).
+The seed's delivery is used, built without opening it; temporary SQLite file or
+PostgreSQL test schema only; no model, provider or network.
 """
 
 import string
@@ -18,7 +19,7 @@ from learning.contracts import EntityRef
 from learning.decisions import proposal_candidates
 from learning.enrolment import CODE_LENGTH, EnrolmentRefused, code_digest, course_code, join_course
 from learning.learner import enrolled_courses, learner_request_id
-from learning.membership import ENROLMENT_POLICY, EnrolmentCommand
+from learning.membership import ENROLMENT_POLICY, EnrolmentCommand, Member
 from learning.policies import AuthorizationError, TrustedPolicy, with_learner
 from learning.store import LearningStore, StateConflict, canonical
 from tests.authoring_cycle_fixtures import DELIVERY, DELIVERY_TWO
@@ -38,7 +39,7 @@ class EnrolmentCase(unittest.TestCase):
 
     def setUp(self):
         block_network(self, NO_NETWORK)
-        self.seed = LearnerSeed(self, 'enrolment.sqlite')
+        self.seed = LearnerSeed(self, 'enrolment.sqlite', open_delivery=False)
         if self.activated:
             self.seed.activate()
         self.staff = self.seed.manifest.staff
@@ -57,6 +58,10 @@ class EnrolmentCase(unittest.TestCase):
     def reset(self, subject=None):
         with self.seed.contexts.open(DELIVERY) as service:
             return service.reset_enrolment_code(DELIVERY, subject or self.staff, secret=SECRET)
+
+    def add(self, subjects, request_id='add-1', subject=None):
+        with self.seed.contexts.open(DELIVERY) as service:
+            return service.add_learners(DELIVERY, subject or self.staff, {'subjects': subjects}, request_id=request_id)
 
     def read_code(self, subject=None):
         with self.seed.contexts.open(DELIVERY) as service:
@@ -162,6 +167,12 @@ class OpeningTest(EnrolmentCase):
         self.open_course()
         with self.assertRaisesRegex(ValueError, 'already open'):
             self.propose_opening('open-2')
+
+    def test_students_are_added_only_once_the_course_is_open(self):
+        before = self.seed.digests()
+        with self.assertRaisesRegex(ValueError, 'not open to learners'):
+            self.add([STUDENT])
+        self.assertEqual(self.seed.digests(), before)
 
     def test_only_a_delivery_is_opened(self):
         with self.assertRaisesRegex(ValueError, 'Only a delivery'):
@@ -298,6 +309,82 @@ class JoinTest(EnrolmentCase):
 
 
 @on_both_backends
+class AddedLearnersTest(EnrolmentCase):
+    """Students added by an administrator (part 2): at once, under the learner grant, with no new policy version."""
+
+    def setUp(self):
+        super().setUp()
+        self.open_course()
+
+    def changes(self, subject):
+        with LearningStore(self.seed.location) as store:
+            return [c for c in store.owned(DELIVERY, 'StateChange')
+                    if c.fields['cause'] == {'type': 'Participant', 'id': f'{DELIVERY}:participant:{subject}',
+                                             'version': c.fields['cause']['version']}]
+
+    def test_an_administrator_adds_students_at_once_under_the_learner_grant(self):
+        files = sorted(path.name for path in self.seed.policies.path.iterdir())
+        with LearningStore(self.seed.location) as store:
+            policies = store.read_context(DELIVERY).fields['policies']
+        members = self.add([STUDENT, 'learner-3'])
+        self.assertIn(Member(subject=STUDENT, roles=('LEARNER',)), members)
+        self.assertIn(Member(subject='learner-3', roles=('LEARNER',)), members)
+        self.assertEqual({k: v for k, v in self.participants().items() if k in (STUDENT, 'learner-3')},
+                         {STUDENT: ['LEARNER'], 'learner-3': ['LEARNER']})
+        # No proposal and no new policy version: the context keeps its policy, the directory its files.
+        with LearningStore(self.seed.location) as store:
+            self.assertEqual(store.read_context(DELIVERY).fields['policies'], policies)
+            self.assertEqual([p.fields['status'] for p in store.owned(DELIVERY, 'ChangeProposal')
+                              if p.fields['status'] != 'APPLIED'], [])
+        self.assertEqual(sorted(path.name for path in self.seed.policies.path.iterdir()), files)
+        [change] = self.changes(STUDENT)
+        self.assertEqual(change.provenance.responsible, self.staff)
+        self.assertIn(f'{STUDENT} added as LEARNER by {self.staff}', change.fields['change'])
+        self.assertEqual([c.context_id for c in self.courses(STUDENT)], [DELIVERY])
+        with self.seed.contexts.open(DELIVERY) as service:
+            self.assertNotIn(STUDENT, service.policy.subjects)
+            self.assertEqual(service.policy_for(DELIVERY, STUDENT).subjects[STUDENT].actions,
+                             {DELIVERY: ['read', 'interact', 'submit']})
+            self.assertEqual(service.course_view(DELIVERY, STUDENT).context_id, DELIVERY)
+
+    def test_adding_is_idempotent_and_a_student_added_then_joining_records_nothing(self):
+        self.add([STUDENT])
+        before = self.seed.digests()
+        self.add([STUDENT])
+        self.add([STUDENT], 'add-again')
+        self.assertEqual(self.join(STUDENT, self.reset().code).context_id, DELIVERY)
+        after = self.seed.digests()
+        after.pop('enrolment_codes'), before.pop('enrolment_codes')
+        self.assertEqual(after, before)
+        self.assertEqual(len(self.changes(STUDENT)), 1)
+        # A learner who joined with the code and is added later is a learner already.
+        self.join(OTHER_STUDENT, self.read_code().code)
+        before = self.seed.digests()
+        self.add([OTHER_STUDENT, 'learner'], 'add-joined')
+        self.assertEqual(self.seed.digests(), before)
+
+    def test_only_an_administrator_adds_students_and_never_a_member_of_the_staff(self):
+        before = self.seed.digests()
+        with self.assertRaises(AuthorizationError):
+            self.add([STUDENT], subject='learner')
+        # One member of the staff in the list refuses all of it: nobody is added.
+        with self.assertRaisesRegex(ValueError, 'admin is already a member'):
+            self.add([STUDENT, self.staff])
+        for subjects in ([], [STUDENT, STUDENT]):
+            with self.subTest(subjects), self.assertRaises(ValueError):
+                self.add(subjects)
+        self.assertEqual(self.seed.digests(), before)
+
+    def test_adding_students_leaves_a_pending_proposal_applicable(self):
+        member = self.seed.propose_member('learner-3', 'member-1')
+        self.add([STUDENT])
+        self.seed.apply(member.proposal, 'member-1')
+        self.assertEqual(self.participants()[STUDENT], ['LEARNER'])
+        self.assertEqual(self.participants()['learner-3'], ['LEARNER'])
+        self.assertEqual([c.context_id for c in self.courses(STUDENT)], [DELIVERY])
+
+
+@on_both_backends
 class InactiveDeliveryTest(EnrolmentCase):
     activated = False
 
@@ -316,6 +403,19 @@ class InactiveDeliveryTest(EnrolmentCase):
                 {'base_context': service.store.read_context(DELIVERY).ref}, request_id='activation')
         self.seed.apply(result.proposal, 'activation')
         self.assertEqual(self.join(STUDENT, code).context_id, DELIVERY)
+
+    def test_students_added_before_activation_take_part_once_it_is_active(self):
+        manifest = self.seed.manifest
+        preview = TrustedPolicy.model_validate_json((self.seed.output / manifest.delivery_policy_preview).read_bytes())
+        self.seed.policies.install('preview.json', preview)
+        self.open_course()
+        self.add([STUDENT])
+        self.assertEqual(self.courses(STUDENT), ())
+        with self.seed.contexts.open(DELIVERY) as service:
+            result = service.propose_activation(DELIVERY, self.staff,
+                {'base_context': service.store.read_context(DELIVERY).ref}, request_id='activation')
+        self.seed.apply(result.proposal, 'activation')
+        self.assertEqual([c.context_id for c in self.courses(STUDENT)], [DELIVERY])
 
 
 @on_both_backends

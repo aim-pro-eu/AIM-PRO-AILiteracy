@@ -78,7 +78,8 @@ test('every proposal kind of the seed is read in words, whatever its status', as
   }
 
   expect(new Set(titles)).toEqual(new Set([teacher.titleSyllabus, teacher.titleInitialization, teacher.titleAssessment,
-    teacher.titleTeacher, teacher.titleTrainer, teacher.titleCompletion, teacher.titleRelease, teacher.titleImport]));
+    teacher.titleTeacher, teacher.titleTrainer, teacher.titleCompletion, teacher.titleRelease, teacher.titleImport,
+    teacher.titleEnrolment]));
   expect(titles).not.toContain(teacher.titleOther);
 });
 

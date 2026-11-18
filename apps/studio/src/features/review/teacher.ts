@@ -6,17 +6,18 @@ import type { Entity, EntityRef, Finding, JsonValue } from './reviewApi';
  * What a proposal is, for its title and its view: generated assessments, teacher or
  * trainer content (the role of its generated package), completion rules, the
  * initialization of the authoring project, a release, a delivery import, a new member,
- * the evaluation of a student's attempt, or another change.
+ * opening a delivery to students, the evaluation of a student's attempt, or another change.
  */
 export type ProposalKind = 'assessment' | 'teacher' | 'trainer' | 'completion' | 'initialization' | 'release' | 'import'
-  | 'membership' | 'evaluation' | 'other';
+  | 'membership' | 'enrolment' | 'evaluation' | 'other';
 
 /** The title of a proposal of each kind, a catalogue key. */
 export const KIND_TITLES = {
   assessment: 'review.teacher.titleAssessment', teacher: 'review.teacher.titleTeacher', trainer: 'review.teacher.titleTrainer',
   completion: 'review.teacher.titleCompletion', initialization: 'review.teacher.titleInitialization',
   release: 'review.teacher.titleRelease', import: 'review.teacher.titleImport',
-  membership: 'review.teacher.titleMembership', evaluation: 'review.teacher.titleEvaluation',
+  membership: 'review.teacher.titleMembership', enrolment: 'review.teacher.titleEnrolment',
+  evaluation: 'review.teacher.titleEvaluation',
   other: 'review.teacher.titleOther',
 } as const satisfies Record<ProposalKind, string>;
 
@@ -56,6 +57,8 @@ export interface TeacherView {
     scopes: string[]; policy: PolicyPreview | null } | null;
   /** For new members (D25, D36): who joins and with which role, one or more. */
   membership: { subject: string; roles: string[] }[] | null;
+  /** For opening a delivery to students (D37): what its learner grant lets every student do, and the scopes they read. */
+  enrolment: { actions: string[]; scopes: string[] } | null;
   /** For the evaluation of an attempt (S11): what the student did, each criterion's judgment and who drafted it. */
   evaluation: EvaluationView | null;
   /** The review agent's assessment of generated content it did not accept (model text), or null. */
@@ -135,12 +138,36 @@ function contents(candidates: Entity[], format: string): Record<string, JsonValu
     .filter((content): content is Record<string, JsonValue> => content?.format === format);
 }
 
+/** The text before the policy in the permissions of an opening's PolicySet (`learning/membership.py`). */
+const ENROLMENT_POLICY = 'Reviewed course enrolment policy: ';
+
+/** The learner grant an opening of the course to students proposes, from its PolicySet, or null for any other proposal. */
+function enrolmentOf(candidates: Entity[]): TeacherView['enrolment'] {
+  const context = candidates.find((candidate) => candidate.type === 'ExecutionContext');
+  const types = new Set(candidates.map(({ type }) => type));
+  if (!context || types.size !== 2 || !types.has('PolicySet')) return null;
+  for (const candidate of candidates.filter((entity) => entity.type === 'PolicySet')) {
+    const entry = texts(candidate.fields.permissions).find((permission) => permission.startsWith(ENROLMENT_POLICY));
+    if (!entry) continue;
+    try {
+      const value: unknown = JSON.parse(entry.slice(ENROLMENT_POLICY.length));
+      const grant = isObject(value) && isObject(value.learners) ? value.learners[context.id] : undefined;
+      if (isObject(grant)) return { actions: texts(grant.actions), scopes: texts(grant.scopes) };
+    } catch {
+      // Not a policy the studio can read: the exact payload stays in the technical details.
+    }
+  }
+  return null;
+}
+
 /** The kind of a proposal, from its candidates. A delivery import carries completion rules and generated content too. */
 function kindOf(candidates: Entity[]): ProposalKind {
   // An evaluation of a student's attempt, drafted by the runtime assessor or written by a person (S11).
   if (candidates.some((candidate) => candidate.type === 'Evaluation')) return 'evaluation';
   // A new member brings a participant record and the policy version that grants it (D25).
   if (candidates.some((candidate) => candidate.type === 'Participant')) return 'membership';
+  // Opening a delivery to students changes only its policy, to a version with its learner grant (D37).
+  if (enrolmentOf(candidates)) return 'enrolment';
   if (candidates.some((candidate) => DELIVERY.has(candidate.type))) return 'import';
   if (contents(candidates, 'authoring-release').length > 0) return 'release';
   const projects = contents(candidates, 'authoring-project');
@@ -349,7 +376,7 @@ function evaluationOf(candidates: Entity[], applied: Entity[]): EvaluationView |
 }
 
 /** Proposals that bring no teaching change of their own: what they carry is described instead. */
-const DESCRIBED = new Set<ProposalKind>(['initialization', 'release', 'import', 'membership', 'evaluation']);
+const DESCRIBED = new Set<ProposalKind>(['initialization', 'release', 'import', 'membership', 'enrolment', 'evaluation']);
 
 /**
  * The teacher view of `candidates`, compared with `applied` (the context's current records). Without `compare`
@@ -383,6 +410,7 @@ export function teacherView(candidates: Entity[], applied: Entity[], compare = t
     delivery: kind === 'import' ? deliveryOf(candidates, applied) : null,
     membership: kind === 'membership' ? candidates.filter((candidate) => candidate.type === 'Participant')
       .map(({ fields }) => ({ subject: text(fields.subjectKey), roles: texts(fields.roles) })) : null,
+    enrolment: kind === 'enrolment' ? enrolmentOf(candidates) : null,
     evaluation: kind === 'evaluation' ? evaluationOf(candidates, applied) : null,
     notAccepted: notAcceptedOf(candidates),
     compared: compare && !DESCRIBED.has(kind),

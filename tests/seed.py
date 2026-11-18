@@ -13,9 +13,9 @@ it holds no real learner or organisation data.
 - ``alm.sqlite`` unless ``--db`` names another store (a PostgreSQL URL is never
   written to disk);
 - ``policies/``: the installed trusted policy, for ``ALM_POLICY_DIR`` (D10);
-- ``policy-previews/``: the delivery import's policy preview, not installed, so
-  the imported delivery context is unavailable until an operator copies it into
-  ``policies/``;
+- ``policy-previews/``: the delivery's policy, not installed, so the imported
+  delivery context is unavailable until an operator copies it into
+  ``policies/``: the import's policy preview, opened to learners (below);
 - ``seed.json``: the contexts, subjects and exact references below.
 
     python -m tests.seed --output DIR --attempt [--db LOCATION]
@@ -29,10 +29,15 @@ delivery's policy and the delivery is active. The same attempt is recorded once;
 State: the authoring context holds an approved and applied syllabus, project,
 assessment, teacher and trainer content, completion rules and release, plus a
 pending Evaluator revision. The delivery context holds the applied import of
-that release. The second delivery context holds a pending import and has the
-learner as a participant. Both delivery contexts have two synthetic learners,
-``learner`` and ``learner-2`` (S12), so a learner's reads can be checked against
-another learner's records.
+that release, opened to learners (D37, S12b): its policy is the reviewed
+opening of the import's preview, with the delivery's learner grant, so students
+join with a code or are added by an administrator once it is active. It has no
+code: the code is derived from the host secret, which the seed does not know.
+``open_delivery=False`` leaves the import's preview as it is. The second
+delivery context holds a pending import and has the learner as a participant.
+Both delivery contexts have two synthetic learners, ``learner`` and
+``learner-2`` (S12), so a learner's reads can be checked against another
+learner's records.
 """
 
 from __future__ import annotations
@@ -89,7 +94,7 @@ def seed_policy():
                    if LEARNER in scope.subjects else scope for name, scope in policy.scopes.items()}})
 
 
-def build_seed(output: Path, store_location: Path | str | None = None) -> SeedManifest:
+def build_seed(output: Path, store_location: Path | str | None = None, open_delivery: bool = True) -> SeedManifest:
     """Build the synthetic state; ``store_location`` defaults to a new ``alm.sqlite`` in ``output``."""
     for name, value in TELEMETRY_OFF.items():
         os.environ.setdefault(name, value)
@@ -118,13 +123,15 @@ def build_seed(output: Path, store_location: Path | str | None = None) -> SeedMa
         _, release = author.release(approve=True)
         imported = author.delivery_import(release, DELIVERY, 'import-1')
         author.review_and_apply(DELIVERY, store.read(imported.proposal, owner=DELIVERY), 'import-1')
+        preview = imported.policy_preview
+        if open_delivery:
+            preview = _open_delivery(store, preview, author)
         pending_import = author.delivery_import(release, DELIVERY_TWO, 'import-2')
         pending_evaluator = author.generate('ASSESSMENT', '2')
         project = service.inspect_authoring_project(AUTH, STAFF, 'synthetic-course').project
 
     (output / POLICY_DIR).mkdir()
     (output / PREVIEW_DIR).mkdir()
-    preview = imported.policy_preview
     preview_path = f'{PREVIEW_DIR}/{preview.policy_ref.id}-{preview.policy_ref.version}.json'
     _write_json(output / POLICY_DIR / f'{policy.policy_ref.id}-{policy.policy_ref.version}.json',
                 policy.model_dump_json(indent=2))
@@ -137,6 +144,21 @@ def build_seed(output: Path, store_location: Path | str | None = None) -> SeedMa
         pending_proposals={AUTH: (pending_evaluator.ref,), DELIVERY_TWO: (pending_import.proposal,)})
     _write_json(output / MANIFEST, manifest.model_dump_json(indent=2))
     return manifest
+
+
+def _open_delivery(store, preview, author):
+    """Open the delivery to learners as an administrator would, under the import's preview; its new policy."""
+    from unittest.mock import Mock
+    from learning.metamodel import load_contract
+    from learning.service import LearningService
+    from tests.authoring_cycle_fixtures import DELIVERY
+    opened = []
+    service = LearningService(store, load_contract(), preview, Mock(side_effect=AssertionError('No agents')),
+                              policies=lambda ref: next((p for p in opened if p.policy_ref == ref), None))
+    result = service.propose_enrolment(DELIVERY, STAFF, {'base_context': store.read_context(DELIVERY).ref},
+                                       request_id='seed-open', install=opened.append)
+    author.review_and_apply(DELIVERY, store.read(result.proposal, owner=DELIVERY), 'seed-open', service)
+    return result.policy
 
 
 def record_attempt(output: Path, store_location: Path | str | None = None, learner: str | None = None) -> EntityRef:

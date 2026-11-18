@@ -91,6 +91,8 @@ describe('home', () => {
     await renderStudio({ 'GET /auth/session': [signedIn], [COURSES]: [error(500), listed()] });
     fireEvent.click(await screen.findByRole('button', { name: en.home.coursesRetry }));
     expect(await screen.findByText(en.home.coursesEmpty)).toBeTruthy();
+    // A person with no course reads their own key, to give to a teacher (S12b).
+    expect(screen.getByText(en.home.yourKey.replace('{{subject}}', 'admin'))).toBeTruthy();
     expect(screen.queryByText(en.home.coursesFailed)).toBeNull();
   });
 });

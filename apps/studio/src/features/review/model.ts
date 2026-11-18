@@ -103,7 +103,8 @@ export interface OpenProposal {
   records: Entity[] | null;
   /**
    * Whether it was made on the course as it is now. Applying any proposal gives the course a new version, and the
-   * core refuses a proposal made on an earlier one as stale: it is proposed again.
+   * core refuses a proposal made on an earlier one as stale: it is proposed again. Students joining or added, and
+   * their attempts, leave the course version as it was (D37, S12b).
    */
   current: boolean;
 }
@@ -112,15 +113,40 @@ const refs = (value: JsonValue | undefined): EntityRef[] => (Array.isArray(value
   .filter((item): item is Record<string, JsonValue> => isObject(item))
   .map((item) => ({ type: String(item.type ?? ''), id: String(item.id ?? ''), version: String(item.version ?? '') }));
 
+/** The causes of the changes that leave the course version: a student joining or added, a student's attempt. */
+const LEARNER_CAUSES = ['Participant', 'LearningEvidence'];
+
+/**
+ * Whether the course is the same now as at the version `base`: every change since then is a learner's event, as the
+ * core checks it (`learning/decisions.py`). An evaluation draft is judged on the learners' records too: for it only a
+ * student joining or added counts (Chat 29 finding 3).
+ */
+function sameCourse(inbox: Inbox, base: string, causes: string[]): boolean {
+  const changes = new Map(inbox.entities.filter(({ type }) => type === 'StateChange')
+    .map((change) => [String(change.fields.newVersion ?? ''), change]));
+  let version = inbox.context.version;
+  while (version !== base) {
+    const change = changes.get(version);
+    changes.delete(version);
+    const cause = change?.fields.cause;
+    if (!change || !isObject(cause) || !causes.includes(String(cause.type ?? ''))) return false;
+    version = String(change.fields.baseVersion ?? '');
+  }
+  return true;
+}
+
 /** The proposals of the course that await a decision or, approved, their application; those awaiting a decision first. */
 export function openProposals(inbox: Inbox): OpenProposal[] {
   const records = new Map(inbox.pending.map((pending) => [pending.proposal.id, pending.candidates]));
   const open = latestProposals(inbox.entities).filter((proposal) => ['AWAITING_DECISION', 'APPROVED']
     .includes(proposalStatus(proposal)));
   return [...inbox.pending.map((pending) => pending.proposal), ...open.filter((proposal) => !records.has(proposal.id))]
-    .map((proposal) => ({
-      proposal, candidates: refs(proposal.fields.candidateDefinitions), records: records.get(proposal.id) ?? null,
-      current: proposal.fields.baseContextVersion === inbox.context.version }));
+    .map((proposal) => {
+      const candidates = refs(proposal.fields.candidateDefinitions);
+      const causes = candidates.some(({ type }) => type === 'Evaluation') ? ['Participant'] : LEARNER_CAUSES;
+      return { proposal, candidates, records: records.get(proposal.id) ?? null,
+        current: sameCourse(inbox, String(proposal.fields.baseContextVersion ?? ''), causes) };
+    });
 }
 
 export const proposalExplanation = (proposal: Entity) => parseExplanation(String(proposal.fields.proposedChange ?? ''));

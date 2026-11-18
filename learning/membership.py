@@ -24,7 +24,10 @@ change, made once: the new policy version adds the delivery's learner grant
 (the learners' actions and the delivery's own scopes) and the proposal changes
 only the context's ``policies`` reference. Once it is applied, an administrator
 creates, resets and disables the course code at once, without a proposal;
-learners join with it (``learning.enrolment``).
+learners join with it (``learning.enrolment``). An administrator also adds
+students at once, recorded exactly as those who join: a ``LEARNER``
+participant each, under the learner grant, with no proposal and no new policy
+version (D37, S12b part 2).
 """
 
 from typing import Literal
@@ -34,10 +37,10 @@ from pydantic import Field, model_validator
 
 from learning.contracts import EntityRef, Record, Text, entity_data, make_entity
 from learning.decisions import create_proposal, save_proposal
-from learning.enrolment import course_code, new_code
+from learning.enrolment import ATTEMPTS, course_code, new_code, record_learner
 from learning.metamodel import validate_entity
 from learning.policies import AuthorizationError, LearnerGrant, SubjectGrant, TrustedPolicy
-from learning.store import canonical
+from learning.store import StateConflict, canonical
 
 
 MEMBERSHIP_POLICY = 'Reviewed course membership policy: '
@@ -294,3 +297,50 @@ def disable_enrolment_code(service, context_id, subject_key, *, secret: bytes) -
     _administrator(service._context(context_id, subject_key))
     service.store.remove_enrolment_code(context_id)
     return enrolment_view(service, context_id, subject_key, secret=secret)
+
+
+class LearnersCommand(Record):
+    """Add students to a course open to learners (D37): subject keys, each at most once."""
+    subjects: tuple[Text, ...] = Field(min_length=1)
+
+    @model_validator(mode='after')
+    def _distinct(self):
+        if len(set(self.subjects)) != len(self.subjects):
+            raise ValueError('A subject is named more than once')
+        return self
+
+
+def add_learners(service, context_id, subject_key, command, request_id) -> tuple[Member, ...]:
+    """Add students to an open course at once, as ``LEARNER`` participants under its learner grant; its members.
+
+    Idempotent by subject: a learner of the course already is left as they are. A member of the staff, or a subject
+    the policy names in the course, refuses the whole list and nothing is recorded.
+    """
+    command = LearnersCommand.model_validate(command)
+    for subject in command.subjects:
+        for _ in range(ATTEMPTS):
+            context = service._context(context_id, subject_key)
+            _administrator(context)
+            root, policy = context.snapshot.context, context.policy
+            if context_id not in policy.learners:
+                raise ValueError('The course is not open to learners')
+            roles = {p.fields['subjectKey']: p.fields['roles'] for p in map(context.snapshot.get, root.fields['participants'])}
+            for each in command.subjects:
+                granted = policy.subjects.get(each)
+                if each in roles and roles[each] != ['LEARNER'] or each not in roles and granted and context_id in granted.actions:
+                    raise ValueError(f'{each} is already a member of the course')
+            if subject in roles:
+                break
+            try:
+                record_learner(service.store, root, policy, subject, responsible=subject_key, origin='HUMAN_DECISION',
+                               change=f'{subject} added as LEARNER by {subject_key}',
+                               operation_id=f'add-learner:{context_id}:{request_id}:{subject}')
+            except StateConflict:
+                # Someone joined, or the course changed, since it was read: read it again.
+                if service.store.read_context(context_id).version == root.version:
+                    raise
+                continue
+            break
+        else:
+            raise StateConflict('The course is changing; try again')
+    return course_members(service, context_id, subject_key)

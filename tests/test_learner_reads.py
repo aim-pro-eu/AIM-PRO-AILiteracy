@@ -49,13 +49,13 @@ def ref_types(value):
 class LearnerSeed:
     """The seed with its delivery active; the learners' attempts and the staff's evaluations on request."""
 
-    def __init__(self, case, name='learner.sqlite'):
+    def __init__(self, case, name='learner.sqlite', open_delivery=True):
         temp = TemporaryDirectory()
         case.addCleanup(temp.cleanup)
         self.root = Path(temp.name)
         self.location = new_store_location(case, temp.name, name)
         self.output = self.root / 'seed'
-        self.manifest = build_seed(self.output, self.location)
+        self.manifest = build_seed(self.output, self.location, open_delivery=open_delivery)
         self.policies = PolicyDirectory(self.output / self.manifest.policy_dir)
         self.contexts = ContextServices(str(self.location), self.policies)
 

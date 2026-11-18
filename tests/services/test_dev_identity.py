@@ -32,20 +32,24 @@ class DevIdentityTest(unittest.TestCase):
         self.assertIn('dev-unmapped', users.values())
 
     def test_realm_holds_placeholders_instead_of_secrets(self):
-        [client] = self.realm['clients']
-        self.assertRegex(client['secret'], PLACEHOLDER)
+        for client in self.realm['clients']:
+            self.assertRegex(client['secret'], PLACEHOLDER)
         for user in self.realm['users']:
             for credential in user['credentials']:
                 self.assertRegex(credential['value'], PLACEHOLDER)
         self.assertNotIn('roles', self.realm)
 
-    def test_client_uses_the_code_flow_with_pkce_only(self):
-        [client] = self.realm['clients']
-        self.assertEqual((client['publicClient'], client['standardFlowEnabled'], client['implicitFlowEnabled'],
-                          client['directAccessGrantsEnabled'], client['serviceAccountsEnabled']),
-                         (False, True, False, False, False))
-        self.assertEqual(client['attributes']['pkce.code.challenge.method'], 'S256')
-        self.assertEqual(client['redirectUris'], ['http://127.0.0.1:58000/auth/callback'])
+    def test_clients_use_the_code_flow_with_pkce_only(self):
+        # The studio's API on 58000 (through the studio's server) and the Learner API on 58002 (S12b browser test).
+        clients = {client['clientId']: client for client in self.realm['clients']}
+        self.assertEqual({name: client['redirectUris'] for name, client in clients.items()},
+                         {'alm-authoring-api': ['http://127.0.0.1:58000/auth/callback'],
+                          'alm-learner-api': ['http://127.0.0.1:58002/auth/callback']})
+        for client in clients.values():
+            self.assertEqual((client['publicClient'], client['standardFlowEnabled'], client['implicitFlowEnabled'],
+                              client['directAccessGrantsEnabled'], client['serviceAccountsEnabled']),
+                             (False, True, False, False, False))
+            self.assertEqual(client['attributes']['pkce.code.challenge.method'], 'S256')
 
 
 if __name__ == '__main__':
