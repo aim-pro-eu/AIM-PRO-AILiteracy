@@ -113,7 +113,8 @@ The browser tests need the local Keycloak; they run in CI (reported in the PR).
 ## Open decisions
 
 None answered here. Still open: D21, D28, D29, D31–D33, D37, the stale rule for evaluation drafts (S13). The other
-roadmap rows proposed in `chat-30.md` (D19 partial, D20 projection, D37, S12 and S13 notes) are still for the owner.
+roadmap rows proposed in `chat-30.md` (D19 partial, D20 projection, D37, S12 and S13 notes) were recorded on
+18 November 2026 at the owner's request (PR #140).
 
 ## Next step
 
@@ -146,8 +147,8 @@ courses (D19 for now), the course view (D20), own progress and isolation across 
    services/authoring_api/app.py and context_summary.py, PolicyDirectory.readable, learning/service.py (show, the
    learner-only redaction, submit), learning/assessment.py, learning/membership.py, tests/seed.py and the
    architecture tests that keep modules apart.
-3. Ask the owner whether the roadmap rows proposed in chat-30.md (D19 partial, D20 projection, D37) are to be
-   recorded; do not decide D37. Write the contract tests first: the learner app imports no authoring module; my
+3. The roadmap rows proposed in chat-30.md are recorded (PR #140): D19 partial, the D20 projection, D37 open, the
+   S12 acceptance; do not decide D37. Write the contract tests first: the learner app imports no authoring module; my
    courses (policy ∩ participant, ACTIVE LEARNING only, a pending member not listed); the course view from the
    validated course only, with no answer key, proposal, decision or other participant; own progress; two learners of
    one delivery isolated on every Learner API endpoint and on the Authoring API context summary; reads leave the
