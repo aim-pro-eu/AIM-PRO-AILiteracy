@@ -35,6 +35,14 @@ logger = logging.getLogger('services.api_common')
 
 
 @dataclass(frozen=True)
+class CookieNames:
+    """The cookies of one API. Cookies are scoped by host name, not port: two APIs whose apps share a host name
+    need names of their own, or one sign-in replaces the other (S13)."""
+    session: str = SESSION_COOKIE
+    login: str = LOGIN_COOKIE
+
+
+@dataclass(frozen=True)
 class Principal:
     subject_key: str
 
@@ -59,8 +67,9 @@ def local_path(value: str | None) -> str:
 class Authenticator:
     def __init__(self, settings: AuthSettings, identities: IdentityMap, *,
                  transport: httpx.BaseTransport | None = None, clock: Callable[[], float] = time.time,
-                 sessions: MemorySessionStore | None = None):
+                 sessions: MemorySessionStore | None = None, cookies: CookieNames = CookieNames()):
         self.settings = settings
+        self.cookies = cookies
         self.identities = identities
         self.oidc = OidcClient(settings, transport=transport)
         self.clock = clock
@@ -88,11 +97,11 @@ class Authenticator:
         self.sessions.begin_login(PendingLogin(state, nonce, verifier, local_path(return_to),
                                                now + self.settings.login_ttl), now)
         response = RedirectResponse(url, status_code=302)
-        self._set_cookie(response, LOGIN_COOKIE, state, self.settings.login_ttl, '/auth')
+        self._set_cookie(response, self.cookies.login, state, self.settings.login_ttl, '/auth')
         return response
 
     def callback(self, request: Request, state: str | None, code: str | None, error: str | None) -> Response:
-        bound = request.cookies.get(LOGIN_COOKIE)
+        bound = request.cookies.get(self.cookies.login)
         if not state or not bound or not secrets.compare_digest(bound, state):
             raise HTTPException(401, 'Login failed')
         login = self.sessions.finish_login(state, self.clock())
@@ -112,12 +121,12 @@ class Authenticator:
                           tokens.access_token, tokens.refresh_token, now + self.settings.session_ttl)
         self.sessions.create(session, now)
         response = RedirectResponse(login.return_to, status_code=303)
-        self._set_cookie(response, SESSION_COOKIE, session.id, self.settings.session_ttl, '/')
-        self._clear_cookie(response, LOGIN_COOKIE, '/auth')
+        self._set_cookie(response, self.cookies.session, session.id, self.settings.session_ttl, '/')
+        self._clear_cookie(response, self.cookies.login, '/auth')
         return response
 
     def session(self, request: Request) -> Session:
-        session_id = request.cookies.get(SESSION_COOKIE)
+        session_id = request.cookies.get(self.cookies.session)
         session = self.sessions.get(session_id, self.clock()) if session_id else None
         if session is None:
             raise HTTPException(401, 'Authentication required')
@@ -132,7 +141,7 @@ class Authenticator:
     def logout(self, request: Request, response: Response) -> str | None:
         session = self.session(request)
         self.sessions.delete(session.id)
-        self._clear_cookie(response, SESSION_COOKIE, '/')
+        self._clear_cookie(response, self.cookies.session, '/')
         return self.oidc.end_session_url(session.id_token)
 
 

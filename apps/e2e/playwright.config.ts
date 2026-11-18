@@ -2,9 +2,9 @@ import { fileURLToPath } from 'node:url';
 
 import { defineConfig, devices } from '@playwright/test';
 
-import { ADMIN_STATE, API_PORT, STATE, STUDIO_URL } from './stack/paths.mjs';
+import { ADMIN_STATE, API_PORT, LEARNER_APP_HOME, LEARNER_APP_URL, STATE, STUDIO_URL } from './stack/paths.mjs';
 
-// Browser tests of the studio on the synthetic seed (roadmap S07). They need the
+// Browser tests of the studio and the learner app (S13) on the synthetic seed (roadmap S07). They need the
 // local Keycloak of compose.identity.yml and the same ALM_KEYCLOAK_DEV_PASSWORD
 // and ALM_OIDC_CLIENT_SECRET it was started with; see docs/architecture/role-applications.md.
 // The tests share one database, restored before each test, so they run one at a time.
@@ -39,9 +39,18 @@ export default defineConfig({
       stdout: 'ignore',
     },
     {
-      command: 'npm run build --workspace @alm/studio && npm run preview --workspace @alm/studio',
+      // The members page shows join links into the learner app (S12b, S13).
+      command: `VITE_ALM_LEARNER_APP_URL=${LEARNER_APP_HOME} npm run build --workspace @alm/studio`
+        + ' && npm run preview --workspace @alm/studio',
       cwd: APPS,
       url: `${STUDIO_URL}/studio/`,
+      reuseExistingServer: false,
+      timeout: 120_000,
+    },
+    {
+      command: 'npm run build --workspace @alm/learner && npm run preview --workspace @alm/learner',
+      cwd: APPS,
+      url: `${LEARNER_APP_URL}/learn/`,
       reuseExistingServer: false,
       timeout: 120_000,
     },

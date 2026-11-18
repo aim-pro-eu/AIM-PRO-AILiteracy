@@ -5,7 +5,8 @@
   "description": "Typed client of the ALM APIs, generated from the OpenAPI snapshots in services/openapi.",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./learner": "./src/learner.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"

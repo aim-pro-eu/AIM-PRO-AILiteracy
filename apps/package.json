@@ -8,13 +8,15 @@
     "packages/api-client",
     "packages/ui",
     "packages/auth",
-    "studio"
+    "studio",
+    "learner"
   ],
   "engines": {
     "node": ">=22.22.0"
   },
   "scripts": {
-    "build": "npm run build --workspace @alm/studio",
+    "build": "npm run build --workspace @alm/studio && npm run build --workspace @alm/learner",
+    "check:bundle": "npm run check:bundle --workspace @alm/learner",
     "typecheck": "tsc --noEmit -p tsconfig.json && npm run typecheck --workspaces",
     "test": "vitest run",
     "generate:client": "node packages/api-client/scripts/generate.mjs",

@@ -9,6 +9,8 @@ import { DATABASE, JOBS, PRISTINE, ROOT, SEED, TELEMETRY_OFF, python } from './s
 
 /** The English catalogue: tests find controls by the text people see. */
 export const en = JSON.parse(readFileSync(new URL('../studio/src/i18n/en.json', import.meta.url), 'utf8'));
+/** The learner app's English catalogue (S13). */
+export const learnerEn = JSON.parse(readFileSync(new URL('../learner/src/i18n/en.json', import.meta.url), 'utf8'));
 
 export interface EntityRef { type: string; id: string; version: string }
 export interface Entity extends EntityRef { fields: Record<string, unknown> }

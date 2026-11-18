@@ -13,7 +13,7 @@ import httpx
 from fastapi import FastAPI
 
 from services.api_common.app import create_app as build_app
-from services.api_common.auth import Authenticator
+from services.api_common.auth import Authenticator, CookieNames
 from services.api_common.contexts import ContextServices, PolicyDirectory
 from services.api_common.identity import IdentityMap, load_identity_map
 from services.api_common.registry import ConfigurationError, ModuleRegistry
@@ -24,6 +24,8 @@ from services.learner_api import attempts, courses, enrolments, progress, questi
 TITLE = 'ALM Learner API'
 VERSION = '0.3.0'
 REGISTRY = ModuleRegistry((courses.MODULE, progress.MODULE, attempts.MODULE, questions.MODULE, enrolments.MODULE))
+# The learner app and the studio may share a host name (127.0.0.1 in development): cookies of its own (S13).
+COOKIES = CookieNames(session='alm_learner_session', login='alm_learner_login')
 
 
 def create_app(settings: ApiSettings | None = None, *, transport: httpx.BaseTransport | None = None) -> FastAPI:
@@ -38,7 +40,8 @@ def create_app(settings: ApiSettings | None = None, *, transport: httpx.BaseTran
         raise ConfigurationError('The questions module needs ALM_JOBS_STORE')
     if enrolments.MODULE in modules and settings.enrolment_secret is None:
         raise ConfigurationError('The enrolments module needs ALM_ENROLMENT_SECRET')
-    authenticator = Authenticator(settings.auth, load_identity_map(settings.identity_map), transport=transport)
+    authenticator = Authenticator(settings.auth, load_identity_map(settings.identity_map), transport=transport,
+                                  cookies=COOKIES)
     app = build_app(TITLE, VERSION, modules, authenticator)
     app.state.contexts = contexts
     questions.configure(app, settings)
@@ -51,4 +54,4 @@ def schema_app() -> FastAPI:
     settings = AuthSettings(issuer='https://identity.invalid', client_id='schema', client_secret='unused',
                             redirect_uri='https://api.invalid/auth/callback')
     return build_app(TITLE, VERSION, REGISTRY.select(None),
-                     Authenticator(settings, IdentityMap(format=1, identities=())))
+                     Authenticator(settings, IdentityMap(format=1, identities=()), cookies=COOKIES))

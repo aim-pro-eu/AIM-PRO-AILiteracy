@@ -5,6 +5,7 @@ export default defineConfig({
     projects: [
       'packages/*',
       'studio',
+      'learner',
       { test: { name: 'workspace', include: ['tests/**/*.test.ts'], environment: 'node' } },
     ],
   },

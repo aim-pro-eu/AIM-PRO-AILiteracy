@@ -1,0 +1,105 @@
+{
+  "app": {
+    "name": "ALM Learning",
+    "title": "ALM Learning"
+  },
+  "shell": {
+    "skipToContent": "Skip to main content",
+    "myCourses": "My courses"
+  },
+  "session": {
+    "loading": "Checking your session…",
+    "signIn": "Sign in",
+    "signOut": "Sign out",
+    "signedInAs": "Signed in as {{subject}}",
+    "signOutFailed": "Sign-out did not complete. Reload the page and try again.",
+    "unavailable": "The learning service cannot be reached. Try again in a moment.",
+    "retry": "Try again"
+  },
+  "signIn": {
+    "title": "Sign in to your courses",
+    "body": "Sign in with your organisation account. This site never sees your password; your session ends when you sign out or when it expires."
+  },
+  "notFound": {
+    "title": "Page not found",
+    "body": "There is no page at this address.",
+    "home": "Go to my courses"
+  },
+  "courses": {
+    "title": "My courses",
+    "loading": "Loading your courses…",
+    "failed": "Your courses could not be loaded.",
+    "retry": "Try again",
+    "empty": "You are not in any course yet. Your teacher gives you a course code, or a link that carries it.",
+    "yourKey": "If your teacher adds you to a course instead, give them your key: {{subject}}",
+    "join": "Join a course with its code"
+  },
+  "join": {
+    "title": "Join a course",
+    "intro": "Type the course code your teacher gave you, or check the one the link carried, then join. You join once: the course then stays in My courses.",
+    "code": "Course code",
+    "hint": "Eight letters and digits. Upper or lower case, spaces and hyphens do not matter.",
+    "submit": "Join the course",
+    "empty": "Type the course code first.",
+    "notFound": "No open course has this code. Check it with your teacher: a code may have been changed or switched off.",
+    "staff": "You teach this course, so you cannot join it as a student.",
+    "failed": "The course could not be joined. Try again in a moment.",
+    "back": "Back to my courses"
+  },
+  "course": {
+    "loading": "Loading the course…",
+    "joined": "You have joined this course. It is now in My courses.",
+    "unavailable": "This course is not available.",
+    "notOpen": "This course is not open to students yet.",
+    "notLearner": "You are not a student of this course.",
+    "failed": "The course could not be loaded. Try again in a moment.",
+    "back": "Back to my courses",
+    "contents": "On this page",
+    "outcomes": {
+      "heading": "What you will learn",
+      "competences": "Competences: {{names}}",
+      "empty": "This course names no learning outcome."
+    },
+    "syllabus": {
+      "heading": "Syllabus",
+      "intro": "The phases and units of the course in their order, with the activities of each.",
+      "duration": "Estimated time: {{duration}}",
+      "empty": "This course has no syllabus yet."
+    },
+    "intent": {
+      "EXPLAIN": "Explanation",
+      "PRACTICE": "Practice",
+      "ASSESS": "Assessment"
+    },
+    "activity": {
+      "label": "{{intent}} · {{format}}",
+      "evidence": "You hand in: {{evidence}}",
+      "materials": "Materials: {{titles}}",
+      "strategies": "How you learn here: {{names}}",
+      "assessment": "How this activity is assessed"
+    },
+    "assessments": {
+      "heading": "Assessments",
+      "intro": "How your work is assessed, with the criteria and levels of each rubric.",
+      "untitled": "Assessment {{number}}",
+      "activities": "For: {{activities}}",
+      "outcomes": "Learning outcomes: {{statements}}",
+      "conditions": "Conditions",
+      "evidence": "Accepted evidence: {{evidence}}",
+      "criterion": "Criterion",
+      "levels": "Levels",
+      "noRubric": "No rubric.",
+      "empty": "This course has no assessment."
+    },
+    "materials": {
+      "heading": "Materials",
+      "language": "Language: {{language}}",
+      "conditions": "Use: {{conditions}}",
+      "empty": "This course has no material."
+    },
+    "strategies": {
+      "heading": "How the course teaches",
+      "empty": "This course names no teaching strategy."
+    }
+  }
+}

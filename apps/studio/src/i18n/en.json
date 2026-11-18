@@ -888,7 +888,7 @@
       "open": "The course is open to students: they join with its code, or you add them below. They take part at once, with no new review.",
       "code": "Course code",
       "link": "Join link",
-      "linkNote": "Students will open this link in the learner app, which is not available yet: until then they join with the code.",
+      "linkNote": "Students open this link in the learner app, sign in and join; they can also type the code there.",
       "noCode": "The course has no code: students cannot join by themselves. Create one to let them join.",
       "create": "Create a code",
       "reset": "Reset the code",

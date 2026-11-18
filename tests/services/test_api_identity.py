@@ -10,17 +10,21 @@ from tempfile import TemporaryDirectory
 import unittest
 
 from fastapi import APIRouter, Depends
+from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from services.api_common.auth import (CSRF_HEADER, LOGIN_COOKIE, SESSION_COOKIE, Principal,
                                       csrf_protected, current_principal)
 from services.api_common.identity import AUTO_PREFIX, IdentityMap, auto_subject_key, load_identity_map
 from services.api_common.registry import ApiModule
+from services.api_common.settings import ApiSettings
+from services.authoring_api.app import create_app as authoring_app
+from services.learner_api.app import create_app as learner_app
 from tests.services.oidc_fixtures import (CLIENT_ID, CLIENT_SECRET, ISSUER, MAPPED_SUBJECT,
                                           NO_NETWORK, POST_LOGOUT_REDIRECT_URI, REDIRECT_URI,
                                           UNMAPPED_SUBJECT, Clock, FakeProvider, api_client,
                                           begin_login, challenge, log_in, new_key, query,
-                                          write_identity_map)
+                                          auth_settings, write_identity_map)
 from tests.store_backends import block_network
 
 
@@ -279,6 +283,54 @@ class CsrfAndLogoutTest(unittest.TestCase):
         self.assertEqual(set_cookies(response)[SESSION_COOKIE]['max-age'], '0')
         self.client.cookies.clear()
         self.assertEqual(self.client.get('/auth/session').status_code, 401)
+
+
+class CookiesPerApiTest(unittest.TestCase):
+    """The Authoring API and the Learner API keep their sessions in cookies of their own (S13).
+
+    Cookies are scoped by host name, not by port: the studio (127.0.0.1:58000) and
+    the learner app (127.0.0.1:58003) share one cookie jar, so each API needs its
+    own names or one sign-in would replace the other.
+    """
+
+    def setUp(self):
+        block_network(self, NO_NETWORK)
+        self.provider = FakeProvider()
+        directory = TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        settings = ApiSettings(auth=auth_settings(), identity_map=write_identity_map(directory.name), modules=())
+        self.clients = {name: TestClient(create(settings, transport=self.provider.transport),
+                                         base_url='https://testserver', raise_server_exceptions=False,
+                                         follow_redirects=False)
+                        for name, create in (('authoring', authoring_app), ('learner', learner_app))}
+
+    def test_each_api_names_its_login_and_session_cookies(self):
+        for name, (login, session) in {'authoring': ('alm_login', 'alm_session'),
+                                       'learner': ('alm_learner_login', 'alm_learner_session')}.items():
+            with self.subTest(name):
+                client = self.clients[name]
+                started, params = begin_login(client)
+                self.assertEqual(set(set_cookies(started)), {login})
+                self.assertEqual(set_cookies(started)[login]['path'], '/auth')
+                code = self.provider.issue(self.provider.sign(self.provider.claims(params['nonce'])))
+                finished = client.get('/auth/callback', params={'code': code, 'state': params['state']})
+                self.assertEqual(finished.status_code, 303, finished.text)
+                self.assertEqual(set(set_cookies(finished)), {login, session})
+                self.assertEqual(set_cookies(finished)[login]['max-age'], '0')
+                self.assertTrue(set_cookies(finished)[session]['httponly'])
+
+    def test_one_browser_holds_both_sessions(self):
+        authoring, learner = self.clients['authoring'], self.clients['learner']
+        self.assertEqual(log_in(authoring, self.provider).status_code, 303)
+        # The learner app's sign-in starts in the same browser: the studio's cookies come along.
+        for cookie in authoring.cookies.jar:
+            learner.cookies.jar.set_cookie(cookie)
+        self.assertEqual(learner.get('/auth/session').status_code, 401)
+        self.assertEqual(log_in(learner, self.provider, UNMAPPED_SUBJECT).status_code, 303)
+        for cookie in learner.cookies.jar:
+            authoring.cookies.jar.set_cookie(cookie)
+        self.assertEqual(authoring.get('/auth/session').json()['subject_key'], 'admin')
+        self.assertRegex(learner.get('/auth/session').json()['subject_key'], r'^auto-[0-9a-f]{20}$')
 
 
 class IdentityMapTest(unittest.TestCase):

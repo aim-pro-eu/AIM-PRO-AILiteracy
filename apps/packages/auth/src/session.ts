@@ -1,4 +1,4 @@
-import type { AuthoringClient } from '@alm/api-client';
+import type { SessionClient } from '@alm/api-client';
 
 /** The signed-in subject. The CSRF token lives only in memory, never in browser storage. */
 export interface Session {
@@ -37,7 +37,8 @@ export interface SessionApi {
   signOut(csrfToken: string): Promise<string | null>;
 }
 
-export function createSessionApi(client: AuthoringClient): SessionApi {
+/** The session of the studio or the learner app, through the client of its own API (both share these routes). */
+export function createSessionApi(client: SessionClient): SessionApi {
   return {
     async readSession() {
       const { data, response } = await client.GET('/auth/session');

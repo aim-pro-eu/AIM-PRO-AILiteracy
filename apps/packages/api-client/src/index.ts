@@ -11,6 +11,12 @@ export type ErrorBody = components['schemas']['ErrorBody'];
 
 export type AuthoringClient = ReturnType<typeof createClient<paths>>;
 
+/**
+ * The session routes, the same in both APIs (their snapshots are compared in the tests): the studio and the learner
+ * app each pass their own client.
+ */
+export type SessionClient = ReturnType<typeof createClient<Pick<paths, '/auth/session' | '/auth/logout'>>>;
+
 export interface AuthoringClientOptions {
   /** Origin of the API; the browser apps use their own origin (D8: same-site cookie). */
   baseUrl: string;
