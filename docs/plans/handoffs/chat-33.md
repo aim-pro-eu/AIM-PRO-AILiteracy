@@ -1,15 +1,16 @@
 # Chat 33 handoff — S12 part 2: attempt submission, the learner request as a job, finding 3
 
-Date: 18 November 2026. Base: `feat/s12-learner-api` at `3a350ed` (S12 part 1, PR #142, not merged yet).
+Date: 18 November 2026. Base: `feat/s12-learner-api` at `3a350ed` (S12 part 1, PR #142), merged into `main` as
+`66680de` during this chat.
 Step: **S12, part 2** of the [prototype roadmap](../prototype-roadmap.md).
 Issue: [#136](https://github.com/thesis-fedfalco-2026/AIM-PRO-AILiteracy/issues/136).
-Branch `feat/s12-learner-writes`, stacked on `feat/s12-learner-api`.
+Branch `feat/s12-learner-writes`, from `3a350ed`; its PR targets `main`.
 
 No model was called; no live run. Synthetic seed and synthetic model responses only.
 
 ## Baseline verified before any change
 
-PR #142 is open, so the baseline is its branch, `feat/s12-learner-api`.
+PR #142 was open at the start, so the baseline is its branch, `feat/s12-learner-api`.
 
 | Check | Result |
 | --- | --- |
@@ -123,7 +124,7 @@ The PostgreSQL variants and the browser tests run in CI (reported in the PR).
 - [x] Isolation on every new endpoint, with the same request ids for two learners; every read leaves the table
   digests unchanged.
 - [x] Finding 3 recorded in a test: a learner's submit makes a pending evaluation draft stale (today's rule).
-- With part 1, every S12 acceptance item is met; #136 can be closed once both PRs are merged.
+- With part 1 (merged), every S12 acceptance item is met; #136 can be closed once this PR is merged.
 
 ## Findings (not changed)
 
@@ -155,7 +156,7 @@ None answered in this chat. Still open: D21, D28, D29, D31–D33, the stale rule
 
 ## Roadmap rows to change (for the owner)
 
-- **S12** row: "done: part 1 (PR #142, chat-32.md) and part 2 (PR of chat-33.md): the Learner API process, my
+- **S12** row: "done: part 1 (PR #142, merged as `66680de`, chat-32.md) and part 2 (PR of chat-33.md): the Learner API process, my
   courses, course view, own progress, attempt submission, the learner request as a job, finding 3, isolation".
 - **S12 acceptance:** tick every item.
 
@@ -173,7 +174,7 @@ revised). Specify it with the owner first, then build the first part.
 
 ## Where things stand
 
-- S12 is done in two PRs: part 1 (#142, docs/plans/handoffs/chat-32.md) and part 2 (the PR of
+- S12 is done in two PRs: part 1 (#142, merged; docs/plans/handoffs/chat-32.md) and part 2 (the PR of
   docs/plans/handoffs/chat-33.md). Read chat-32.md and chat-33.md, and the owner decisions on #141.
 - "My courses" come from one function, learning.learner.enrolled_courses (D19 for now); S12b changes how learners
   arrive, not how the list is read. A learner's attempts and questions are recorded under learner:{subject}:{id}.
@@ -181,7 +182,7 @@ revised). Specify it with the owner first, then build the first part.
 
 ## Protocol
 
-1. Verify the baseline on main (or on the S12 branches if they are not merged; say which): git status, git log
+1. Verify the baseline on main (or on the S12 part 2 branch if it is not merged; say which): git status, git log
    --oneline -5, gh pr list --state open, the Python suite with `python -m unittest discover -q` and telemetry off
    (LANGFUSE_ENABLED=false CREWAI_DISABLE_TELEMETRY=true CREWAI_TRACING_ENABLED=false), python -m aimpro.generate
    --check, python -m services.api_common.openapi --check, python -m evaluation --check, and in apps/ npm run
