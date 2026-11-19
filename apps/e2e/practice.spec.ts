@@ -49,10 +49,10 @@ test('a learner practises, submits an attempt and reads its reviewed evaluation'
 
   // The coach answers first; the Teacher only once the learner confirms leaving the coach.
   const questions = region(learner, learnerEn.practice.questions.heading);
-  await learner.getByLabel(learnerEn.practice.ask.label).fill('Where do I start?');
+  await learner.getByLabel(learnerEn.practice.ask.label, { exact: true }).fill('Where do I start?');
   await learner.getByRole('button', { name: learnerEn.practice.ask.coach }).click();
   await expect(questions.getByText(/^Synthetic coach:/)).toBeVisible({ timeout: 30_000 });
-  await learner.getByLabel(learnerEn.practice.ask.label).fill('Please explain the two prompting choices.');
+  await learner.getByLabel(learnerEn.practice.ask.label, { exact: true }).fill('Please explain the two prompting choices.');
   await learner.getByRole('button', { name: learnerEn.practice.ask.teacher }).click();
   await expect(learner.getByText(learnerEn.practice.ask.confirm)).toBeVisible();
   await expectAccessible(learner);
@@ -61,7 +61,7 @@ test('a learner practises, submits an attempt and reads its reviewed evaluation'
   await expect(questions.getByRole('listitem')).toHaveCount(2);
 
   // The attempt is submitted once confirmed, and listed.
-  await learner.getByLabel(learnerEn.practice.attempt.label).fill(ATTEMPT);
+  await learner.getByLabel(learnerEn.practice.attempt.label, { exact: true }).fill(ATTEMPT);
   await learner.getByRole('button', { name: learnerEn.practice.attempt.submit }).click();
   await learner.getByRole('button', { name: learnerEn.practice.attempt.confirmSubmit }).click();
   await expect(learner.getByText(learnerEn.practice.attempt.submitted)).toBeVisible();
