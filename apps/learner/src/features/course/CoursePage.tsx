@@ -1,6 +1,5 @@
 import { StatusMessage } from '@alm/ui';
-import { useEffect, useId, useState } from 'react';
-import type { ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useParams } from 'react-router';
 
@@ -8,51 +7,12 @@ import type { Activity, CourseNode, CourseView } from '../courses/learnerApi';
 import { LearnerError } from '../courses/learnerApi';
 import type { LearnerFailure } from '../courses/learnerApi';
 import { useLearnerServices } from '../courses/LearnerServices';
+import { practicePath, progressPath } from '../courses/paths';
+import { FAILURES, assessmentAnchor, isIntent, isWebAddress, named, namesOf, readable } from './model';
+import type { Names } from './model';
+import { Section } from './Section';
 
-/** A code of the course (an intent, a format) in words, when the catalogue has none. */
-export function readable(code: string): string {
-  const words = code.replace(/[_-]+/g, ' ').trim();
-  const lower = words === words.toUpperCase() ? words.toLowerCase() : words;
-  return lower.charAt(0).toUpperCase() + lower.slice(1);
-}
-
-const INTENTS = ['EXPLAIN', 'PRACTICE', 'ASSESS'] as const;
-const isIntent = (code: string): code is (typeof INTENTS)[number] => (INTENTS as readonly string[]).includes(code);
-
-/** Only a web address becomes a link; any other locator is shown as text. */
-const isWebAddress = (value: string) => /^https?:\/\//i.test(value);
-
-const assessmentAnchor = (id: string) => `assessment-${id}`;
-
-/** Names of the course's records by id, for the references of activities and assessments. */
-interface Names {
-  outcomes: Map<string, string>;
-  competences: Map<string, string>;
-  strategies: Map<string, string>;
-  materials: Map<string, string>;
-  activities: Map<string, string>;
-}
-
-function activitiesOf(node: CourseNode): Activity[] {
-  return [...node.activities, ...node.children.flatMap(activitiesOf)];
-}
-
-function namesOf(course: CourseView): Names {
-  const byId = <T,>(items: readonly T[], id: (item: T) => string, name: (item: T) => string) =>
-    new Map(items.map((item) => [id(item), name(item)]));
-  return {
-    outcomes: byId(course.outcomes, (o) => o.ref.id, (o) => o.statement),
-    competences: byId(course.competences, (c) => c.ref.id, (c) => c.name),
-    strategies: byId(course.strategies, (s) => s.ref.id, (s) => s.name),
-    materials: byId(course.materials, (m) => m.ref.id, (m) => m.title),
-    activities: byId(activitiesOf(course.structure), (a) => a.ref.id, (a) => a.instruction),
-  };
-}
-
-const named = (names: Map<string, string>, refs: readonly { id: string }[]) =>
-  refs.map((ref) => names.get(ref.id) ?? ref.id).join(', ');
-
-function ActivityItem({ activity, names }: { activity: Activity; names: Names }) {
+function ActivityItem({ contextId, activity, names }: { contextId: string; activity: Activity; names: Names }) {
   const { t } = useTranslation();
   const intent = isIntent(activity.intent) ? t(`course.intent.${activity.intent}`) : readable(activity.intent);
   return (
@@ -72,12 +32,15 @@ function ActivityItem({ activity, names }: { activity: Activity; names: Names })
       {activity.assessment ? (
         <p><a href={`#${assessmentAnchor(activity.assessment.id)}`}>{t('course.activity.assessment')}</a></p>
       ) : null}
+      <p><Link to={practicePath(contextId, activity.ref.id)}>{t('course.activity.practise')}</Link></p>
     </li>
   );
 }
 
 /** A phase or unit with its activities and the nodes inside it; headings follow the depth (h3 for phases). */
-function NodeSection({ node, depth, names }: { node: CourseNode; depth: number; names: Names }) {
+function NodeSection({ contextId, node, depth, names }: {
+  contextId: string; node: CourseNode; depth: number; names: Names;
+}) {
   const { t } = useTranslation();
   const Heading = `h${Math.min(depth + 2, 6)}` as 'h3' | 'h4' | 'h5' | 'h6';
   const strategies = node.strategies.length ? named(names.strategies, node.strategies) : null;
@@ -88,26 +51,19 @@ function NodeSection({ node, depth, names }: { node: CourseNode; depth: number; 
       {strategies ? <p>{t('course.activity.strategies', { names: strategies })}</p> : null}
       {node.activities.length ? (
         <ul className="alm-cards">
-          {node.activities.map((activity) => <ActivityItem key={activity.ref.id} activity={activity} names={names} />)}
+          {node.activities.map((activity) => (
+            <ActivityItem key={activity.ref.id} contextId={contextId} activity={activity} names={names} />
+          ))}
         </ul>
       ) : null}
       {node.children.length ? (
         <ol className="alm-tree">
-          {node.children.map((child) => <NodeSection key={child.ref.id} node={child} depth={depth + 1} names={names} />)}
+          {node.children.map((child) => (
+            <NodeSection key={child.ref.id} contextId={contextId} node={child} depth={depth + 1} names={names} />
+          ))}
         </ol>
       ) : null}
     </li>
-  );
-}
-
-function Section({ heading, intro, children }: { heading: string; intro?: string; children: ReactNode }) {
-  const id = useId();
-  return (
-    <section aria-labelledby={`${id}-heading`}>
-      <h2 id={`${id}-heading`}>{heading}</h2>
-      {intro ? <p>{intro}</p> : null}
-      {children}
-    </section>
   );
 }
 
@@ -139,11 +95,15 @@ function CourseContent({ course }: { course: CourseView }) {
           <>
             {structure.activities.length ? (
               <ul className="alm-cards">
-                {structure.activities.map((activity) => <ActivityItem key={activity.ref.id} activity={activity} names={names} />)}
+                {structure.activities.map((activity) => (
+                  <ActivityItem key={activity.ref.id} contextId={course.context_id} activity={activity} names={names} />
+                ))}
               </ul>
             ) : null}
             <ol className="alm-tree">
-              {structure.children.map((node) => <NodeSection key={node.ref.id} node={node} depth={1} names={names} />)}
+              {structure.children.map((node) => (
+                <NodeSection key={node.ref.id} contextId={course.context_id} node={node} depth={1} names={names} />
+              ))}
             </ol>
           </>
         )}
@@ -235,15 +195,6 @@ function CourseContent({ course }: { course: CourseView }) {
   );
 }
 
-const FAILURES: Record<LearnerFailure, 'course.unavailable' | 'course.notOpen' | 'course.notLearner' | 'course.failed'> = {
-  'not-found': 'course.unavailable',
-  'not-open': 'course.notOpen',
-  forbidden: 'course.notLearner',
-  conflict: 'course.failed',
-  'signed-out': 'course.failed',
-  failed: 'course.failed',
-};
-
 export function CoursePage() {
   const { t } = useTranslation();
   const { contextId = '' } = useParams();
@@ -261,6 +212,10 @@ export function CoursePage() {
       (error: unknown) => { if (current) setFailure(error instanceof LearnerError ? error.reason : 'failed'); });
     return () => { current = false; };
   }, [api, contextId]);
+  // A link from a practice page names an assessment of the course: show it once the course is on the page.
+  useEffect(() => {
+    if (course && location.hash) document.getElementById(decodeURIComponent(location.hash.slice(1)))?.scrollIntoView?.();
+  }, [course, location.hash]);
 
   if (failure) {
     return (
@@ -275,6 +230,7 @@ export function CoursePage() {
     <>
       <h1>{course.title}</h1>
       {joined ? <StatusMessage>{t('course.joined')}</StatusMessage> : null}
+      <p><Link to={progressPath(course.context_id)}>{t('course.progress')}</Link></p>
       <CourseContent course={course} />
       <p><Link to="/">{t('course.back')}</Link></p>
     </>

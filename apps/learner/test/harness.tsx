@@ -37,7 +37,7 @@ export async function renderLearner(replies: Record<string, Reply[]>, path = '/l
   const router = createMemoryRouter(learnerRoutes, { basename: LEARNER_BASENAME, initialEntries: [path] });
   render(
     <LearnerApp api={createSessionApi(client)} learner={createLearnerApi(client)} newRequestId={newRequestId}
-      navigate={navigate} router={router} i18n={await createLearnerI18n()} />,
+      pollMs={5} navigate={navigate} router={router} i18n={await createLearnerI18n()} />,
   );
   return { navigate, requests, router };
 }
@@ -99,3 +99,38 @@ export const COURSE = {
       ] } },
   ],
 };
+
+const A2 = ref('ActivityDefinition', 'a-2');
+
+/** The learner's attempt at the assessed activity, as the Learner API returns it. */
+export const EVIDENCE = {
+  ref: ref('LearningEvidence', 'e-1'), activity: A2, occurrence: ref('ActivityOccurrence', 'occ-1'),
+  outcomes: [ref('LearningOutcome', 'o-1')], kind: 'TEXT', content_or_locator: 'My synthetic design review.',
+  observed_at: '2026-11-18T09:30:00Z',
+};
+
+/** The learner's own records (S12): one attempt, its applied evaluation and the learning state that followed. */
+export const PROGRESS = {
+  context_id: COURSE.context_id,
+  occurrences: [{ ref: EVIDENCE.occurrence, activity: A2, status: 'IN_PROGRESS', process_node: null,
+    evidence: [EVIDENCE.ref] }],
+  evidence: [EVIDENCE],
+  evaluations: [{ ref: ref('Evaluation', 'ev-1'), assessment: ref('AssessmentDefinition', 'as-1'), mode: 'FORMATIVE',
+    evidence: [EVIDENCE.ref], result: 'Synthetic result: a clear review.',
+    judgments: [{ criterion_key: 'tradeoffs', level_key: 'full', reason: 'Synthetic reason: every trade-off named.' }] }],
+  learning_states: [{ ref: ref('LearningState', 'ls-1'), outcome: ref('LearningOutcome', 'o-1'), progress: 'ACQUIRED',
+    verification: 'UNVERIFIED', basis: [ref('Evaluation', 'ev-1')] }],
+};
+
+export const NO_PROGRESS = { context_id: COURSE.context_id, occurrences: [], evidence: [], evaluations: [], learning_states: [] };
+
+/** A question of the learner on the assessed activity, as the Learner API returns it; `changes` replace fields. */
+export function question(requestId: string, changes: Record<string, unknown> = {}, asked: Record<string, unknown> = {}) {
+  return {
+    request_id: requestId, status: 'COMPLETED', created: '2026-11-18T09:00:00Z', updated: '2026-11-18T09:00:05Z',
+    detail: null, response: { kind: 'ANSWER', content: `Answer to ${requestId}.`, citations: [], coverage: [], findings: [] },
+    question: { text: `Question ${requestId}?`, intent: 'SOCRATIC_GUIDANCE', problem_key: 'a-2', switch_from_socratic: false,
+      activities: [A2], ...asked },
+    ...changes,
+  };
+}

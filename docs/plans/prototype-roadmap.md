@@ -681,9 +681,19 @@ Teacher as jobs), progress and the browser test from practice to a reviewed
 evaluation. The stale rule for evaluation drafts stays as it is until the owner
 has tried the app (part 2).
 
+Part 2 (owner answers of 19 November 2026, Chat 37): practice lives on a page
+per activity, linked from the course view, which stays read only; an attempt is
+text only and submitted after a confirmation, one request id per text; a
+question goes to the Socratic coach by default, with the activity as its
+problem, and to the Teacher on a problem the coach holds only after the learner
+confirms leaving the coach (an explicit switch); a running question is read
+again every second until its job ends; My progress is a page per course with
+the learner's attempts, applied evaluations, learning states and questions.
+Chat 36 finding 2 (the studio's join link default) waits for D17.
+
 **Acceptance.**
 
-- [ ] Browser test: practice, submission and a reviewed evaluation on the seed delivery (part 2).
+- [x] Browser test: practice, submission and a reviewed evaluation on the seed delivery (part 2: `e2e/practice.spec.ts`).
 - [x] The learner build contains no authoring code (bundle check, part 1).
 - [x] A learner joins the course with its code or link (S12b) before practising (part 1: the join page and `enrolment.spec.ts`).
 - [x] My courses and the course view (D19, D20) in the browser (part 1).

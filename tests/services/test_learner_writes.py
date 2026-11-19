@@ -30,7 +30,7 @@ from services.jobs.worker import Worker
 from services.learner_api.app import create_app
 from tests.authoring_cycle_fixtures import AUTH, DELIVERY, DELIVERY_TWO
 from tests.services.course_fixtures import ENROLMENT_SECRET, module_settings
-from tests.services.job_fixtures import new_jobs_location
+from tests.services.job_fixtures import SyntheticAgents as DevAgents, new_jobs_location
 from tests.services.oidc_fixtures import (ISSUER, MAPPED_SUBJECT, NO_NETWORK, FakeProvider, auth_settings, log_in,
                                           write_identity_map)
 from tests.store_backends import block_network, on_both_backends
@@ -392,6 +392,33 @@ class LearnerRequestJobTest(LearnerWritesCase):
         scoped = learner_request_id('learner', 'question-1')
         self.assertEqual(staff.get(f'/contexts/{DELIVERY}/jobs/{scoped}').status_code, 404)
         self.assertEqual(staff.get(f'/contexts/{DELIVERY}/jobs/{scoped}/events').status_code, 404)
+
+
+@on_both_backends
+class DevWorkerTest(LearnerWritesCase):
+    """The dev-only synthetic worker (``tests.synthetic_worker``) answers learners as the learner app asks (S13)."""
+
+    def test_the_synthetic_worker_answers_the_coach_and_the_teacher_on_an_activity(self):
+        # The learner app names the activity as the problem: the coach keeps it until the learner switches.
+        activity = self.activity()
+        on_activity = {'problem_key': activity.id, 'activities': [activity.model_dump()]}
+        resources = DevAgents().resources()
+        self.ask('learner', 'coach-1', intent='SOCRATIC_GUIDANCE', **on_activity)
+        self.assertEqual(self.run_worker(resources).status, 'COMPLETED')
+        self.ask('learner', 'teacher-1', **on_activity)
+        self.assertEqual(self.run_worker(resources).status, 'COMPLETED')
+        self.ask('learner', 'teacher-2', switch_from_socratic=True, **on_activity)
+        self.assertEqual(self.run_worker(resources).status, 'COMPLETED')
+        answers = {request_id: self.get('learner', f'/courses/{DELIVERY}/questions/{request_id}')
+                   for request_id in ('coach-1', 'teacher-1', 'teacher-2')}
+        coach, held, teacher = answers['coach-1'], answers['teacher-1'], answers['teacher-2']
+        self.assertEqual((coach['response']['kind'], coach['detail']), ('ANSWER', None))
+        self.assertTrue(coach['response']['content'].startswith('Synthetic coach:'))
+        self.assertEqual((held['response'], held['detail']),
+                         (None, 'The problem remains in Socratic mode; switching requires an explicit choice.'))
+        self.assertEqual(teacher['response']['kind'], 'ANSWER')
+        self.assertTrue(teacher['response']['content'].startswith('Synthetic Teacher:'))
+        self.assertEqual(self.store_counts(), self.counts)
 
 
 if __name__ == '__main__':
