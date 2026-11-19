@@ -424,7 +424,7 @@ request id.
 ## Front-end workspace
 
 `apps/` is an npm workspace (D12) with exact versions in `apps/package-lock.json`;
-Node 22.22 or later.
+Node 26.13 or later.
 
 | Workspace | Content |
 | --- | --- |
