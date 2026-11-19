@@ -5,9 +5,11 @@
 It is ``python -m services.jobs`` with the synthetic responses of
 ``tests/services/job_fixtures.py`` in place of the model and retrieval
 factories: the same job store, kinds, service methods and outcomes, and no
-model, provider, credential or network. Settings: ``ALM_STORE``,
-``ALM_POLICY_DIR``, ``ALM_JOBS_STORE`` and ``ALM_AIMPRO_EXPORTS``, as for the
-production worker. Never run it against real data.
+model, provider, credential or network. A learner's question (S13) is answered
+by synthetic learning agents: the Socratic coach asks back, the Teacher
+explains. Settings: ``ALM_STORE``, ``ALM_POLICY_DIR``, ``ALM_JOBS_STORE`` and
+``ALM_AIMPRO_EXPORTS``, as for the production worker. Never run it against real
+data.
 """
 
 from __future__ import annotations

@@ -14,6 +14,7 @@ from uuid import uuid4
 from aimpro.audit import DEFAULT_PROJECT
 from aimpro.generators import GenerationCommand
 from learning.contracts import EntityRef
+from learning.outputs import LearningResponse
 from learning.store import LearningStore
 from services.api_common.contexts import ContextServices, PolicyDirectory
 from services.jobs.kinds import Resources
@@ -82,9 +83,26 @@ class SyntheticAgents:
         self.built.append('assessor')
         return synthetic_evaluation
 
+    def orchestrator(self):
+        """The learning agents of a learner's question (S12, S13): the coach asks back, the Teacher explains."""
+        self.built.append('orchestrator')
+        return _Learning()
+
     def resources(self):
         return Resources(authoring=self.authoring, search=self.search, exports=self.exports,
-                         search_client=self.search_client, assessor=self.assessor)
+                         search_client=self.search_client, assessor=self.assessor, orchestrator=self.orchestrator)
+
+
+class _Learning:
+    """A synthetic run of the learning agents: an answer by intent, and nothing else to record."""
+    last_records, last_proposals = (), []
+
+    def run(self, request, context):
+        if request.intent == 'SOCRATIC_GUIDANCE':
+            content = 'Synthetic coach: who reads your text, and what must they do after reading it?'
+        else:
+            content = 'Synthetic Teacher: name the task, the audience and the fictional details, then the tone.'
+        return LearningResponse(kind='ANSWER', content=content)
 
 
 class _Client:

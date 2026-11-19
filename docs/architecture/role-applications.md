@@ -1591,10 +1591,10 @@ and the browser test.
 
 ## Learner app (S13)
 
-Owner decisions of 18 November 2026 (Chat 36). Part 1: sign-in, the join page,
-my courses and the course view; part 2: practice with the Socratic coach,
-attempts, progress and the browser test from practice to a reviewed
-evaluation. The app (`apps/learner`, `@alm/learner`) reaches the Learner API
+Owner decisions of 18 November 2026 (Chat 36) and 19 November 2026 (Chat 37).
+Part 1: sign-in, the join page, my courses and the course view; part 2: practice
+with the Socratic coach, attempts, progress and the browser test from practice
+to a reviewed evaluation (`e2e/practice.spec.ts`). The app (`apps/learner`, `@alm/learner`) reaches the Learner API
 only, through `createLearnerClient`.
 
 - **Serving.** Under `/learn/` on `127.0.0.1:58003`: its Vite server (`npm run dev`
@@ -1635,10 +1635,48 @@ only, through `createLearnerClient`.
   source maps for it. CI runs it after the build.
 - **Strings.** `learner/src/i18n/en.json`, scanned by the same test as the
   studio's catalogue.
-- **Not yet (part 2).** Practice: submitting an attempt, questions to the
-  Teacher or the Socratic coach (option b) as jobs, own progress, and the
-  browser test from practice to a reviewed evaluation; then the stale rule for
-  evaluation drafts, decided with the owner once the app is tried.
+- **Practice page** (`/learn/courses/{context_id}/activities/{activity_id}`,
+  part 2, owner answers of 19 November 2026). Each activity of the course view
+  links to it ("Work on this activity"); the course view stays read only and
+  links to My progress. The page shows what to do (format, instruction, what
+  the learner hands in, strategies, materials, a link to the assessment on the
+  course view), then:
+  - **The attempt** (PRACTICE and ASSESS activities only; an explanation is
+    read and asked about). Text only. "Submit the attempt" asks for a
+    confirmation ("It is recorded as it is and cannot be changed"), then sends
+    `POST .../attempts` with one request id per text, so a retry after a lost
+    answer is recorded once (once recorded, the same text again is a new
+    attempt); a 409 or the core's refusal (422, its `detail`)
+    is said in words. The learner's attempts at the activity are listed below,
+    each with the evaluations applied to it.
+  - **Questions.** The activity is the problem: every question carries
+    `problem_key` = the activity's id and the activity in `activities`. "Ask the
+    coach" (the default) sends `SOCRATIC_GUIDANCE`. "Ask the Teacher instead"
+    sends `EXPLAIN` at once when the coach does not hold the activity; while it
+    does (the newest question on it that the core recorded, or one still
+    waiting, went to the coach, with no answered question to the Teacher after
+    it: the core's rule), the learner confirms leaving the coach first and the
+    question carries `switch_from_socratic`. One request id per question, as for
+    attempts. The
+    page lists the learner's questions on the activity, newest first, and
+    while any job is queued or running reads `GET .../questions` again every
+    second ("Waiting for an answer…", "The answer is being written…"); an
+    answer shows its content and sources; a question the core held in
+    Socratic mode, a refusal or a failure is explained in words.
+- **My progress** (`/learn/courses/{context_id}/progress`). From
+  `GET .../progress` and `GET .../questions`: the learner's attempts (newest
+  first, each linked to its activity), the evaluations a person applied (the
+  rubric's name and the mode, a table of criteria with the level given and its
+  descriptor, or "Not determined", and the reason, then the result; never a
+  draft), the learning outcomes with their progress and verification in words,
+  and every question in the course with its activity and outcome.
+- **The dev worker answers learners.** `tests.synthetic_worker` (browser
+  tests and UI development only) holds synthetic learning agents: the coach
+  answers with a question (`Synthetic coach: …`), the Teacher with an
+  explanation (`Synthetic Teacher: …`); no model is called.
+- **Not yet.** The stale rule for evaluation drafts (Chat 29 finding 3) is
+  decided with the owner once the app is tried. Choosing between alternative
+  next exercises waits for decision 1.
 
 ## Local identity smoke test
 

@@ -8,14 +8,17 @@ interface LearnerServicesValue {
   api: LearnerApi;
   /** A new id for a learner's request (letters, digits and `-`: a `ClientRequestId`). */
   newRequestId: () => string;
+  /** Milliseconds between two reads of a question whose job is still running. */
+  pollMs: number;
 }
 
 const LearnerServicesContext = createContext<LearnerServicesValue | null>(null);
 
-export function LearnerServicesProvider({ api, newRequestId, children }: {
-  api: LearnerApi; newRequestId?: () => string; children: ReactNode;
+export function LearnerServicesProvider({ api, newRequestId, pollMs = 1000, children }: {
+  api: LearnerApi; newRequestId?: () => string; pollMs?: number; children: ReactNode;
 }) {
-  const value = useMemo(() => ({ api, newRequestId: newRequestId ?? (() => crypto.randomUUID()) }), [api, newRequestId]);
+  const value = useMemo(() => ({ api, pollMs, newRequestId: newRequestId ?? (() => crypto.randomUUID()) }),
+    [api, newRequestId, pollMs]);
   return <LearnerServicesContext.Provider value={value}>{children}</LearnerServicesContext.Provider>;
 }
 

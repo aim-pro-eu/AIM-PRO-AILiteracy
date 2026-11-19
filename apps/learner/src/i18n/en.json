@@ -54,6 +54,7 @@
     "notLearner": "You are not a student of this course.",
     "failed": "The course could not be loaded. Try again in a moment.",
     "back": "Back to my courses",
+    "progress": "My progress in this course",
     "contents": "On this page",
     "outcomes": {
       "heading": "What you will learn",
@@ -76,7 +77,8 @@
       "evidence": "You hand in: {{evidence}}",
       "materials": "Materials: {{titles}}",
       "strategies": "How you learn here: {{names}}",
-      "assessment": "How this activity is assessed"
+      "assessment": "How this activity is assessed",
+      "practise": "Work on this activity"
     },
     "assessments": {
       "heading": "Assessments",
@@ -100,6 +102,111 @@
     "strategies": {
       "heading": "How the course teaches",
       "empty": "This course names no teaching strategy."
+    }
+  },
+  "practice": {
+    "loading": "Loading the activity…",
+    "missing": "This course has no such activity.",
+    "back": "Back to the course",
+    "progress": "My progress in this course",
+    "title": "{{intent}}: {{place}}",
+    "task": {
+      "heading": "What to do",
+      "materials": "Materials"
+    },
+    "attempt": {
+      "heading": "Your attempt",
+      "intro": "Write your answer and submit it. A submitted attempt is recorded as it is and cannot be changed; you may submit another one.",
+      "label": "Your answer",
+      "empty": "Write your answer first.",
+      "submit": "Submit the attempt",
+      "confirm": "Submit this attempt? It is recorded as it is and cannot be changed.",
+      "confirmSubmit": "Yes, submit it",
+      "keepEditing": "Keep editing",
+      "submitted": "Your attempt was submitted. It is listed below, and your assessors can now evaluate it.",
+      "conflict": "This attempt was already sent with another text. Reload the page and submit it again.",
+      "refused": "The attempt was not accepted: {{detail}}",
+      "failed": "The attempt could not be submitted. Try again: it is recorded only once."
+    },
+    "attempts": {
+      "heading": "Your attempts at this activity",
+      "none": "You have not submitted an attempt here yet.",
+      "submitted": "Submitted {{at}}",
+      "evaluated": "Evaluated ({{mode}}). The levels and reasons are in My progress."
+    },
+    "ask": {
+      "heading": "Ask for help",
+      "intro": "The Socratic coach helps you find the answer yourself, with questions; it does not give you the solution. The Teacher explains. On this activity the coach stays with you until you choose the Teacher.",
+      "label": "Your question",
+      "empty": "Write your question first.",
+      "coach": "Ask the coach",
+      "teacher": "Ask the Teacher instead",
+      "confirm": "The coach is guiding you on this activity. Ask the Teacher for an explanation instead? The coach then leaves this activity until you ask it again.",
+      "confirmTeacher": "Yes, ask the Teacher",
+      "stay": "Stay with the coach",
+      "conflict": "This question was already sent with another text. Reload the page and ask again.",
+      "refused": "The question was not accepted: {{detail}}",
+      "failed": "The question could not be sent. Try again: it is sent only once."
+    },
+    "questions": {
+      "heading": "Your questions on this activity",
+      "none": "You have not asked anything here yet.",
+      "toCoach": "You asked the coach",
+      "toTeacher": "You asked the Teacher",
+      "asked": "{{who}}, {{at}}",
+      "queued": "Waiting for an answer…",
+      "running": "The answer is being written…",
+      "stillSocratic": "The coach is still guiding you on this activity, so the Teacher did not answer. Choose “Ask the Teacher instead” to switch.",
+      "noAnswer": "No answer: {{detail}}",
+      "failed": "This question could not be answered. Ask it again in a moment.",
+      "abandoned": "This question was withdrawn.",
+      "sources": "Sources"
+    }
+  },
+  "progress": {
+    "title": "My progress",
+    "loading": "Loading your progress…",
+    "back": "Back to the course",
+    "mode": {
+      "FORMATIVE": "Formative",
+      "FORMAL": "Formal"
+    },
+    "attempts": {
+      "heading": "Your attempts",
+      "none": "You have not submitted an attempt in this course yet.",
+      "submitted": "Submitted {{at}}"
+    },
+    "evaluations": {
+      "heading": "Evaluations",
+      "intro": "Evaluations of your attempts that a teacher reviewed and applied. A draft is not shown until then.",
+      "none": "None of your attempts has been evaluated yet.",
+      "title": "{{assessment}} ({{mode}})",
+      "untitled": "Assessment",
+      "criterion": "Criterion",
+      "level": "Level",
+      "reason": "Reason",
+      "notDetermined": "Not determined",
+      "result": "Result: {{result}}",
+      "levelText": "{{level}}: {{descriptor}}"
+    },
+    "states": {
+      "heading": "Learning outcomes",
+      "intro": "Where you stand on each learning outcome, from the evaluations applied so far.",
+      "none": "No learning outcome has been assessed yet.",
+      "line": "{{progress}} · {{verification}}",
+      "progress": {
+        "ACQUIRED": "Achieved",
+        "IN_PROGRESS": "In progress"
+      },
+      "verification": {
+        "VERIFIED": "Verified",
+        "PENDING_CONFIRMATION": "Awaiting confirmation",
+        "UNVERIFIED": "Not verified"
+      }
+    },
+    "questions": {
+      "heading": "Your questions",
+      "none": "You have not asked anything in this course yet."
     }
   }
 }
