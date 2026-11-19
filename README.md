@@ -104,7 +104,7 @@ The [Documentation](#documentation) section lists the other guides.
 | Tool | Version | Needed for |
 | --- | --- | --- |
 | Python | 3.11 or later (CI uses 3.11) | everything |
-| Node.js | 22.22 or later | the studio and the learner app |
+| Node.js | 26.13 or later | the studio and the learner app |
 | Docker Compose | 2.20.3 or later | Keycloak, PostgreSQL, the WP3 corpus, optional Qdrant/TEI and Langfuse |
 | `openssl` | any | generating local secrets |
 

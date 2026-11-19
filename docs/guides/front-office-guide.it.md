@@ -25,7 +25,7 @@ La guida segue l'ordine in cui lavorerai: avviare l'interfaccia, capire come è 
 
 Per vedere le app con dati veri servono tre pezzi in esecuzione: Keycloak per il login, le API con un database di esempio, e le app in modalità sviluppo. Bastano due terminali, tre se lavori anche sull'app dello studente.
 
-**Prerequisiti, una volta sola.** Git, Node 22.22 o successivo, Python 3, Docker Desktop (Compose 2.20.3 o successivo) e un editor come VS Code. Poi, dalla cartella del repository:
+**Prerequisiti, una volta sola.** Git, Node 26.13 o successivo, Python 3, Docker Desktop (Compose 2.20.3 o successivo) e un editor come VS Code. Poi, dalla cartella del repository:
 
 ```sh
 python3 -m venv .venv
