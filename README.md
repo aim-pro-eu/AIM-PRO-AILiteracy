@@ -345,7 +345,8 @@ Rules that always apply:
   only fixed application text may reach an error message or a log.
 - Every visible UI string goes in the JSON catalogues
   (`apps/*/src/i18n/en.json`); layout and visual design changes are agreed with
-  the layout owner.
+  the layout owner (see the
+  [front-office guide](docs/guides/front-office-guide.it.md), in Italian).
 
 ## Security and data protection
 
@@ -374,6 +375,7 @@ Rules that always apply:
 | WP3 source corpus | [docs/wp3/integration.md](docs/wp3/integration.md) |
 | AIM-PRO integration | [SCN01 review](docs/aimpro/scn01-conceptual-review.md), [change requests](docs/aimpro/metamodel-change-requests.md), [convergence proposal](docs/aimpro/alm-convergence-proposal.md) |
 | Roadmap and plans | [roadmap](docs/plans/prototype-roadmap.md), [role-applications plan](docs/plans/role-applications-plan.md), [handoffs](docs/plans/handoffs/) |
+| Changing the look of the web apps (Italian) | [docs/guides/front-office-guide.it.md](docs/guides/front-office-guide.it.md) |
 | Demo and case studies | [SCN01 runbook](docs/demo/scn01-colleague-runbook.md), [SE-AI case study](examples/se-ai/README.md) |
 | Domain specification | [docs/resources/2026-10-27-specifica.md](docs/resources/2026-10-27-specifica.md) |
 
