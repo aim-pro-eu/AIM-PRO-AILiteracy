@@ -93,6 +93,7 @@ Facts in this table are a snapshot. Every chat re-verifies the ones it uses.
 | D37 | Enrolment like Microsoft Teams: students join a published course with a course code (or a link carrying it) and take part at once; the teacher's reviewed choice to open the course with a code is the human decision. Teaching staff are still added by the reviewed membership proposal (D25, D36). The course is authored independently of its students; once approved, students join or are added, and **the course version stays the same whatever students enrol**: proposals, approvals and the stale check use a course version that leaves out participants and learners' own records, and a student, whether joining with the code or added by the teacher, is recorded as a participant only under the delivery's reviewed learner grant, with no new policy version (this replaces D25/D36 membership for the `LEARNER` role). Staff are left as they are for now. Implemented in S12b (#141) | 18 Nov 2026 |
 | D9 (revised) | A person who signs in through the configured identity provider and is not in the identity map gets a subject key automatically; Keycloak roles still grant nothing and course authority still comes from the trusted policy and the participant record (S12b, #141) | 18 Nov 2026 |
 | D36 | Membership proposals made together (#133): the studio shows the pending membership proposals and warns that one is applied at a time; one membership proposal may add several members (batch); the core does not refuse a proposal while another is pending (options B + batch, S11b) | 17 Nov 2026 |
+| D38 | The stale rule for evaluation drafts (Chat 29 finding 3), option B: another learner's attempt no longer makes a pending evaluation draft stale, since in a real class drafts would almost always expire; a new attempt by the learner whose attempt is evaluated still does, so the assessor starts again from the latest attempt. Any other change of the course still makes the draft stale. To implement in Chat 38 | 19 Nov 2026 |
 | Earlier | Socratic option b; live model runs only with owner authorization; never edit AIM-PRO/jjodel exports | see `docs/architecture/agentic-network-decisions.md` |
 
 ## Proposed defaults to confirm when this roadmap is reviewed
@@ -116,7 +117,6 @@ Open decisions that block later steps, not decided here:
 | Id | Decision | Blocks |
 | --- | --- | --- |
 | D16 | Scenario input independent of the AIM-PRO export (today the Curator reads the AIM-PRO project export) | nothing before S13; needed when scenarios change |
-| Stale drafts | The stale rule for evaluation drafts: every apply and every learner's `submit` gives the course a new version, so every pending proposal goes stale, evaluation drafts included (Chat 29 finding 3, Chat 30 finding 1). Decided with the owner after the learner app is tried | S13 |
 | D21 | The trainer's role once a course is validated, beyond authoring trainer content. Owner direction (9 Nov 2026), to be clarified: the trainer is used to give learners practice, a kind of Socratic agent that hands out exercises with a method. Open points: whether the trainer is a person, an agent or both, and how it relates to the Socratic coach of S13 | after S13 |
 | D28 | A Curator revision of the syllabus in use. Today an applied syllabus can be edited by the teacher but not revised by the Curator: a revision needs a revision request, and a decision on an applied proposal is not one. Options: a revision job that carries its own reason, or a new decision kind (Chat 19 finding 2) | when a course is refined after it is applied |
 | D29 | The form of the optional agent review of a teacher's edit (D27): a job that records a new proposal with the review agent's verdict, or a review record beside the edited proposal. Needs a model call (Chat 19 finding 3) | before the review of an edit is offered |
@@ -697,7 +697,7 @@ Chat 36 finding 2 (the studio's join link default) waits for D17.
 - [x] The learner build contains no authoring code (bundle check, part 1).
 - [x] A learner joins the course with its code or link (S12b) before practising (part 1: the join page and `enrolment.spec.ts`).
 - [x] My courses and the course view (D19, D20) in the browser (part 1).
-- [ ] The stale rule for evaluation drafts (Chat 29 finding 3) is decided with the owner once the learner app is tried.
+- [ ] The stale rule for evaluation drafts (Chat 29 finding 3): decided as D38 (19 Nov 2026, option B: only the evaluated learner's own new attempt makes the draft stale); to implement in Chat 38.
 
 ### S13b — Review and release readability
 

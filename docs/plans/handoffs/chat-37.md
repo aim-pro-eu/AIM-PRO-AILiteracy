@@ -106,7 +106,7 @@ this chat. They run in CI (reported in the PR).
 - [x] **My courses and the course view in the browser** (part 1).
 - [x] **Practice, submission and a reviewed evaluation** (`practice.test.tsx`, `progress.test.tsx`,
   `practice.spec.ts`).
-- [ ] **The stale rule for evaluation drafts**: to decide with the owner once they have tried the app.
+- [ ] **The stale rule for evaluation drafts**: decided as D38 (below); implemented in Chat 38.
 
 ## Findings (not changed)
 
@@ -126,20 +126,23 @@ this chat. They run in CI (reported in the PR).
 
 ## Open decisions
 
-The stale rule for evaluation drafts (Chat 29 finding 3): a learner's new attempt makes a pending evaluation draft of
-the same course stale at application. Chat 36 finding 2 with D17. Still open: D21, D28, D29, D31–D33.
+**D38, decided by the owner on 19 November 2026** (the stale rule for evaluation drafts, Chat 29 finding 3): the
+owner avoids today's behaviour, under which any learner's new attempt makes every pending evaluation draft of the
+course stale, because in a real class drafts would almost always expire. Option B: another learner's attempt no
+longer makes a draft stale; a new attempt by the learner whose attempt is evaluated still does, so the assessor starts
+again from the latest attempt; any other change of the course still does. Recorded in the roadmap; implemented in
+Chat 38. Chat 36 finding 2 waits for D17. Still open: D21, D28, D29, D31–D33.
 
 ## Next step
 
-The owner tries the learner app on a synthetic stack and decides the stale rule. Then **Chat 38** implements that
-decision on a new branch from `main` once this PR is merged, closing milestone M3; S13b follows with the layout owner.
+The owner tries the learner app on a synthetic stack. **Chat 38** implements D38 on a new branch from `main` once this PR is merged, closing milestone M3; S13b follows with the layout owner.
 
 ### Prompt for Chat 38
 
 ```text
 You are Chat 38 of the ALM prototype (repo thesis-fedfalco-2026/AIM-PRO-AILiteracy, checkout
 ~/development/py-prototype). Your step closes **S13** of docs/plans/prototype-roadmap.md (milestone M3): the stale
-rule for evaluation drafts, as the owner decided it after trying the learner app.
+rule for evaluation drafts as the owner decided it (D38, option B).
 
 ## Where things stand
 
@@ -160,9 +163,10 @@ rule for evaluation drafts, as the owner decided it after trying the learner app
    CREWAI_TRACING_ENABLED=false), python -m aimpro.generate --check, python -m services.api_common.openapi --check,
    python -m evaluation --check, and in apps/ npm run check:client, typecheck, test, build, check:bundle. Report any
    difference from the Chat 37 handoff.
-2. Ask the owner, in Italian, for the stale rule if it is not recorded yet (for example: keep it; an attempt by
-   another learner no longer makes the draft stale; no learner's attempt does), and what the studio shows for a stale
-   draft. Record the answer in the roadmap.
+2. D38 (roadmap): another learner's attempt no longer makes a pending evaluation draft stale; a new attempt by the
+   evaluated learner still does; any other change of the course still does. Ask the owner, in Italian, only what D38
+   leaves open (for example what the studio says about a draft made stale by the learner's new attempt), and record
+   the answer in the roadmap.
 3. Contract tests first (the core rule, the API, the studio's stale label), then implement; update the browser test
    if the rule changes what the assessor sees. Run the full offline suite and the checks. Write
    docs/plans/handoffs/chat-38.md; open one focused PR; wait for CI and report.
