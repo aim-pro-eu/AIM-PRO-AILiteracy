@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ALM docs</title>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<style>
+  :root { --bg:#f7f6f2; --panel:#efede6; --text:#1b2433; --muted:#5d6676; --line:#dcd8ce; --accent:#a84a1a; --code:#ebe8df; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#14181f; --panel:#1b212b; --text:#e6e2da; --muted:#9aa3b2; --line:#2c3441; --accent:#f0a36b; --code:#222a35; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:16px/1.6 -apple-system, "Segoe UI", Inter, sans-serif; display:flex; height:100vh; }
+  nav { width:320px; flex:none; background:var(--panel); border-right:1px solid var(--line); overflow:auto; padding:16px; }
+  nav h1 { font-size:18px; margin:0 0 12px; }
+  nav input { width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--text); font:inherit; margin-bottom:12px; }
+  details { margin-bottom:6px; }
+  summary { cursor:pointer; font-weight:600; font-size:14px; color:var(--muted); padding:4px 0; }
+  nav a { display:block; padding:3px 8px; border-radius:4px; color:var(--text); text-decoration:none; font-size:14px; overflow-wrap:anywhere; }
+  nav a:hover { background:var(--line); }
+  nav a.active { background:var(--accent); color:var(--bg); }
+  main { flex:1; overflow:auto; padding:32px 48px; }
+  article { max-width:980px; }
+  .path { color:var(--muted); font-size:13px; margin-bottom:16px; font-family:ui-monospace, monospace; }
+  .path a { color:var(--accent); }
+  article a { color:var(--accent); }
+  article h1, article h2, article h3 { line-height:1.25; }
+  article h2 { border-bottom:1px solid var(--line); padding-bottom:6px; margin-top:36px; }
+  article table { border-collapse:collapse; display:block; overflow:auto; margin:16px 0; }
+  article th, article td { border:1px solid var(--line); padding:6px 10px; vertical-align:top; }
+  article th { background:var(--panel); }
+  article code { background:var(--code); padding:1px 4px; border-radius:4px; font-size:0.9em; }
+  article pre { background:var(--code); padding:12px; border-radius:6px; overflow:auto; }
+  article pre code { padding:0; background:none; }
+  article img, .figure { max-width:100%; background:#fff; border-radius:6px; }
+  .mermaid { background:#fff; border-radius:6px; padding:12px; margin:16px 0; overflow:auto; }
+  @media (max-width: 760px) {
+    body { flex-direction:column; height:auto; }
+    nav { width:100%; max-height:40vh; border-right:none; border-bottom:1px solid var(--line); }
+    main { padding:16px; }
+  }
+</style>
+</head>
+<body>
+<nav>
+  <h1>ALM prototype docs</h1>
+  <p style="font-size:13px;margin:0 0 12px"><a href="https://github.com/thesis-fedfalco-2026/AIM-PRO-AILiteracy">Repository on GitHub</a></p>
+  <input id="filter" type="search" placeholder="Filter by name…">
+  <div id="tree"></div>
+</nav>
+<main><article id="doc"><p>Loading…</p></article></main>
+<script>
+const ORDER = ["docs/architecture", "docs", "docs/plans", "control", "categories", "agents", "agents/authoring", "skills",
+  "docs/aimpro", "docs/wp3", "docs/demo", "docs/resources", "docs/plans/handoffs", ".", "examples"];
+const LABELS = { "docs/architecture": "Architecture", "docs": "Docs (diagrams, evaluation)", "docs/plans": "Plans and roadmap",
+  "docs/plans/handoffs": "Chat handoffs", "control": "Agents: control (Lead)", "categories": "Agents: categories",
+  "agents": "Agents: runtime workers", "agents/authoring": "Agents: authoring", "skills": "Agents: skills",
+  "docs/aimpro": "AIM-PRO", "docs/wp3": "WP3 corpus", "docs/demo": "Demo", "docs/resources": "Resources", ".": "Repository" };
+const STARTS = ["docs/architecture/system-overview.md", "docs/architecture/role-applications.md", "README.md"];
+// Files the site does not carry (code, data) open in the repository on GitHub.
+const BLOB = "https://github.com/thesis-fedfalco-2026/AIM-PRO-AILiteracy/blob/main/";
+let files = [], START = "";
+
+mermaid.initialize({ startOnLoad: false, theme: "default", securityLevel: "strict" });
+
+const dirOf = p => p.includes("/") ? p.slice(0, p.lastIndexOf("/")) : ".";
+const rank = d => { const i = ORDER.indexOf(d); return i < 0 ? ORDER.length : i; };
+
+function resolve(base, href) {
+  const parts = dirOf(base) === "." ? [] : dirOf(base).split("/");
+  for (const seg of href.split("/")) {
+    if (seg === "..") parts.pop(); else if (seg && seg !== ".") parts.push(seg);
+  }
+  return parts.join("/");
+}
+
+function slug(text) {
+  return text.toLowerCase().trim().replace(/[^\p{L}\p{N}\s-]/gu, "").replace(/\s/g, "-");
+}
+
+function buildTree() {
+  const q = document.getElementById("filter").value.toLowerCase();
+  const groups = {};
+  for (const f of files) {
+    if (q && !f.toLowerCase().includes(q)) continue;
+    (groups[dirOf(f)] ||= []).push(f);
+  }
+  const dirs = Object.keys(groups).sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+  const current = decodeURIComponent(location.hash.slice(1)).split("#")[0];
+  document.getElementById("tree").innerHTML = dirs.map(d => {
+    const open = q || d === dirOf(current) || d === "docs/architecture" ? " open" : "";
+    const links = groups[d].map(f =>
+      `<a href="#${encodeURIComponent(f)}" class="${f === current ? "active" : ""}">${f.split("/").pop()}</a>`).join("");
+    return `<details${open}><summary>${LABELS[d] || d} (${groups[d].length})</summary>${links}</details>`;
+  }).join("");
+}
+
+async function show() {
+  const [path, anchor] = (decodeURIComponent(location.hash.slice(1)) || START).split("#");
+  const doc = document.getElementById("doc");
+  const crumb = `<div class="path">${path} · <a href="raw/${path}" target="_blank">raw</a></div>`;
+  buildTree();
+  if (/\.(svg|png)$/.test(path)) {
+    doc.innerHTML = crumb + `<img class="figure" src="raw/${path}" alt="${path}">`;
+    return;
+  }
+  const res = await fetch("raw/" + path);
+  if (!res.ok) { doc.innerHTML = crumb + "<p>Not found.</p>"; return; }
+  doc.innerHTML = crumb + marked.parse(await res.text());
+  doc.querySelectorAll("h1, h2, h3, h4").forEach(h => h.id = slug(h.textContent));
+  doc.querySelectorAll("a[href]").forEach(a => {
+    const href = a.getAttribute("href");
+    if (/^([a-z]+:|#)/i.test(href)) {
+      if (href.startsWith("#")) a.setAttribute("href", "#" + encodeURIComponent(path) + href);
+      else a.target = "_blank";
+      return;
+    }
+    const [target, frag] = href.split("#");
+    const resolved = resolve(path, target);
+    if (files.includes(resolved)) a.setAttribute("href", "#" + encodeURIComponent(resolved) + (frag ? "#" + frag : ""));
+    else { a.setAttribute("href", BLOB + resolved + (frag ? "#" + frag : "")); a.target = "_blank"; }
+  });
+  doc.querySelectorAll("img[src]").forEach(img => {
+    const src = img.getAttribute("src");
+    if (!/^[a-z]+:/i.test(src)) img.src = "raw/" + resolve(path, src);
+  });
+  doc.querySelectorAll("pre code.language-mermaid").forEach(code => {
+    const div = document.createElement("div");
+    div.className = "mermaid";
+    div.textContent = code.textContent;
+    code.parentElement.replaceWith(div);
+  });
+  try { await mermaid.run({ querySelector: "#doc .mermaid" }); } catch (e) { console.warn(e); }
+  const target = anchor && document.getElementById(anchor);
+  if (target) target.scrollIntoView(); else document.querySelector("main").scrollTop = 0;
+}
+
+document.getElementById("filter").addEventListener("input", buildTree);
+window.addEventListener("hashchange", show);
+fetch("docs.json").then(r => r.json()).then(list => {
+  files = list;
+  START = STARTS.find(path => files.includes(path)) || files[0];
+  show();
+});
+</script>
+</body>
+</html>
