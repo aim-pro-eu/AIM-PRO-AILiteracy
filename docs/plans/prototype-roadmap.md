@@ -64,7 +64,7 @@ them and names what is new.
 | Activation | refused while an ASSESS activity has no runtime role (D4) | `RELEASE_RUNTIME_ROLE` in `learning/releases.py` |
 | Web stack | none yet: no `services/`, no `apps/`, no FastAPI dependency | `ls`, `requirements.txt` |
 | Toolchain | Node 22.22.2, Docker 29.8.2; `psycopg[binary]==3.2.12` already pinned | local commands |
-| Repository | `thesis-fedfalco-2026/AIM-PRO-AILiteracy` (renamed from `py-prototype`) | `gh repo view` |
+| Repository | `aim-pro-eu/AIM-PRO-AILiteracy` (renamed from `py-prototype`, transferred from `thesis-fedfalco-2026` on 2026-11-19) | `gh repo view` |
 
 Facts in this table are a snapshot. Every chat re-verifies the ones it uses.
 
@@ -719,7 +719,7 @@ Copy the prompt for the next step. Replace `NN` with the next free handoff numbe
 
 ```text
 Work in /Users/juridirocco/development/py-prototype (GitHub:
-thesis-fedfalco-2026/AIM-PRO-AILiteracy). Read AGENTS.md,
+aim-pro-eu/AIM-PRO-AILiteracy). Read AGENTS.md,
 docs/plans/prototype-roadmap.md (sections "Working protocol" and "S01"), the
 latest docs/plans/handoffs/chat-NN.md, learning/store.py and every core module
 the S01 scope lists. Chat in Italian; write code, docs and GitHub content in
@@ -739,7 +739,7 @@ handoff with evidence and the next step id.
 
 ```text
 Work in /Users/juridirocco/development/py-prototype (GitHub:
-thesis-fedfalco-2026/AIM-PRO-AILiteracy). Read AGENTS.md,
+aim-pro-eu/AIM-PRO-AILiteracy). Read AGENTS.md,
 docs/plans/prototype-roadmap.md (sections "Working protocol", the step SNN and
 any decision it depends on), the latest docs/plans/handoffs/chat-NN.md and the
 files the step names. Chat in Italian; write code, docs and GitHub content in

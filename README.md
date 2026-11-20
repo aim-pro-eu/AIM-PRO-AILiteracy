@@ -6,7 +6,7 @@ agents (Curator, Evaluator, Teacher, Trainer, Socratic coach) propose syllabi,
 assessments, materials and feedback; people review, approve and apply every
 change; the ALM service records each version, decision and learner interaction.
 
-**Browse the documentation:** <https://thesis-fedfalco-2026.github.io/AIM-PRO-AILiteracy/>
+**Browse the documentation:** <https://aim-pro.eu/AIM-PRO-AILiteracy/>
 
 ## Contents
 
@@ -114,7 +114,7 @@ real agents; tests and the synthetic demo need none.
 ## Installation and build
 
 ```bash
-git clone https://github.com/thesis-fedfalco-2026/AIM-PRO-AILiteracy.git
+git clone https://github.com/aim-pro-eu/AIM-PRO-AILiteracy.git
 cd AIM-PRO-AILiteracy
 
 # Python
