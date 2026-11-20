@@ -5,10 +5,11 @@ in-memory identity provider. A learner submits an attempt, idempotent by their
 own request id, and asks the Teacher or the Socratic coach a question, which
 the job worker runs with synthetic learning agents. Each learner reaches only
 their own attempts and questions; a learner still cannot propose, decide or
-apply, and a learner request never persists an ``Evaluation``. Chat 29 finding
-3 is recorded as today's rule: a learner's submit makes a pending evaluation
-draft stale (decided in S13). The network is blocked except for the PostgreSQL
-test service; no model or provider is used.
+apply, and a learner request never persists an ``Evaluation``. The stale rule
+for evaluation drafts (Chat 29 finding 3, D38): the evaluated learner's new
+attempt at the assessment makes a pending draft stale, another learner's attempt
+does not. The network is blocked except for the PostgreSQL test service; no
+model or provider is used.
 """
 
 import json
@@ -219,18 +220,30 @@ class AttemptSubmissionTest(LearnerWritesCase):
                 with self.subTest(name), self.assertRaises(AuthorizationError):
                     call()
 
-    # Chat 29 finding 3, today's rule (decided in S13 once the learner app is tried).
-    def test_finding_3_a_learners_submit_makes_a_pending_evaluation_draft_stale(self):
+    # D38 (Chat 29 finding 3): the evaluated learner's new attempt at the assessment makes the draft stale.
+    def test_the_evaluated_learners_new_submit_makes_a_pending_evaluation_draft_stale(self):
         first, _ = self.seed.attempts()
         proposal = self.seed.draft(first, 'draft-first')
         self.submit('learner', 'attempt-1', FIRST_ATTEMPT)
         with self.seed.contexts.open(DELIVERY) as service:
             service.decide(DELIVERY, self.seed.manifest.staff, proposal, 'APPROVE', 'Synthetic review')
-            with self.assertRaisesRegex(StateConflict, 'Proposal base is stale'):
+            with self.assertRaisesRegex(StateConflict, 'Proposal base is stale: the learner submitted a new attempt'):
                 service.apply(DELIVERY, self.seed.manifest.staff, proposal, 'apply-first')
             self.assertEqual(next(e for e in service.store.owned(DELIVERY, 'ChangeProposal')
                                   if e.id == proposal.id).fields['status'], 'STALE')
         self.assertEqual(self.get('learner', f'/courses/{DELIVERY}/progress')['evaluations'], [])
+
+    # D38: another learner's submit leaves it applicable; the evaluated learner reads the evaluation.
+    def test_another_learners_submit_leaves_a_pending_evaluation_draft_applicable(self):
+        first, _ = self.seed.attempts()
+        proposal = self.seed.draft(first, 'draft-first')
+        second = self.submit('learner-2', 'attempt-1', SECOND_ATTEMPT)
+        self.seed.apply(proposal, 'apply-first')
+        evaluations = self.get('learner', f'/courses/{DELIVERY}/progress')['evaluations']
+        self.assertEqual([e['evidence'] for e in evaluations], [[first.model_dump()]])
+        progress = self.get('learner-2', f'/courses/{DELIVERY}/progress')
+        self.assertEqual(progress['evaluations'], [])
+        self.assertIn(second['ref'], [e['ref'] for e in progress['evidence']])
 
 
 @on_both_backends

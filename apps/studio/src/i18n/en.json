@@ -317,7 +317,10 @@
         "criteria": "Each criterion of the rubric",
         "judged": "{{criterion}} — level “{{level}}”: {{descriptor}} Reason: {{reason}}",
         "undetermined": "{{criterion}} — not determined. Reason: {{reason}}",
-        "result": "Result"
+        "result": "Result",
+        "attemptedAgain": "The student has submitted a new attempt at this assessment since this draft was made, so it can no longer be applied. Ask for a draft of the latest attempt.",
+        "courseChanged": "The course has changed since this draft was made, so it can no longer be applied. Ask for a new draft of the attempt.",
+        "latest": "Ask for a draft of the latest attempt"
       }
     },
     "syllabus": {

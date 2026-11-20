@@ -93,7 +93,7 @@ Facts in this table are a snapshot. Every chat re-verifies the ones it uses.
 | D37 | Enrolment like Microsoft Teams: students join a published course with a course code (or a link carrying it) and take part at once; the teacher's reviewed choice to open the course with a code is the human decision. Teaching staff are still added by the reviewed membership proposal (D25, D36). The course is authored independently of its students; once approved, students join or are added, and **the course version stays the same whatever students enrol**: proposals, approvals and the stale check use a course version that leaves out participants and learners' own records, and a student, whether joining with the code or added by the teacher, is recorded as a participant only under the delivery's reviewed learner grant, with no new policy version (this replaces D25/D36 membership for the `LEARNER` role). Staff are left as they are for now. Implemented in S12b (#141) | 18 Nov 2026 |
 | D9 (revised) | A person who signs in through the configured identity provider and is not in the identity map gets a subject key automatically; Keycloak roles still grant nothing and course authority still comes from the trusted policy and the participant record (S12b, #141) | 18 Nov 2026 |
 | D36 | Membership proposals made together (#133): the studio shows the pending membership proposals and warns that one is applied at a time; one membership proposal may add several members (batch); the core does not refuse a proposal while another is pending (options B + batch, S11b) | 17 Nov 2026 |
-| D38 | The stale rule for evaluation drafts (Chat 29 finding 3), option B: another learner's attempt no longer makes a pending evaluation draft stale, since in a real class drafts would almost always expire; a new attempt by the learner whose attempt is evaluated still does, so the assessor starts again from the latest attempt. Any other change of the course still makes the draft stale. To implement in Chat 38 | 19 Nov 2026 |
+| D38 | The stale rule for evaluation drafts (Chat 29 finding 3), option B: another learner's attempt no longer makes a pending evaluation draft stale, since in a real class drafts would almost always expire; a new attempt by the learner whose attempt is evaluated still does, so the assessor starts again from the latest attempt. Any other change of the course still makes the draft stale. Implemented in Chat 38 (20 Nov 2026) with three choices the owner has not confirmed yet: only the learner's new attempt at the same assessment activity counts (an attempt at another activity does not); an applied evaluation of another learner still makes the draft stale, as D38 says (open: with many drafts, applying one expires the others); the studio says why on the proposal page, before the decision | 19 Nov 2026 |
 | Earlier | Socratic option b; live model runs only with owner authorization; never edit AIM-PRO/jjodel exports | see `docs/architecture/agentic-network-decisions.md` |
 
 ## Proposed defaults to confirm when this roadmap is reviewed
@@ -691,13 +691,19 @@ again every second until its job ends; My progress is a page per course with
 the learner's attempts, applied evaluations, learning states and questions.
 Chat 36 finding 2 (the studio's join link default) waits for D17.
 
+The stale rule for evaluation drafts (D38, option B; Chat 38, 20 November 2026, three choices awaiting the
+owner's confirmation): an evaluation draft stays applicable after joins and after attempts other than its own
+learner's new attempt at the judged assessment activity; that attempt makes it stale, and the core says why; an
+applied proposal of any kind, another learner's evaluation included, still does. The studio's proposal page shows
+the reason before the decision, and again once the application was refused, with a link to "Attempts to evaluate".
+
 **Acceptance.**
 
 - [x] Browser test: practice, submission and a reviewed evaluation on the seed delivery (part 2: `e2e/practice.spec.ts`).
 - [x] The learner build contains no authoring code (bundle check, part 1).
 - [x] A learner joins the course with its code or link (S12b) before practising (part 1: the join page and `enrolment.spec.ts`).
 - [x] My courses and the course view (D19, D20) in the browser (part 1).
-- [ ] The stale rule for evaluation drafts (Chat 29 finding 3): decided as D38 (19 Nov 2026, option B: only the evaluated learner's own new attempt makes the draft stale); to implement in Chat 38.
+- [x] The stale rule for evaluation drafts (Chat 29 finding 3): D38 (19 Nov 2026, option B), implemented in Chat 38: another learner's attempt, or the evaluated learner's attempt at another activity, leaves a pending evaluation draft applicable; the evaluated learner's new attempt at the assessment makes it stale ("the learner submitted a new attempt at this assessment"), as does any applied proposal; the studio's proposal page says so before the decision and links to the attempts to evaluate (`tests/test_enrolment.py`, `tests/services/test_learner_writes.py`, `review-model.test.ts`, `review.test.tsx`).
 
 ### S13b — Review and release readability
 
