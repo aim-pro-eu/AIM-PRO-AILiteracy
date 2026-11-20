@@ -350,3 +350,58 @@ describe('teacher views of generated content and completion rules (S09c2)', () =
     expect(screen.queryByRole('heading', { name: en.review.teacher.students.heading })).toBeNull();
   });
 });
+
+describe('an evaluation draft made stale by the student’s new attempt (D38)', () => {
+  const ref = (type: string, id: string, version = '1') => ({ type, id, version });
+  const attempt = (id: string, activity: string) => entity('LearningEvidence', id, '1', {
+    learner: ref('Participant', 'participant-learner'), activity: ref('ActivityDefinition', activity),
+    contentOrLocator: `Synthetic attempt ${id}` });
+  const change = (base: string, next: string, cause: ReturnType<typeof ref>) =>
+    entity('StateChange', `change-${next}`, '1', { baseVersion: base, newVersion: next, cause });
+  const EVALUATION = entity('Evaluation', 'evaluation-1', 'e1', { mode: 'FORMATIVE',
+    evidence: [ref('LearningEvidence', 'evidence-judged')], criterionJudgments: [], result: 'Synthetic result.' });
+  const draft = (status: string) => entity('ChangeProposal', 'p-1', '1', { status, findings: [],
+    proposedChange: 'Assessor-requested evaluation draft, for a human decision.', baseContextVersion: 'c0',
+    candidateDefinitions: [ref('Evaluation', 'evaluation-1', 'e1')] });
+  const open = (status: string, ...records: unknown[]) => {
+    const proposal = draft(status);
+    const awaiting = status === 'AWAITING_DECISION';
+    return renderStudio({
+      'GET /auth/session': [signedIn],
+      [SUMMARY]: [{ status: 200, body: { context: CONTEXT, findings: [],
+        entities: [CONTEXT, proposal, attempt('evidence-judged', 'activity-assess'), ...records] } }],
+      [PENDING_LIST]: [{ status: 200, body: { proposals: awaiting
+        ? [{ proposal, candidates: [EVALUATION], review_payload_key: KEY }] : [] } }],
+      ...(awaiting ? {} : { [PROPOSAL]: [{ status: 200, body: { proposal, candidates: [EVALUATION], review_payload_key: KEY } }] }),
+    }, '/studio/contexts/ctx/review/p-1');
+  };
+
+  it('says before the decision that the student attempted again, with a way to the latest attempt', async () => {
+    await open('AWAITING_DECISION', attempt('evidence-again', 'activity-assess'),
+      change('c0', 'c1', ref('LearningEvidence', 'evidence-again')));
+    expect((await screen.findByTestId('draft-stale')).textContent).toContain(en.review.teacher.evaluation.attemptedAgain);
+    expect(screen.getByRole('link', { name: en.review.teacher.evaluation.latest }).getAttribute('href'))
+      .toBe('/studio/contexts/ctx/assessments');
+  });
+
+  it('says it again once the application was refused', async () => {
+    await open('STALE', attempt('evidence-again', 'activity-assess'),
+      change('c0', 'c1', ref('LearningEvidence', 'evidence-again')));
+    expect((await screen.findByTestId('draft-stale')).textContent).toContain(en.review.teacher.evaluation.attemptedAgain);
+  });
+
+  it('says nothing after another student’s attempt or the student’s practice', async () => {
+    await open('APPROVED', entity('LearningEvidence', 'evidence-other', '1', {
+      learner: ref('Participant', 'participant-other'), activity: ref('ActivityDefinition', 'activity-assess') }),
+    attempt('evidence-practice', 'activity-practice'),
+    change('c0', 'c-1', ref('LearningEvidence', 'evidence-other')),
+    change('c-1', 'c1', ref('LearningEvidence', 'evidence-practice')));
+    expect(await screen.findByText(en.review.apply.heading)).toBeTruthy();
+    expect(screen.queryByTestId('draft-stale')).toBeNull();
+  });
+
+  it('says the course changed when a proposal was applied since', async () => {
+    await open('AWAITING_DECISION', change('c0', 'c1', ref('ChangeProposal', 'p-other')));
+    expect((await screen.findByTestId('draft-stale')).textContent).toBe(en.review.teacher.evaluation.courseChanged);
+  });
+});

@@ -92,7 +92,8 @@ def approval_valid(entity: Entity, snapshot: Snapshot, policy: TrustedPolicy) ->
 
 # What enrolment and learning change without changing the course (D37, S12b): a proposal reviewed against the
 # course stays applicable when only these changed since its base. An evaluation draft is judged against the
-# learners' records too, so for it only the participants are left out (Chat 29 finding 3; decided in S13).
+# learners' records too: for it the learning states count, and its learner's new attempt at the judged activity
+# makes it stale, while another learner's attempt does not (Chat 29 finding 3, D38).
 LEARNER_FIELDS = ("participants", "activityOccurrences", "learningStates")
 
 
@@ -100,8 +101,12 @@ LEARNER_FIELDS = ("participants", "activityOccurrences", "learningStates")
 LEARNER_CAUSES = {"participants": "Participant", "activityOccurrences": "LearningEvidence"}
 
 
+# Why an evaluation draft no longer applies when its learner attempted the assessment again (D38).
+NEW_ATTEMPT = "Proposal base is stale: the learner submitted a new attempt at this assessment"
+
+
 def left_out(candidates: tuple[Entity, ...]) -> tuple[str, ...]:
-    return ("participants",) if any(c.type == "Evaluation" for c in candidates) else LEARNER_FIELDS
+    return ("participants", "activityOccurrences") if any(c.type == "Evaluation" for c in candidates) else LEARNER_FIELDS
 
 
 def course_version(root: Entity, excluded: tuple[str, ...] = LEARNER_FIELDS) -> str:
@@ -109,20 +114,36 @@ def course_version(root: Entity, excluded: tuple[str, ...] = LEARNER_FIELDS) -> 
     return hashlib.sha256(canonical({k: v for k, v in root.fields.items() if k not in excluded}).encode()).hexdigest()
 
 
-def _same_course(store: LearningStore, root: Entity, base: str, excluded: tuple[str, ...]) -> Entity | None:
-    """The context record at ``base`` when the course is the same in it as in ``root``; otherwise ``None``.
-
-    Every change since ``base`` must be a learner's event of an excluded field (a join, an attempt), never an
-    applied proposal, and the two records must agree outside the excluded fields.
-    """
+def _learner_events(store: LearningStore, root: Entity, base: str, excluded: tuple[str, ...]) -> list[EntityRef] | None:
+    """The causes of the changes since ``base``, newest first, when each is a learner's event of an excluded field
+    (a join, an attempt), never an applied proposal; otherwise ``None``."""
     causes = {LEARNER_CAUSES[name] for name in excluded if name in LEARNER_CAUSES}
     changes = {change.fields["newVersion"]: change for change in store.owned(root.id, "StateChange")}
-    version = root.version
+    events, version = [], root.version
     while version != base:
         change = changes.pop(version, None)
         if change is None or change.fields["cause"]["type"] not in causes:
             return None
+        events.append(EntityRef.model_validate(change.fields["cause"]))
         version = change.fields["baseVersion"]
+    return events
+
+
+def _attempted_again(store: LearningStore, owner: str, events: list[EntityRef], candidates: tuple[Entity, ...]) -> bool:
+    """Whether a learner whose attempt an evaluation draft judges has attempted the same activity since (D38).
+
+    Learners and activities are compared by id: another learner's attempt, or the learner's attempt at another
+    activity, leaves the draft as it was.
+    """
+    def key(evidence):
+        return evidence.fields["learner"]["id"], evidence.fields["activity"]["id"]
+    judged = {key(store.read(EntityRef.model_validate(ref), owner=owner))
+              for candidate in candidates if candidate.type == "Evaluation" for ref in candidate.fields["evidence"]}
+    return any(key(store.read(ref, owner=owner)) in judged for ref in events if ref.type == "LearningEvidence")
+
+
+def _recorded_base(store: LearningStore, root: Entity, base: str, excluded: tuple[str, ...]) -> Entity | None:
+    """The context record at ``base`` when it agrees with ``root`` outside the excluded fields; otherwise ``None``."""
     try:
         recorded = store.read(EntityRef(type="ExecutionContext", id=root.id, version=base), owner=root.id)
     except ValueError:
@@ -309,11 +330,16 @@ def apply_proposal(store: LearningStore, context: RunContext, proposal: EntityRe
     root = store.read_context(context.snapshot.context.id)
     if root.version != current.fields["baseContextVersion"]:
         excluded = left_out(candidates)
-        base = _same_course(store, root, current.fields["baseContextVersion"], excluded)
+        # The course is the same when every change since the base is a learner's event (a join, an attempt) and
+        # the records agree outside the excluded fields; for an evaluation draft, not its learner's new attempt.
+        events = _learner_events(store, root, current.fields["baseContextVersion"], excluded)
+        again = events is not None and _attempted_again(store, root.id, events, candidates)
+        base = (None if events is None or again
+                else _recorded_base(store, root, current.fields["baseContextVersion"], excluded))
         if base is None:
             stale = current.model_copy(update={"version": uuid4().hex, "fields": {**current.fields, "status": "STALE"}})
             store.record_event(operation_id, stale)
-            raise StateConflict("Proposal base is stale")
+            raise StateConflict(NEW_ATTEMPT if again else "Proposal base is stale")
         candidates = _rebased(candidates, base, root, excluded)
     _validate_candidates(context, candidates)
     applied = []

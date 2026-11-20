@@ -434,17 +434,82 @@ class CourseVersionTest(EnrolmentCase):
         with self.seed.contexts.open(DELIVERY) as service:
             self.assertEqual(len(service.own_progress(DELIVERY, 'learner').evaluations), 1)
 
-    def test_a_learners_attempt_still_makes_a_pending_evaluation_draft_stale(self):
+    def activity(self, intent, subject):
+        with self.seed.contexts.open(DELIVERY) as service:
+            return next(e.ref for e in service._context(DELIVERY, subject).snapshot.active_domain()
+                        if e.type == 'ActivityDefinition' and e.fields['intent'] == intent)
+
+    def submit(self, subject, intent, request_id):
+        with self.seed.contexts.open(DELIVERY) as service:
+            return service.submit_attempt(DELIVERY, subject, self.activity(intent, subject), SYNTHETIC_ATTEMPT,
+                                          request_id=request_id).ref
+
+    def occurrences(self):
+        with LearningStore(self.seed.location) as store:
+            return [store.read(EntityRef.model_validate(ref), owner=DELIVERY)
+                    for ref in store.read_context(DELIVERY).fields['activityOccurrences']]
+
+    def proposal_status(self, proposal):
+        with LearningStore(self.seed.location) as store:
+            return next(e for e in store.owned(DELIVERY, 'ChangeProposal') if e.id == proposal.id).fields['status']
+
+    # D38 (option B, 19 November 2026): another learner's attempt leaves the draft applicable.
+    def test_another_learners_attempt_leaves_a_pending_evaluation_draft_applicable(self):
         first, _ = self.seed.attempts()
         proposal = self.seed.draft(first, 'draft-first')
         self.join(STUDENT, self.code)
+        evidence = self.submit(STUDENT, 'ASSESS', 'attempt-1')
+        self.seed.apply(proposal, 'apply-draft')
+        self.assertEqual(self.proposal_status(proposal), 'APPLIED')
         with self.seed.contexts.open(DELIVERY) as service:
-            activity = next(e.ref for e in service._context(DELIVERY, STUDENT).snapshot.active_domain()
-                            if e.type == 'ActivityDefinition' and e.fields['intent'] == 'ASSESS')
-            service.submit_attempt(DELIVERY, STUDENT, activity, SYNTHETIC_ATTEMPT, request_id='attempt-1')
+            self.assertEqual(len(service.own_progress(DELIVERY, 'learner').evaluations), 1)
+            self.assertEqual(service.own_progress(DELIVERY, STUDENT).evaluations, ())
+        # The other learner's attempt, recorded after the draft, is kept by the application.
+        self.assertIn(evidence.model_dump(), [ref for o in self.occurrences() for ref in o.fields['evidence']])
+        self.assertEqual(self.participants()[STUDENT], ['LEARNER'])
+
+    def test_the_evaluated_learners_new_attempt_at_the_assessment_makes_the_draft_stale(self):
+        first, _ = self.seed.attempts()
+        proposal = self.seed.draft(first, 'draft-first')
+        self.submit('learner', 'ASSESS', 'attempt-again')
+        with self.seed.contexts.open(DELIVERY) as service:
             service.decide(DELIVERY, self.staff, proposal, 'APPROVE', 'Synthetic review')
-            with self.assertRaisesRegex(StateConflict, 'Proposal base is stale'):
+            with self.assertRaisesRegex(StateConflict, 'Proposal base is stale: the learner submitted a new attempt'):
                 service.apply(DELIVERY, self.staff, proposal, 'apply-draft')
+            self.assertEqual(service.own_progress(DELIVERY, 'learner').evaluations, ())
+        self.assertEqual(self.proposal_status(proposal), 'STALE')
+
+    def test_the_evaluated_learners_attempt_at_another_activity_leaves_the_draft_applicable(self):
+        first, _ = self.seed.attempts()
+        proposal = self.seed.draft(first, 'draft-first')
+        self.submit('learner', 'PRACTICE', 'practice-1')
+        self.seed.apply(proposal, 'apply-draft')
+        self.assertEqual(self.proposal_status(proposal), 'APPLIED')
+
+    def test_an_applied_evaluation_of_another_learner_still_makes_the_draft_stale(self):
+        # D38: any change of the course other than another learner's attempt or a join still makes it stale.
+        first, second = self.seed.attempts()
+        proposal = self.seed.draft(first, 'draft-first')
+        other = self.seed.draft(second, 'draft-second')
+        self.seed.apply(other, 'apply-second')
+        with self.seed.contexts.open(DELIVERY) as service:
+            service.decide(DELIVERY, self.staff, proposal, 'APPROVE', 'Synthetic review')
+            with self.assertRaisesRegex(StateConflict, r'^Proposal base is stale$'):
+                service.apply(DELIVERY, self.staff, proposal, 'apply-first')
+        self.assertEqual(self.proposal_status(proposal), 'STALE')
+
+    def test_a_draft_after_another_learners_attempt_and_a_join_applies_once(self):
+        first, _ = self.seed.attempts()
+        proposal = self.seed.draft(first, 'draft-first')
+        self.join(STUDENT, self.code)
+        self.submit(STUDENT, 'ASSESS', 'attempt-1')
+        self.join(OTHER_STUDENT, self.code, request_id='join-2')
+        self.seed.apply(proposal, 'apply-draft')
+        with self.seed.contexts.open(DELIVERY) as service:
+            # The same operation again replays the recorded change; nothing more is applied.
+            service.apply(DELIVERY, self.staff, proposal, 'apply-draft')
+            self.assertEqual(len(service.own_progress(DELIVERY, 'learner').evaluations), 1)
+        self.assertEqual(self.participants()[OTHER_STUDENT], ['LEARNER'])
 
     def test_a_staff_membership_applied_after_joins_and_attempts_keeps_them(self):
         member = self.seed.propose_member('learner-3', 'member-1')
