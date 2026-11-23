@@ -190,7 +190,7 @@ metamodel.
 | S11 | — | Runtime assessor role and evaluation adapter (G7); course membership (D25) (done: PR #131) | S10, D25, G7 / D4 |
 | S11b | — | Studio flow fixes from the SE-AI case study: an existing course id as delivery course (#132), pending activation and membership proposals (#133); batch membership (D36) (done: PR #139) | S11, D36 (decided) |
 | S12 | 5 | Learner API, including the learner's own courses (#136) (done: PRs #142, #143) | S11 (done), D19 (answered for S12), D20 (decided, projection on #136) |
-| S12b | — | Teams-style enrolment: a course code or link for students, students added by the teacher in the same way, a course version that enrolments leave unchanged, automatic subject keys (D9 revised) (#141) | S12, D37 |
+| S12b | — | Teams-style enrolment: a course code or link for students, students added by the teacher in the same way, a course version that enrolments leave unchanged, automatic subject keys (D9 revised) (#141) (done: PRs #146, #147) | S12, D37 |
 | S13 | 5 | Learner app: my courses, course view, practice — **milestone M3: learner practice end to end**; the stale rule for evaluation drafts is decided here with the owner | S12, S12b |
 | S13b | — | Review and release readability for the teacher: release views (#125), the next action on long review pages (#134) | S13, the layout owner |
 | S14 | — | Scenario input independent of the AIM-PRO export | D16 |
@@ -199,7 +199,7 @@ metamodel.
 Planned order (owner, 17 November 2026, after the SE-AI case study): Chat 30 writes
 the D19 and D36 options for the owner and specifies S12 (done, PR #137); then S11b
 (done, PR #139); then S12 (part 1, part 2; done, PRs #142 and #143), S12b (Teams-style enrolment, D37;
-owner, 18 November 2026) and S13; then S13b. The SE-AI case study (`examples/se-ai/`) is run again, with the
+owner, 18 November 2026; done, PRs #146 and #147) and S13; then S13b. The SE-AI case study (`examples/se-ai/`) is run again, with the
 owner's authorization, as a live check at M3.
 
 S14 and S15 are listed so they are not forgotten; they are specified when their
@@ -641,21 +641,25 @@ applies one recorded before).
 
 Part 1:
 
-- [ ] **Learner grant.** A participant with only `LEARNER` in a delivery whose installed policy has the grant reads, interacts and submits there exactly as a learner named in the policy (D25 learners keep working) and reads the grant's scopes; learners never gain `propose`, `decide` or `apply`.
-- [ ] **Opening is reviewed.** A new policy file (never changing an installed one) and a proposal that changes only the policy reference; nothing is open until a person applies it; application rechecks that exactly that policy is installed.
-- [ ] **The code.** Created, read, reset and disabled by an administrator of an open delivery; only the nonce and the digest stored; a reset or disabled code is refused; learners and other staff cannot read or change it.
-- [ ] **Joining with the code.** A `LEARNER` participant of that ACTIVE delivery at once, idempotent by the learner's request id; joining again returns the same course; a wrong, reset or disabled code, or a course not ACTIVE, records nothing and answers the same way; the course is in "my courses".
-- [ ] **Course version.** Joining leaves every pending proposal applicable, a pending evaluation draft included; applying a proposal never drops a participant or a learner's record recorded after it was made; a learner's attempt still makes a pending evaluation draft stale; a proposal recorded before S12b still applies when nothing changed since.
-- [ ] **Automatic keys.** Stable `auto-` keys for people of the configured issuer outside the identity map; a map entry using the prefix is refused; a mapped person keeps their key.
-- [ ] **APIs.** Learner API "join with a code"; Authoring API: propose opening, read, reset and disable the code; OpenAPI snapshots regenerated.
-- [ ] **Isolation.** Two learners join with the code and stay isolated; staff membership (D25, D36) unchanged.
-- [ ] Full offline suite, `python -m aimpro.generate --check`, `python -m services.api_common.openapi --check`, `python -m evaluation --check` and the studio checks pass.
+- [x] **Learner grant.** A participant with only `LEARNER` in a delivery whose installed policy has the grant reads, interacts and submits there exactly as a learner named in the policy (D25 learners keep working) and reads the grant's scopes; learners never gain `propose`, `decide` or `apply`.
+- [x] **Opening is reviewed.** A new policy file (never changing an installed one) and a proposal that changes only the policy reference; nothing is open until a person applies it; application rechecks that exactly that policy is installed.
+- [x] **The code.** Created, read, reset and disabled by an administrator of an open delivery; only the nonce and the digest stored; a reset or disabled code is refused; learners and other staff cannot read or change it.
+- [x] **Joining with the code.** A `LEARNER` participant of that ACTIVE delivery at once, idempotent by the learner's request id; joining again returns the same course; a wrong, reset or disabled code, or a course not ACTIVE, records nothing and answers the same way; the course is in "my courses".
+- [x] **Course version.** Joining leaves every pending proposal applicable, a pending evaluation draft included; applying a proposal never drops a participant or a learner's record recorded after it was made; a learner's attempt still makes a pending evaluation draft stale; a proposal recorded before S12b still applies when nothing changed since.
+- [x] **Automatic keys.** Stable `auto-` keys for people of the configured issuer outside the identity map; a map entry using the prefix is refused; a mapped person keeps their key.
+- [x] **APIs.** Learner API "join with a code"; Authoring API: propose opening, read, reset and disable the code; OpenAPI snapshots regenerated.
+- [x] **Isolation.** Two learners join with the code and stay isolated; staff membership (D25, D36) unchanged.
+- [x] Full offline suite, `python -m aimpro.generate --check`, `python -m services.api_common.openapi --check`, `python -m evaluation --check` and the studio checks pass.
 
 Part 2:
 
-- [ ] **Studio members page.** Propose opening, see the code and the join link, reset and disable it.
-- [ ] **Students added by the teacher**, at once, under the learner grant, with no new policy version (replaces D25/D36 for `LEARNER`).
-- [ ] The seed (D15) opens its delivery; a browser test joins with the code.
+- [x] **Studio members page.** Propose opening, see the code and the join link, reset and disable it.
+- [x] **Students added by the teacher**, at once, under the learner grant, with no new policy version (replaces D25/D36 for `LEARNER`).
+- [x] The seed (D15) opens its delivery; a browser test joins with the code.
+
+**Done** in two parts: part 1 in PR #146 (handoff `docs/plans/handoffs/chat-34.md`),
+merged as `9b9f66a`; part 2 in PR #147 (handoff `docs/plans/handoffs/chat-35.md`),
+merged as `9e4320f`. Issue #141 closed.
 
 ### S13 — Learner app (M3)
 
