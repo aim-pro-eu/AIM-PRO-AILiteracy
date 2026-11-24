@@ -178,6 +178,18 @@ class HarnessTest(unittest.TestCase):
         self.assertIn('<file path="AGENTS.md">', out)
         self.assertTrue((self.tmp / "var" / "prompts" / "S02-chatgpt.md").exists())
 
+    def test_check_asks_for_node_modules_instead_of_running_npm(self):
+        (self.tmp / "apps").mkdir()
+        (self.tmp / "apps" / "package.json").write_text("{}")
+        out = io.StringIO()
+        with redirect_stdout(out):
+            ok = self.aim.run_checks([{"name": "npm test", "cmd": "exit 0", "cwd": "apps"}], {"env": {}})
+        self.assertFalse(ok)
+        self.assertIn("npm ci --ignore-scripts", out.getvalue())
+        (self.tmp / "apps" / "node_modules").mkdir()
+        with redirect_stdout(io.StringIO()):
+            self.assertTrue(self.aim.run_checks([{"name": "npm test", "cmd": "exit 0", "cwd": "apps"}], {"env": {}}))
+
     def test_selfcheck_reports_unknown_ids(self):
         data = json.loads((self.tmp / "docs" / "plans" / "steps.json").read_text())
         data["steps"][1]["depends_on"].append("S99")

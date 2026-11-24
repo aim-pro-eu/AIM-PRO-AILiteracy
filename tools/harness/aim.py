@@ -843,12 +843,15 @@ def run_checks(checks: list[dict], cfg: dict) -> bool:
     python = project_python()
     ok_all = True
     for c in checks:
+        cwd = ROOT / c.get("cwd", ".")
         if "url" in c:
             ok, info = http_ok(c["url"])
+        elif (cwd / "package.json").exists() and not (cwd / "node_modules").exists():
+            ok, info = False, f"not run: no node_modules in {cwd.relative_to(ROOT)}; run: cd {cwd} && npm ci --ignore-scripts"
         else:
             cmd = c["cmd"].replace("{python}", shlex.quote(python))
             start = dt.datetime.now()
-            r = subprocess.run(cmd, shell=True, cwd=ROOT / c.get("cwd", "."), env=env, capture_output=True, text=True)
+            r = subprocess.run(cmd, shell=True, cwd=cwd, env=env, capture_output=True, text=True)
             secs = (dt.datetime.now() - start).total_seconds()
             ok, info = r.returncode == 0, f"exit {r.returncode}, {secs:.0f} s"
             if not ok:

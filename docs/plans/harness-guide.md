@@ -113,7 +113,8 @@ have dependencies like steps and can block steps (S13b waits for C3). `./aim sho
 ```
 
 Python commands use the project's `.venv` (of the worktree, else of the main checkout), or `AIM_PYTHON` when set;
-the first line of the output names it. Commands run with telemetry off (`LANGFUSE_ENABLED=false` and the CrewAI variables of `config.json`) and never call a
+the first line of the output names it. A front-end check in a folder without `node_modules` (a fresh worktree) is not run: it
+fails with the command to install them (`npm ci --ignore-scripts` in `apps/`). Commands run with telemetry off (`LANGFUSE_ENABLED=false` and the CrewAI variables of `config.json`) and never call a
 model. `./aim check stack` only reads health URLs: it never starts or stops your stacks.
 
 ### Housekeeping
