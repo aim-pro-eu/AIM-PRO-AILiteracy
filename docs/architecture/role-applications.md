@@ -424,7 +424,7 @@ request id.
 ## Front-end workspace
 
 `apps/` is an npm workspace (D12) with exact versions in `apps/package-lock.json`;
-Node 22.22 or later.
+Node 26.13 or later.
 
 | Workspace | Content |
 | --- | --- |
@@ -1413,9 +1413,9 @@ writes need the CSRF header, as the Authoring API's writes do; the module
   `ActivityOccurrence` and its `LearningEvidence`, observed events. The same id
   and attempt again return the same evidence and write nothing; another attempt
   or activity under that id is a 409. Submitting proposes, decides and
-  evaluates nothing. As today (Chat 29 finding 3, decided in S13), a submit
-  makes a pending evaluation draft stale when it is applied; since S12b it no
-  longer makes any other proposal stale (see the course version below).
+  evaluates nothing. A submit makes a pending evaluation draft stale only when
+  it is the evaluated learner's new attempt at the judged activity (D38, S13);
+  it never makes any other proposal stale (see the course version below).
 - **The learner request as a job (part 2).** `POST .../questions` checks that
   the subject is a learner of the active course with `interact`
   (`LearningService.authorize_learner_requests`) and queues the job
@@ -1525,9 +1525,13 @@ and the browser test.
   `Participant`, or an attempt, caused by its `LearningEvidence`; never an
   applied proposal), and the context record at the base and the current one
   agree without `participants`, `activityOccurrences` and `learningStates`
-  (`learning.decisions.course_version`). For an evaluation draft only joins and
-  `participants` count, so a learner's new attempt still makes it stale (Chat 29
-  finding 3, decided in S13). When only
+  (`learning.decisions.course_version`). For an evaluation draft
+  `learningStates` count too, and so does one attempt: a new attempt by the
+  learner whose attempt it judges, at the same activity (learners and
+  activities compared by id), makes it stale with "Proposal base is stale: the
+  learner submitted a new attempt at this assessment"; another learner's
+  attempt, or the learner's attempt at another activity, does not (Chat 29
+  finding 3, D38, S13). When only
   those fields changed, the proposal's context record is applied with them
   merged: the participants and learners' records recorded since are kept, and
   the applied record gets its own version. A candidate may name an earlier
@@ -1674,9 +1678,17 @@ only, through `createLearnerClient`.
   tests and UI development only) holds synthetic learning agents: the coach
   answers with a question (`Synthetic coach: …`), the Teacher with an
   explanation (`Synthetic Teacher: …`); no model is called.
-- **Not yet.** The stale rule for evaluation drafts (Chat 29 finding 3) is
-  decided with the owner once the app is tried. Choosing between alternative
-  next exercises waits for decision 1.
+- **The stale rule for evaluation drafts (D38, Chat 38).** Another learner's
+  attempt no longer makes a pending evaluation draft stale; the evaluated
+  learner's new attempt at the judged activity still does, as does any applied
+  proposal, another learner's evaluation included (see the course version).
+  The studio's proposal page follows the `StateChange` records back from the
+  context's version as the core does (`evaluationDraftState` in
+  `features/review/model.ts`) and, for a draft awaiting a decision, approved or
+  refused as stale, says why it can no longer be applied: the student's new
+  attempt, with a link to "Attempts to evaluate" for a draft of the latest one,
+  or a change of the course.
+- **Not yet.** Choosing between alternative next exercises waits for decision 1.
 
 ## Local identity smoke test
 

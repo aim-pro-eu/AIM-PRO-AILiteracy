@@ -1,222 +1,394 @@
-# ALM prototype with CrewAI agents
+# AIM-PRO AI Literacy — ALM prototype
 
+<<<<<<< HEAD
 Start with the [system overview: capabilities, agents and architecture](docs/architecture/system-overview.md)
 for the agent catalogue, interaction diagrams, application boundaries and current limitations.
 
 For a colleague presentation, follow the [SCN01 step-by-step demo runbook](docs/demo/scn01-colleague-runbook.md).
 It provides a fresh isolated database, explicit review steps, live MCP checks,
 Teacher/Trainer commands and expected state changes using a fixed illustrative workshop.
+=======
+A working prototype for designing learning paths with AI agents and delivering
+them under human control. It is built on ALM, the Agnostic Learning Metamodel:
+agents (Curator, Evaluator, Teacher, Trainer, Socratic coach) propose syllabi,
+assessments, materials and feedback; people review, approve and apply every
+change; the ALM service records each version, decision and learner interaction.
+>>>>>>> 5aca25534bbd67a9583378db654627cd65b104d6
 
-The [versioned authoring architecture](docs/architecture/authoring-lifecycle.md)
-defines independently reviewed artifacts, frozen releases and separate delivery
-contexts. Its executable acceptance test uses simulated agents and the existing
-ALM lifecycle. The dedicated Evaluator now has a real source-backed, human-approved
-SCN01 result. Production release, delivery-import and activation commands are
-described in [the release guide](docs/architecture/releases.md); no SCN01 release
-has been proposed.
+**Browse the documentation:** <https://aim-pro.eu/AIM-PRO-AILiteracy/>
 
-Local application for managing an ALM learning context with state and tracking in SQLite. A Lead agent plans tasks, specialized agents produce responses, and code checks permissions, sources and results. Generation uses OpenRouter by default; search uses the WP3 PostgreSQL corpus through MCP, with mock data for synthetic tests and optional Qdrant/TEI retrieval.
+## Contents
 
-- [ALM metamodel 1.0.0](docs/resources/metamodello-agnostico-apprendimento.json)
-- [ALM conceptual model: diagrams, relationships and lifecycle](docs/architecture/alm-model.md)
-- [Domain specification](docs/resources/2026-10-27-specifica.md)
+- [Overview](#overview)
+- [Status](#status)
+- [Architecture](#architecture)
+- [Repository layout](#repository-layout)
+- [Requirements](#requirements)
+- [Installation and build](#installation-and-build)
+- [Configuration](#configuration)
+- [How to run](#how-to-run)
+- [Testing](#testing)
+- [Data and storage](#data-and-storage)
+- [How to contribute](#how-to-contribute)
+- [Security and data protection](#security-and-data-protection)
+- [Documentation](#documentation)
+- [License](#license)
 
-Work on the AIM-PRO integration starts with the [SCN01 integration review and issue dependency path](docs/aimpro/scn01-conceptual-review.md).
-The [2 November 2026 jjodel project](docs/resources/aimpro-megamodel-2026-11-02.json)
-is preserved as exported. Run `python3 -m aimpro.audit` to inspect `SCN01` and
-`elena_usecase_competencies`, or add `--all` for every model; this inspection does
-not migrate the ALM runtime. The AIM-PRO metamodel is externally owned and remains
-unchanged; requested changes are tracked in [the change requests](docs/aimpro/metamodel-change-requests.md)
-and checked by `python3 -m aimpro.change_requests`. Run
-`.venv/bin/python -m aimpro.adapter` to export the resolved scenario closure for
-authoring review, preserving raw values, source identities and diagnostics.
-This envelope is for authoring review and does not authorize learning execution.
-Generated Pydantic domain classes preserve the external declarations, including
-free-text fields. Run `.venv/bin/python -m aimpro.generate --check` to verify the
-checked-in concrete schemas and fingerprint, or `.venv/bin/python -m aimpro.validation`
-to inspect the scenario against those contracts. Validation reports source gaps
-and records scalar/list transport conversions while retaining the original data.
-Run `.venv/bin/python -m aimpro.lead` to prepare the Lead input without calling
-a model. Add `--run` to request a structured review from the configured Lead.
-This path builds only the Lead, preserves deterministic findings in its result,
-and does not invoke workers, retrieval, approvals or SQLite writes. It uses the
-Lead profile and credentials from the existing configuration and `.env`.
+## Overview
 
-To generate teaching units, materials, activities and proposed analytic rubrics,
-use `python -m learning` with the required `--db`, `--policy`, `--subject` and
-`--context` options, followed by
-`generate-aimpro docs/resources/aimpro-megamodel-2026-11-02.json --request-id teaching-1`.
-This requires `propose` permission and a `PREPARATION/DRAFT` context. The configured
-Lead generates and semantically reviews a draft, then the service stores a
-pending proposal in the existing SQLite lifecycle. Review it through `decide`
-and apply it through `apply`; neither operation starts learning or records
-learner achievement. Required resources and progression rules remain explicit
-gaps before activation. See the [integration workflow](docs/aimpro/scn01-conceptual-review.md#teaching-generation-and-local-execution-state).
-For WP3-backed drafting, append `--source-scope wp3 --query '"prompt engineering"' --k 1`.
-The policy must explicitly authorize read access to source `wp3` for that subject
-and context. Retrieval uses the existing MCP client with full metadata, retains
-exact resource versions and excerpt citations, and proposes source resources
-without approving bindings. Empty or truncated retrieval does not silently
-fall back to ungrounded generation.
+The system has two modes:
 
-For dedicated Curator syllabus proposals, use `generate-aimpro-syllabus` with
-mandatory `--source-scope` and `--query`. The Curator generates a typed outline,
-the Lead reviews it, and a human approves/applies the exact pending payload.
-`show-aimpro-syllabus` resolves the approved version for subsequent authoring.
-See [the Curator workflow](docs/aimpro/curator-syllabus.md); outline approval
-keeps PREPARATION/DRAFT and does not activate learning.
+- **PREPARATION**: a teacher builds a course from an uploaded AIM-PRO model:
+  sources prepared and accepted, a Curator syllabus refined step by step, then
+  Evaluator assessments and rubrics, Teacher and Trainer content and completion
+  rules. The course is then released, imported into a delivery and activated.
+- **LEARNING**: enrolled learners open the course, practise, submit attempts and
+  talk to the Socratic coach; an assessor asks the runtime evaluator for a draft
+  evaluation that a person reviews.
 
-Use `prepare-aimpro-syllabus-sources` for multi-query discovery and exact
-content-pinned excerpt selection without models. Review its packet before
-authorizing `generate-aimpro-syllabus --prepared-sources <request-id>`; see
-[selected-source preparation](docs/aimpro/selected-sources.md).
+One rule holds everywhere: **agents propose, people decide, ALM records.**
+`LearningService` and its store own every write; a model verdict is never a
+human approval, and no agent can change permissions, approve, apply or mark a
+competency as acquired.
 
-Production authoring projects select an approved/applied Curator syllabus and
-exact artifact versions through reviewed immutable revisions. Use
-`init-authoring-project`, `revise-authoring-project`, `show-authoring-project`
-and `show-project-syllabus`; see the [project CLI guide](docs/architecture/authoring-projects.md).
-Dedicated Evaluator, Teacher and Trainer authoring now use this project boundary:
-`generate-project-assessments`, `generate-project-teacher` and
-`generate-project-trainer`. See [the generator guide](docs/architecture/authoring-generators.md)
-for exact input bundles, review and replay. The [SCN01 Evaluator report](docs/aimpro/scn01-evaluator-example.md)
-records real source-backed generation, separate Lead review, owner approval and
-isolated production application. Teacher/Trainer scaffolding is covered with
-synthetic responses; #10 still requires its own authorized real workflow.
-Production release/import commands are in [the release guide](docs/architecture/releases.md);
-learner runtime evaluation remains separate.
+## Status
 
-## Installation
+Research prototype, under active development. Synthetic data only; it is not
+deployed and has not been piloted with learners. Done so far (steps of the
+[prototype roadmap](docs/plans/prototype-roadmap.md)):
 
-Python 3 is required, along with Docker Compose 2.20.3 or later only for real search.
+| Area | Delivered |
+| --- | --- |
+| Platform | ALM store on SQLite or PostgreSQL, Authoring API and Learner API (FastAPI), Keycloak sign-in, agent job worker |
+| Authoring studio | Course from an AIM-PRO model, source preparation, syllabus refinement, Evaluator/Teacher/Trainer forms with generation by blocks of units, every proposal read in plain words |
+| Delivery | Release, delivery import, activation, course members, the runtime assessor, Teams-style enrolment with a course code |
+| Learner app | Join with a code, my courses, course view, practice with the Socratic coach, progress |
+
+Open decisions and the next steps are listed in the roadmap and in the latest
+handoff under [docs/plans/handoffs/](docs/plans/handoffs/).
+
+## Architecture
+
+```text
+Browser apps (studio, learner app)
+  -> Authoring API / Learner API (FastAPI, OIDC sessions through Keycloak)
+       -> LearningService -> ALM store (SQLite or PostgreSQL) + jobs store
+       -> agent job (queued)
+            -> job worker -> Lead + specialist agents (CrewAI) -> model providers
+                          -> scoped retrieval through MCP -> WP3 source corpus
+```
+
+- Applications reach agents only through jobs; only the worker loads model
+  credentials.
+- Every generated artifact is a typed proposal, checked by code and by a
+  review agent before a person sees it.
+- The AIM-PRO/jjodel export is read, never edited; the ALM metamodel is the
+  reference model.
+
+Start with [role applications](docs/architecture/role-applications.md)
+(processes, APIs, identity, studio and learner app) and the
+[agentic-network decision register](docs/architecture/agentic-network-decisions.md).
+The [Documentation](#documentation) section lists the other guides.
+
+## Repository layout
+
+| Path | Content |
+| --- | --- |
+| `learning/` | ALM core: `LearningService`, store, policies, projects, releases, CLI (`python -m learning`) |
+| `aimpro/` | AIM-PRO adapter, generated contracts, Curator and generators (Evaluator, Teacher, Trainer) |
+| `agent_system/` | Agent registry, dispatchers, CrewAI Flow orchestrator, model clients, events, telemetry |
+| `control/`, `categories/`, `agents/`, `skills/` | Agent definitions: the Lead, role categories, worker and authoring agents, skills |
+| `document_search/` | MCP retrieval server and backends (mock, WP3 PostgreSQL, Qdrant) |
+| `services/` | `authoring_api`, `learner_api`, `jobs` (store and worker), `api_common`, OpenAPI snapshots |
+| `apps/` | npm workspace: `studio`, `learner`, shared `packages/`, Playwright tests in `e2e/` |
+| `evaluation/` | Offline adversarial evaluation suite |
+| `tests/` | Python test suite, synthetic seed and synthetic worker |
+| `infra/` | Keycloak dev realm and identity map, WP3 database image |
+| `examples/` | Case studies (SE-AI) and scenario data (SCN01) |
+| `tools/docsite/` | The documentation site published on GitHub Pages |
+| `docs/` | Architecture guides, plans and chat handoffs, AIM-PRO material, evaluation |
+
+## Requirements
+
+| Tool | Version | Needed for |
+| --- | --- | --- |
+| Python | 3.11 or later (CI uses 3.11) | everything |
+| Node.js | 26.13 or later | the studio and the learner app |
+| Docker Compose | 2.20.3 or later | Keycloak, PostgreSQL, the WP3 corpus, optional Qdrant/TEI and Langfuse |
+| `openssl` | any | generating local secrets |
+
+A model provider key (OpenRouter, Anthropic or OpenAI) is needed only to run
+real agents; tests and the synthetic demo need none.
+
+## Installation and build
 
 ```bash
+git clone https://github.com/aim-pro-eu/AIM-PRO-AILiteracy.git
+cd AIM-PRO-AILiteracy
+
+# Python
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
+
+# Front-end (studio and learner app)
+cd apps
+npm ci --ignore-scripts
+npm run build            # studio/dist and learner/dist
+cd ..
 ```
+
+Generated artifacts are checked in and verified in CI. Regenerate them only
+after changing their source:
+
+| Change | Regenerate | Check |
+| --- | --- | --- |
+| AIM-PRO metamodel contracts | `python -m aimpro.generate` | `python -m aimpro.generate --check` |
+| An API route or model | `python -m services.api_common.openapi` | `python -m services.api_common.openapi --check` |
+| An OpenAPI snapshot | `npm run generate:client` (in `apps/`) | `npm run check:client` |
 
 ## Configuration
 
-For the real WP3 corpus, follow the [WP3 setup and architecture decision](docs/wp3/integration.md): `SEARCH_BACKEND=postgres` and `docker compose up -d --wait wp3-postgres`. PostgreSQL persists the restored dump in a named volume and search uses the existing local MCP server.
-
-Create `.env` in the project root. For testing with synthetic documents, set `OPENROUTER_API_KEY` and `SEARCH_BACKEND=mock`. This mode does not require Docker. Do not add the key to the repository.
-
-The Lead and specialized agents select their profiles in `control/lead.md` and `agents/*.md`, respectively. `model.properties` defines the provider, model and credential variable name; `runtime.properties` defines the Lead, generation parameters and limits. The included OpenRouter model ends in `:free` and does not automatically switch to a paid model. Using a paid model requires `allow_paid = true` in its profile.
-
-To search real documents, set `SEARCH_BACKEND=qdrant` and configure the following variables in `.env`:
+Create `.env` in the repository root; it is ignored by git. Never commit keys.
 
 | Variable | Purpose |
 | --- | --- |
-| `EMBEDDING_MODEL_ID` | Model loaded by TEI, such as `google/embeddinggemma-300m` |
-| `QDRANT_URL`, `QDRANT_COLLECTION` | Qdrant endpoint and collection |
-| `EMBEDDING_URL`, `EMBEDDING_MODEL` | Endpoint and model name for embedding requests |
-| `EMBEDDING_DIMENSIONS`, `EMBEDDING_API_KEY` | Vector dimension and credential sent to the embedding endpoint |
-| `QDRANT_API_KEY` | Optional, only if required by Qdrant |
+| `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` | Model provider keys, as named by the profiles in `model.properties` |
+| `SEARCH_BACKEND` | `mock` (synthetic documents), `postgres` (WP3 corpus) or `qdrant` |
+| `LANGFUSE_ENABLED` | `false` by default; see [observability](docs/observability.md) |
 
-After accepting the embedding model license, populate the shared cache once before starting TEI offline.
+- **Models.** `model.properties` defines the profiles (provider, model, key
+  variable); each agent picks one in its file (`control/lead.md`,
+  `agents/*.md`). `runtime.properties` sets the Lead, generation parameters,
+  the model-call deadline and orchestration limits. The default OpenRouter
+  model is free and never switches to a paid one; a paid profile needs
+  `allow_paid = true`.
+- **Sources.** For the real WP3 corpus, follow the
+  [WP3 setup](docs/wp3/integration.md) (`SEARCH_BACKEND=postgres`,
+  `docker compose up -d --wait wp3-postgres`). For Qdrant and TEI, set
+  `QDRANT_URL`, `QDRANT_COLLECTION`, `EMBEDDING_URL`, `EMBEDDING_MODEL`,
+  `EMBEDDING_MODEL_ID`, `EMBEDDING_DIMENSIONS` and `EMBEDDING_API_KEY` and run
+  `docker compose --profile vector up -d tei-embedding qdrant`; this project
+  does not create or populate the Qdrant collection.
+- **APIs and worker.** The `ALM_*` variables (store, policy directory, jobs
+  store, OIDC client, identity map, course template, exports directory,
+  enrolment secret) are described in
+  [role applications, Configuration](docs/architecture/role-applications.md#configuration).
 
-`HF_TOKEN` is needed only for the initial download and is not passed to running services. Start vector services with `docker compose --profile vector up -d tei-embedding qdrant`; TEI listens on `127.0.0.1:9000` and Qdrant on `127.0.0.1:6333` (HTTP) and `6334` (gRPC).
+## How to run
 
-This project **does not create or populate** the Qdrant collection. Document ingestion is external: EmbeddingGemma requires 768-dimensional vectors and data with `text`, `metadata.source` and `metadata.source_scope` for PREPARATION, or `metadata.resource_key` for LEARNING. PREPARATION search requires an authorized source scope; LEARNING requires bound, approved resources with exact versions.
+### Local demo with synthetic data
 
-## Local ALM workflow
-
-Orchestration uses a new CrewAI Flow for every request: `@start` prepares and authorizes the plan, `@router` selects steps in dependency order, and `@listen` executes them and starts final synthesis. A single accepted step is delivered as is, after the deterministic final check; several steps are synthesized and semantically reviewed again. A plan that violates a plan rule gets one corrected attempt. Each executable step is a CrewAI `Task` (`DelegatedTask`) with `output_pydantic=WorkerOutput` and a guardrail applying semantic review and the checks in `learning/`. The adapter delegates through a plain `TaskDispatcher` registry resolver (not an LLM tool), without automatic retries after rejection. Steps depending on failed results are skipped; independent steps continue.
-
-The Flow keeps only an execution cursor in CrewAI state; automatic memory and Flow persistence are disabled. Permissions, snapshots, results and changes remain under the control of `learning/` and the existing SQLite service.
-
-Operational `python -m learning` commands require `--db`, `--policy`, `--subject` and `--context` before the subcommand. Use `--help` to see `bootstrap`, `propose`, `decide`, `apply`, `abandon`, `ask`, `submit` and `show`.
-
-The CLI is intended for a trusted local operator: `--subject` selects a person; it **does not authenticate** a remote person. Protect the policy file and database at the host level. A generated response neither approves proposals nor automatically assigns learner progress.
-
-`bootstrap` rejects an existing context: use a new database to repeat the example. If `ask` is interrupted after reserving `demo-ask-1`, an authorized administrator may run `alm abandon demo-ask-1`; the next attempt requires a new ID. `submit` records an observed response, but an evaluation must be proposed, approved and applied separately.
-
-## Data and verification
-
-The SQLite path is always the one supplied with `--db`; there is no default database. Opening a schema v1 database creates a private `.v1.bak` copy (or `.v1.N.bak` if one already exists) and migrates it to v2: stop other writers before opening it. The previous application version cannot read v2; restoring the v1 backup after new writes discards those writes.
-
-Legacy specialization names are not migrated automatically: `teacher` → `lesson-explainer`, `trainer` → `guided-practice-coach`, `socratic` → `reasoning-questioner`. For `curator`, choose `lesson-support-summarizer` in LEARNING or `resource-candidate-researcher` in PREPARATION; for `evaluator`, choose `learner-response-evaluator` in LEARNING or `assessment-designer` in PREPARATION. Update specializations through an authorized proposal, review and application, preserving historical versions.
-
-`docker compose down` preserves volumes. **`docker compose down -v` also deletes Qdrant data and model caches**: do not use it without saving the required data.
+The whole prototype on one machine, with synthetic model responses: no model
+key and no network beyond the local containers. The secrets are drawn once into
+an environment file that every terminal sources.
 
 ```bash
-.venv/bin/python -m unittest discover -q
-.venv/bin/python smoke.py --runs 1
+# 1. Once: settings and local secrets, then Keycloak and a seeded state
+cat > /tmp/alm-dev.env <<EOF
+export ALM_KEYCLOAK_ADMIN_PASSWORD=$(openssl rand -hex 16)
+export ALM_KEYCLOAK_DEV_PASSWORD=$(openssl rand -hex 16)
+export ALM_OIDC_CLIENT_SECRET=$(openssl rand -hex 24)
+export ALM_ENROLMENT_SECRET=$(openssl rand -hex 24)
+export ALM_OIDC_ISSUER=http://127.0.0.1:58080/realms/alm-dev
+export ALM_IDENTITY_MAP=infra/keycloak/identity-map.dev.json ALM_API_COOKIE_SECURE=false
+export ALM_STORE=/tmp/alm-seed/alm.sqlite ALM_POLICY_DIR=/tmp/alm-seed/policies
+export ALM_JOBS_STORE=/tmp/alm-seed/jobs.sqlite ALM_AIMPRO_EXPORTS=/tmp/alm-seed/exports
+export ALM_COURSE_TEMPLATE=/tmp/alm-seed/course-template.json
+EOF
+source /tmp/alm-dev.env
+docker compose -f compose.identity.yml up -d --wait   # users dev-admin, dev-learner, dev-assessor, dev-unmapped
+python -m tests.seed --output /tmp/alm-seed            # contexts, a project, proposals, a release, two deliveries
+mkdir -p /tmp/alm-seed/exports
+echo '{"format": 1, "creators": ["admin"], "source_scopes": {"wp3": ["wp3"]}}' > /tmp/alm-seed/course-template.json
+
+# Each block below in its own terminal, from the repository root:
+#   source .venv/bin/activate && source /tmp/alm-dev.env
+
+# 2. Authoring API, and the synthetic job worker in another terminal
+ALM_OIDC_CLIENT_ID=alm-authoring-api ALM_OIDC_REDIRECT_URI=http://127.0.0.1:58000/auth/callback \
+  ALM_OIDC_POST_LOGOUT_REDIRECT_URI=http://127.0.0.1:58000/ \
+  python -m services.authoring_api --port 58001
+python -m tests.synthetic_worker --poll 1
+
+# 3. Studio: http://127.0.0.1:58000/studio/
+cd apps && npm run dev --workspace @alm/studio
+
+# 4. Learner API, and the learner app in another terminal: http://127.0.0.1:58003/learn/
+ALM_OIDC_CLIENT_ID=alm-learner-api ALM_OIDC_REDIRECT_URI=http://127.0.0.1:58003/auth/callback \
+  ALM_OIDC_POST_LOGOUT_REDIRECT_URI=http://127.0.0.1:58003/ \
+  python -m services.learner_api --port 58002
+cd apps && npm run dev --workspace @alm/learner
 ```
 
-Automated tests use synthetic data. `smoke.py` actually calls the free OpenRouter model and uses the MCP protocol, but selects `mock` search: it does not verify the Qdrant collection, TEI or local vLLM.
+Sign in to the studio as `dev-admin` with the password in
+`ALM_KEYCLOAK_DEV_PASSWORD`. Both APIs read the same `ALM_ENROLMENT_SECRET`, so
+course codes match. The step
+by step checks are in
+[role applications, Local identity smoke test](docs/architecture/role-applications.md#local-identity-smoke-test).
+Stop Keycloak with `docker compose -f compose.identity.yml down`.
 
-## Structured event log (optional)
+| Port | Service |
+| --- | --- |
+| 58000 | Studio (forwards API paths to 58001) |
+| 58001 | Authoring API |
+| 58002 | Learner API |
+| 58003 | Learner app (forwards API paths to 58002) |
+| 58080 | Keycloak |
+| 55433 | ALM PostgreSQL (`compose.alm.yml`, optional) |
+| 3000 | Langfuse (optional) |
 
-Set `ALM_EVENT_LOG=<path>.jsonl` to record a content-free event for each plan,
-model call, retrieval, review and step outcome of a learning request. Run
-`python -m agent_system.metrics <path>.jsonl` to derive model calls, rejection
-rates, token usage and latency from that log. See [the event log](docs/architecture/event-log.md).
-`python -m evaluation --check` runs the adversarial [evaluation suite](docs/evaluation.md) without model calls.
+### With real agents
 
-## Langfuse tracing (optional)
-
-Telemetry is disabled by default. When `LANGFUSE_ENABLED` is absent or `false`, the module neither imports Langfuse/OpenInference nor sends data. Dependencies are included in `requirements.txt` so integration tests with an in-memory exporter can also run.
-
-To start observability alone, without Qdrant, TEI or vLLM:
+Replace the synthetic worker with the production worker, the only process that
+loads model credentials:
 
 ```bash
-docker compose -f compose.local.yml --profile observability up -d
+python -m services.jobs --poll 1
 ```
 
-The main configuration includes the same profile: `docker compose --profile observability up -d` also starts Qdrant and TEI and requires their configuration. The Langfuse stack includes web, worker, Postgres, ClickHouse, Redis and MinIO, with dedicated volumes. Only web (`127.0.0.1:3000`) and MinIO (`127.0.0.1:9090`, for media) expose host ports; it does not occupy TEI/Qdrant ports. Langfuse images follow major version 4 of the upstream configuration: pin validated digests for persistent installations.
+It reads the keys from `.env` and the profiles from `model.properties`. Live
+runs call a model provider and may cost money; in this project they need the
+owner's explicit authorization. Prefer `LANGFUSE_ENABLED=false` unless tracing
+is wanted. The [SE-AI case study](examples/se-ai/README.md) (`examples/se-ai/stack.sh`)
+runs the whole flow on a new empty state.
 
-### Initial setup and complete test
+### Command line
 
-1. Install dependencies with `.venv/bin/python -m pip install -r requirements.txt` and start the stack with the preceding command.
-2. Open <http://127.0.0.1:3000>. There are no default credentials: choose **Sign up** and create an account, organization and project.
-3. In the project, open **Settings → API Keys** and create a Public Key (`pk-lf-...`) and Secret Key (`sk-lf-...`) pair. These differ from the login password.
-4. Create a key in [OpenRouter API settings](https://openrouter.ai/settings/keys).
-5. Run `openssl rand -hex 32`: copy the result into `LANGFUSE_HASH_SALT`. This value is generated locally, not provided by Langfuse.
-6. Create or update `.env` in the repository root with actual values replacing the placeholders:
-
-```dotenv
-OPENROUTER_API_KEY=your-openrouter-key
-SEARCH_BACKEND=mock
-LANGFUSE_ENABLED=true
-LANGFUSE_PUBLIC_KEY=pk-lf-...
-LANGFUSE_SECRET_KEY=sk-lf-...
-LANGFUSE_BASE_URL=http://127.0.0.1:3000
-LANGFUSE_HASH_SALT=your-openssl-result
-LANGFUSE_SYNTHETIC_DATA_ONLY=true
-```
-
-The preceding block is for testing with synthetic fixtures. Keep `.env` local: do not commit keys or passwords. For a persistent installation, also use private random values for `LF_NEXTAUTH_SECRET`, `LF_SALT`, `LF_ENCRYPTION_KEY` (64 hexadecimal digits), `LF_POSTGRES_PASSWORD`, `LF_CLICKHOUSE_PASSWORD`, `LF_REDIS_PASSWORD` and `LF_MINIO_PASSWORD` (at least 8 characters). Compose defaults are exclusively for local tests with synthetic data. Keep the salt stable to correlate the same person; changing it changes pseudonymous identifiers.
-
-Each `Orchestrator.run` produces a `learning.request` root, grouped by ExecutionContext, with request and response. Beneath the root are Lead generations, plan authorization, steps, client-side MCP search, worker calls, semantic reviews and deterministic checks. OpenInference CrewAI and OpenAI spans nest inside current observations. The OpenAI instrumentor captures prompts, completions, model and tokens, including native streaming OpenRouter calls; structured conversion calls and additional attempts remain visible as separate calls. Span duration measures latency. Monetary costs depend on the model pricing catalog/configuration in Langfuse; the prototype does not estimate them.
-
-Semantic outcomes are categorical scores `ACCEPT` / `REJECT` / `UNCERTAIN`; checks and steps also record `SUCCEEDED` / `FAILED` / `SKIPPED`. The trace includes request ID, metamodel version and fingerprint, per-agent profiles, roles, modes and Git commit. The `python -m learning`, `main.py` and `smoke.py` programs flush the queue before exiting, including on error.
-
-7. Check the configuration, run tests and test the free model. Smoke uses synthetic documents through MCP and requires neither Qdrant nor TEI:
+The `learning` CLI runs every lifecycle operation for a trusted local operator
+(it does not authenticate anyone):
 
 ```bash
-docker compose -f compose.local.yml --profile observability config --quiet
-.venv/bin/python -m unittest tests.test_telemetry -v
-LANGFUSE_ENABLED=false .venv/bin/python -m unittest discover -q
-.venv/bin/python smoke.py --runs 1
+python -m learning --db <store> --policy <policy.json> --subject <subject> --context <context> <command>
+python -m learning --help
 ```
 
-8. Wait for `PASS 1/1`: the live test may take a few minutes. Return to the Langfuse project, open **Tracing** and refresh the list. Open the latest `learning.request`: it must contain `lead.call`, `authorize_plan`, a step with `document_search` and `worker.call`, `semantic_review` reviews, synthesis and `check_final_response`. OpenAI/OpenRouter calls show model, tokens and duration; outcomes are visible as scores.
+| Commands | Purpose | Guide |
+| --- | --- | --- |
+| `bootstrap`, `show`, `propose`, `decide`, `apply`, `abandon` | Contexts, proposals and human decisions | [authoring lifecycle](docs/architecture/authoring-lifecycle.md) |
+| `discover-` / `prepare-aimpro-syllabus-sources`, `generate-`, `revise-`, `edit-`, `show-aimpro-syllabus` | Sources and the Curator syllabus | [Curator workflow](docs/aimpro/curator-syllabus.md), [selected sources](docs/aimpro/selected-sources.md) |
+| `init-`, `revise-`, `show-authoring-project`, `show-project-syllabus`, `propose-completion-rules` | Authoring projects | [projects](docs/architecture/authoring-projects.md) |
+| `generate-project-assessments`, `-teacher`, `-trainer` | Evaluator, Teacher and Trainer drafts | [generators](docs/architecture/authoring-generators.md) |
+| `propose-release`, `show-release`, `propose-delivery-import`, `propose-activation` | Release and delivery | [releases](docs/architecture/releases.md) |
+| `propose-membership`, `propose-evaluation`, `ask`, `submit` | Members, evaluations and learner requests | [role applications](docs/architecture/role-applications.md) |
+| `export-aimpro-trace` | Read-only AIM-PRO execution trace | [execution trace](docs/aimpro/execution-trace.md) |
 
-### Diagnosing a failed test
+AIM-PRO inspection tools need no store: `python -m aimpro.audit`,
+`python -m aimpro.adapter`, `python -m aimpro.validation` and
+`python -m aimpro.change_requests` (see the
+[SCN01 integration review](docs/aimpro/scn01-conceptual-review.md)).
 
-- If no trace appears, check `LANGFUSE_ENABLED=true`, the local endpoint and a key pair from the same project. The process sends observations before exiting.
-- `Plan rejected (ValueError)` means checks blocked the plan before task execution: open `authorize_plan` in the trace and read `status_message` and the input plan. `step.agent` is the worker name (`lesson-explainer`); `specialization` is the exact reference with `type: AgentSpecialization`, `id: teacher-demo`, `version: 1` in the smoke fixture. They are not interchangeable.
-- If a worker is rejected, read the verdict and reason in `semantic_review` (stage `WORKER`) and codes in `check_worker_output`. Semantic rejection produces a failure outcome even if the model returned text.
-- The `app.crewai.com` link belongs to CrewAI's native collector, separate from Langfuse. The prototype disables it; use your local instance to inspect traces.
-- The test uses a free model and does not switch to a paid model on errors or unavailability. A successful test verifies integration on synthetic fixtures; it does not guarantee every future generation's outcome.
+## Testing
 
-### Data and retention
+All automated tests use synthetic data and make no model call.
 
-Do not use Langfuse Cloud with real data. To also view LEARNING fixture content in smoke, set `LANGFUSE_SYNTHETIC_DATA_ONLY=true`: this declaration disables LEARNING content redaction while retaining pseudonymization. Endpoints under `*.langfuse.com` require explicit `LANGFUSE_SYNTHETIC_DATA_ONLY=true`, to be set only for synthetic fixtures. For real data, use the project's instance. `subject_key` becomes an HMAC SHA-256 with a private salt; masking also covers identities embedded in prompts. In LEARNING mode, all input/output content is conservatively redacted, including automatically captured messages, to prevent learner instructions and evidence from resurfacing through prompts or synthesis. Structure, outcomes, check codes and token metrics remain available. PREPARATION retains content for debugging: do not include unnecessary personal data.
+```bash
+# Python suite (telemetry off)
+LANGFUSE_ENABLED=false CREWAI_DISABLE_TELEMETRY=true CREWAI_TRACING_ENABLED=false \
+  python -m unittest discover -q
 
-The intended retention window is 30 days. Native automatic deletion requires Langfuse Self Hosted Enterprise: configure the license and `Project Settings → Data Retention = 30`. Headless provisioning supports `LANGFUSE_INIT_ORG_ID/NAME`, `LANGFUSE_INIT_PROJECT_ID/NAME`, `LANGFUSE_INIT_USER_EMAIL/PASSWORD` and project keys: `LANGFUSE_INIT_PROJECT_RETENTION` receives `LANGFUSE_RETENTION_DAYS` (default 30). It does not modify existing projects. Without a license, native retention does not activate: provide an administrative deletion procedure and verify it before collecting real data. `down` preserves data; volume deletion is irreversible and must be planned separately.
+# Contract and evaluation checks
+python -m aimpro.generate --check
+python -m services.api_common.openapi --check
+python -m evaluation --check
 
-References: [CrewAI integration](https://langfuse.com/integrations/frameworks/crewai), [span masking](https://langfuse.com/docs/observability/features/masking), [Compose installation](https://langfuse.com/self-hosting/deployment/docker-compose), [retention and licensing requirements](https://langfuse.com/docs/administration/data-retention).
+# Front-end (in apps/)
+npm run check:client && npm run typecheck && npm test && npm run build && npm run check:bundle
+```
 
-The prototype disables CrewAI's native cloud collector and stores negative consent in its own `.cache/crewai`, without changing the user's global preferences. Application traces remain directed only to the configured Langfuse endpoint. In the plan, `step.agent` must be the worker's `registryName` (e.g. `lesson-explainer`); `specialization` is the exact `AgentSpecialization` reference (e.g. `teacher-demo`). The prompt explicitly presents authorized pairs; validation continues to reject incorrect references.
+- **PostgreSQL variants** run when `ALM_TEST_POSTGRES_URL` points to the
+  database of `compose.alm.yml`; otherwise they are skipped.
+- **Browser tests** (`npm run test:browser` in `apps/`) need Keycloak and free
+  ports 58000–58003; see
+  [role applications, Browser tests](docs/architecture/role-applications.md#browser-tests).
+- **Live smoke test**: `python smoke.py --runs 1` calls the free OpenRouter
+  model through MCP with mock search; it is a live run.
+
+CI (`.github/workflows/aimpro-contracts.yml`) runs these checks on every push
+and pull request: generated contracts, authoring architecture, store backends
+on PostgreSQL 17, API, front-end, browser tests and the offline evaluation.
+
+## Data and storage
+
+- The ALM store is the SQLite file or PostgreSQL URL given with `--db` or
+  `ALM_STORE`; there is no default. The APIs never create a SQLite store; the
+  CLI `bootstrap` and the seed do.
+- Opening an older store migrates it in place: version 1 is first copied to a
+  private `.v1.bak` file; version 2 becomes version 3 (enrolment codes) with
+  every row kept. Older code then refuses the store. Stop other writers first.
+- `python -m learning.copy_store --from <sqlite> --to <postgresql-url>` copies
+  a store to PostgreSQL and verifies counts and hashes.
+- `docker compose down` keeps volumes; **`docker compose down -v` deletes**
+  them: the WP3 database, Qdrant data and the model cache.
+- Legacy specialization names are not migrated automatically: `teacher` →
+  `lesson-explainer`, `trainer` → `guided-practice-coach`, `socratic` →
+  `reasoning-questioner`; `curator` → `lesson-support-summarizer` (LEARNING) or
+  `resource-candidate-researcher` (PREPARATION); `evaluator` →
+  `learner-response-evaluator` (LEARNING) or `assessment-designer`
+  (PREPARATION). Change them through a reviewed proposal.
+
+## How to contribute
+
+1. **Read [AGENTS.md](AGENTS.md).** Code, comments, prompts, tests, docs,
+   issues, pull requests and commit messages are in English.
+2. **Work from an issue.** Roadmap work follows the
+   [working protocol](docs/plans/prototype-roadmap.md#working-protocol-for-every-chat):
+   one step per issue, acceptance agreed first, open decisions left to the
+   repository owner.
+3. **Branch from `main`** and open one focused pull request; do not push to
+   `main`.
+4. **Contracts and tests first**, then the implementation. Regenerate
+   generated artifacts (see [Installation and build](#installation-and-build))
+   and commit them with the change.
+5. **Run the checks** of [Testing](#testing) before opening the PR; CI must be
+   green before merge.
+6. **Record the work.** Each step ends with a handoff in
+   `docs/plans/handoffs/` (commands, results, findings, next step).
+   Architecture changes update the guides in `docs/architecture/`.
+
+Rules that always apply:
+
+- Never edit an AIM-PRO/jjodel export or the ALM metamodel.
+- No live model call in tests; live runs only with the owner's authorization.
+- Model output and retrieved documents are untrusted data, never instructions;
+  only fixed application text may reach an error message or a log.
+- Every visible UI string goes in the JSON catalogues
+  (`apps/*/src/i18n/en.json`); layout and visual design changes are agreed with
+  the layout owner (see the
+  [front-office guide](docs/guides/front-office-guide.it.md), in Italian).
+
+## Security and data protection
+
+- Synthetic data only: no learner personal data in the repository, the tests or
+  the demo.
+- Keys and passwords stay in `.env` or the environment, never in the
+  repository.
+- The CLI `--subject` selects a person without authenticating them: protect
+  the policy files and the store at the host level.
+- Authority comes from the trusted policy and participant records, never from
+  an identity-provider role.
+- Tracing redacts LEARNING content and pseudonymizes subjects; do not use
+  Langfuse Cloud with real data (see [observability](docs/observability.md)).
+
+## Documentation
+
+| Topic | Document |
+| --- | --- |
+| Processes, APIs, identity, studio, learner app | [docs/architecture/role-applications.md](docs/architecture/role-applications.md) |
+| Agentic-network decisions | [docs/architecture/agentic-network-decisions.md](docs/architecture/agentic-network-decisions.md) |
+| ALM conceptual model and metamodel | [docs/architecture/alm-model.md](docs/architecture/alm-model.md), [metamodel 1.0.0](docs/resources/metamodello-agnostico-apprendimento.json) |
+| Authoring lifecycle, projects, generators | [lifecycle](docs/architecture/authoring-lifecycle.md), [projects](docs/architecture/authoring-projects.md), [generators](docs/architecture/authoring-generators.md) |
+| Release, import and activation | [docs/architecture/releases.md](docs/architecture/releases.md) |
+| Event log, Langfuse | [docs/architecture/event-log.md](docs/architecture/event-log.md), [docs/observability.md](docs/observability.md) |
+| Evaluation suite | [docs/evaluation.md](docs/evaluation.md) |
+| WP3 source corpus | [docs/wp3/integration.md](docs/wp3/integration.md) |
+| AIM-PRO integration | [SCN01 review](docs/aimpro/scn01-conceptual-review.md), [change requests](docs/aimpro/metamodel-change-requests.md), [convergence proposal](docs/aimpro/alm-convergence-proposal.md) |
+| Roadmap and plans | [roadmap](docs/plans/prototype-roadmap.md), [role-applications plan](docs/plans/role-applications-plan.md), [handoffs](docs/plans/handoffs/) |
+| Changing the look of the web apps (Italian) | [docs/guides/front-office-guide.it.md](docs/guides/front-office-guide.it.md) |
+| Demo and case studies | [SCN01 runbook](docs/demo/scn01-colleague-runbook.md), [SE-AI case study](examples/se-ai/README.md) |
+| Domain specification | [docs/resources/2026-10-27-specifica.md](docs/resources/2026-10-27-specifica.md) |
+
+## License
+
+The repository has no license file yet, so no license is granted. Ask the
+repository owner before reusing the code or the documents.

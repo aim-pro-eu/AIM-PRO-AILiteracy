@@ -64,98 +64,76 @@ them and names what is new.
 | Activation | refused while an ASSESS activity has no runtime role (D4) | `RELEASE_RUNTIME_ROLE` in `learning/releases.py` |
 | Web stack | none yet: no `services/`, no `apps/`, no FastAPI dependency | `ls`, `requirements.txt` |
 | Toolchain | Node 22.22.2, Docker 29.8.2; `psycopg[binary]==3.2.12` already pinned | local commands |
-| Repository | `thesis-fedfalco-2026/AIM-PRO-AILiteracy` (renamed from `py-prototype`) | `gh repo view` |
+| Repository | `aim-pro-eu/AIM-PRO-AILiteracy` (renamed from `py-prototype`, transferred from `thesis-fedfalco-2026` on 2026-11-19) | `gh repo view` |
 
 Facts in this table are a snapshot. Every chat re-verifies the ones it uses.
 
-## Owner decisions in force
+## Decisions
 
-| Id | Decision | Date |
-| --- | --- | --- |
-| Stack | FastAPI backend; React + TypeScript + Vite front-end, one app per audience | 8 Nov 2026 |
-| Identity | Keycloak OIDC from the start | 8 Nov 2026 |
-| Store | ALM store on PostgreSQL now (SQLite kept for tests and single-host use) | 8 Nov 2026 |
-| UI language | English first, externalised strings | 8 Nov 2026 |
-| D1–D5 | R1 scope, manifest format 1, policy preview, D4 = a, tracking in #71 | 8 Nov 2026 |
-| D18 | A teacher refines a proposal both ways: a conversation with the Design Agent, and manual edits of the proposed content. The agents' output and the teacher's edits stay proposals that a human decides and applies | 9 Nov 2026 |
-| D22 | Source preparation becomes an agent job, in its own step (S09a2), not in S09a. Its result is the prepared sources, not a proposal: the teacher reviews them and decides whether the Curator syllabus job uses them; nothing is used until the teacher accepts. The job contract gains an outcome for "completed, awaiting the teacher's choice" (Chat 16 owner answer 1, Chat 17) | 9 Nov 2026 |
-| D23 | A teacher creates a course from the studio, and the API writes its policy. An operator installs a course template (`ALM_COURSE_TEMPLATE`, read only for the API) naming the subjects who may create courses and the source scopes of a new course. `POST /courses` writes one new policy file in `ALM_POLICY_DIR` granting the creator `ADMINISTRATOR` and `CONTENT_RESPONSIBLE` in that context only, and bootstraps the context in PREPARATION/DRAFT. The API never changes or removes an existing policy file; the same request returns the same course (Chat 17, issue #97) | 9 Nov 2026 |
-| D24 | Uploaded AIM-PRO exports are stored unchanged in the worker's export directory (`ALM_AIMPRO_EXPORTS`) as `<sha256>.json`. An upload is refused when it is not JSON, is over the size limit (10 MiB, configurable), is not a jjodel megamodel 1.0 export, its metamodels cannot be read, or the chosen scenario and competency catalogue cannot be resolved. Findings against the generated contracts do not refuse it: they are diagnostics shown in plain words (Chat 16 owner answer 2, Chat 17) | 9 Nov 2026 |
-| D26 | Source preparation (S09a2) is two jobs. A model-free discovery job runs the teacher's queries and records what they found (in the ALM requests store, replayed without a new search); the teacher picks excerpts with their purpose and limitations; the preparation job fetches them exactly (`SourcePlan` unchanged). The teacher's acceptance is recorded in the jobs store: a preparation job ends `AWAITING_CHOICE` and the teacher moves it to `ACCEPTED` or `DECLINED`; the API and the worker refuse a Curator job on a preparation that is not accepted, while the CLI `--prepared-sources` stays an operator path without acceptance. A minimal job list is on the build page. Coverage requirements are an optional form guided by the uploaded export (Chat 18, issue #101) | 10 Nov 2026 |
-| D27 | Syllabus refinement (S09b, refines D18). Units of two syllabi are paired by learning target (`source_target_id`), in their order when several share a target. The Curator holds the conversation (no separate Design Agent): a revision request is one turn, and the revision job gives the Curator the previous syllabus and the reasons of the whole chain. A teacher's edit is complete (every field; units added, removed and reordered), passes the same checks as a generated syllabus and is a proposal by that teacher, declared not reviewed by the agent; the agent's review of an edit is optional and does not block (its form is D29). A refinement reuses the input of the proposal it refines, accepted sources included, while the course is still at that proposal's step; otherwise the sources are prepared again (Chat 19, issue #104) | 10 Nov 2026 |
-| D30 | The review of a Curator syllabus (Chat 20, issue #107, refines D27). A request makes at most three drafts: a draft refused by the deterministic checks or not accepted by the review agent (`REJECT`, `UNCERTAIN`, a flag false) goes back to the Curator with its draft and the reason, as untrusted data; the review agent judges each draft on its own. When the drafts run out the request fails as before, so a generated syllabus always carries an `ACCEPT` review. Every attempt's verdict, or the fixed text of the check that refused it, is kept with the request's result in the ALM requests store, read through the API and shown in the studio; the review agent's reason is shown as model text and never becomes an error message, a log line or an event. The review of a revision receives the previous syllabus and the teacher's reasons. The review prompt was calibrated on 4 + 4 owner-authorized live jobs, in three clauses only: source diagnostics are not by themselves grounds for rejection, uncited excerpts are not grounds for rejection, and a claim is judged as worded. The configured models are unchanged | 10 Nov 2026 |
-| D34 | Generation by blocks of units (S09d, issue #118, refines D30 for the generators). The Evaluator, Teacher (unstructured) and Trainer write a request in blocks of 12 target units; the generator of a block receives the whole input (the whole syllabus included), its units and the accepted drafts of the earlier blocks, as untrusted data. Each block is judged by the review agent on its own, with the full input and that block only, up to three drafts per block; the assembled draft is judged once at the end, also for one block. One proposal per job. A flow ends with something for the teacher to decide (13 November 2026, changes D30 for these generators): a block the review agent does not accept keeps its last checked draft, and a final review that is not `ACCEPT` is proposed with its verdict and a fixed notice; a block whose drafts all fail the checks is written in two halves, and only a one-unit block failing them fails the job. Accepted blocks are kept and reused, without a model call, by a new job over the same exact inputs. The structured Teacher and the Curator keep one response. A block whose response does not fit (a call past its deadline, or a response cut at its output length limit) is written in two halves, down to one unit, so the approach does not depend on the model; only a one-unit block that does not fit stops the request, with a fixed text, never the provider's message; the deadline of a model call is 1200 s (was 600); block progress is a content-free event shown in the studio job list. A draft that does not cover its units is refused in words the author can read, naming the units by their position in the syllabus; the retry receives the unit keys as data (Chat 23, 12–13 November 2026) | 13 Nov 2026 |
-| D35 | Responses may reveal which contexts exist: the rule "a response never reveals which contexts exist" (D10, S05) is removed, so the API may list the contexts of the signed-in subject, for the studio home (in place of the context id field) and for the learner's courses (D19, S12). A missing context and an uninstalled policy still both answer 404 `context_unavailable` | 16 Nov 2026 |
-| D20 | A learner sees everything needed to follow and learn from the course: syllabus, material, activities, exercises and the rest of the learning content. What the learner sees comes from the validated course, never from drafts or other learners' records; the exact projection (for example rubrics and assessment criteria) is defined in S12 with the owner. Projection (17 Nov 2026, #136): for an assessment, its activity, conditions, accepted evidence and the rubric's criteria and levels; the learner's own applied evaluations with each criterion's level and reason and the result; never an answer key, never a pending draft | 9 Nov 2026, 17 Nov 2026 |
-| D25 | Course membership, option A: the administrator of a course adds a member (any subject of the identity map, as `CONTENT_RESPONSIBLE`, `ASSESSOR`, `LEARNER` or `OBSERVER`; never `ADMINISTRATOR`); the API writes a new trusted policy file (an installed file is never changed or removed, as D23) and records a proposal that adds the member's `Participant` and changes the context's `policies` reference; the member's authority starts when a person applies it (Chat 28, #129) | 16 Nov 2026 |
-| G7 / D4 | D4 is lifted by an assessor-requested evaluation draft (option A): a person with the `ASSESSOR` role asks the runtime evaluator `learner-response-evaluator` for a draft on one observed attempt; control builds the `Evaluation`, checks it with `validate_evaluation` (at most three drafts) and records it as a proposal that a person decides and applies; FORMATIVE and FORMAL; the import configures the EVALUATOR worker (Chat 28–29, #129, PR #131) | 16 Nov 2026 |
-| D19 (partial) | A learner's courses are those they are enrolled in; for now the deliveries where they are `LEARNER` by D25 membership (policy ∩ participant), behind one function that D37 may change. One delivery context per learner is excluded (#136) | 17 Nov 2026 |
-| D37 | Enrolment like Microsoft Teams: students join a published course with a course code (or a link carrying it) and take part at once; the teacher's reviewed choice to open the course with a code is the human decision. Teaching staff are still added by the reviewed membership proposal (D25, D36). The course is authored independently of its students; once approved, students join or are added, and **the course version stays the same whatever students enrol**: proposals, approvals and the stale check use a course version that leaves out participants and learners' own records, and a student, whether joining with the code or added by the teacher, is recorded as a participant only under the delivery's reviewed learner grant, with no new policy version (this replaces D25/D36 membership for the `LEARNER` role). Staff are left as they are for now. Implemented in S12b (#141) | 18 Nov 2026 |
-| D9 (revised) | A person who signs in through the configured identity provider and is not in the identity map gets a subject key automatically; Keycloak roles still grant nothing and course authority still comes from the trusted policy and the participant record (S12b, #141) | 18 Nov 2026 |
-| D36 | Membership proposals made together (#133): the studio shows the pending membership proposals and warns that one is applied at a time; one membership proposal may add several members (batch); the core does not refuse a proposal while another is pending (options B + batch, S11b) | 17 Nov 2026 |
-| D38 | The stale rule for evaluation drafts (Chat 29 finding 3), option B: another learner's attempt no longer makes a pending evaluation draft stale, since in a real class drafts would almost always expire; a new attempt by the learner whose attempt is evaluated still does, so the assessor starts again from the latest attempt. Any other change of the course still makes the draft stale. To implement in Chat 38 | 19 Nov 2026 |
-| Earlier | Socratic option b; live model runs only with owner authorization; never edit AIM-PRO/jjodel exports | see `docs/architecture/agentic-network-decisions.md` |
+Every decision (the owner's decisions in force, the proposed defaults approved with this roadmap,
+the open ones) lives in [decisions.json](decisions.json), is changed only through `./aim` and is
+rendered in [DECISIONS.md](DECISIONS.md). Agents propose (`./aim propose`); only the owner accepts or
+rejects.
 
-## Proposed defaults to confirm when this roadmap is reviewed
+<!-- aim:decisions start: generated by ./aim, do not edit -->
+Decisions waiting for the owner and open decisions. The full log, with every accepted decision, is
+[DECISIONS.md](DECISIONS.md).
 
-These close choices that would otherwise be made differently by different
-chats. Approving the roadmap PR approves them; any row can be changed in review.
-
-| Id | Topic | Proposed default | Needed by |
+| Id | Status | Question or proposal | Blocks |
 | --- | --- | --- | --- |
-| D8 | Browser authentication pattern | Backend-for-frontend: the API runs the OIDC code flow with PKCE, keeps tokens server-side, sets an `HttpOnly` `SameSite=Lax` session cookie, and requires a CSRF header on writes. No token in the browser. | S03 |
-| D9 | Identity → subject key | A host-side `identity-map.json` maps (issuer, `sub`) to a policy `subject_key`. Keycloak roles grant nothing; the trusted policy stays the only authority. Unmapped users get 403. | S03 |
-| D10 | Policy resolution in a multi-context API | A configured directory of trusted policy files; for each request the API loads the file whose `policy_ref` equals the context's `policies` ref. No match → the context is unavailable (activation requires the installed preview, as today). | S05 |
-| D11 | Python libraries | `fastapi`, `uvicorn`, `pyjwt[crypto]` (JWKS validation), `httpx` (already pinned) for the OIDC client; exact versions pinned in `requirements.txt` | S03 |
-| D12 | Front-end libraries | npm workspaces; `openapi-typescript` + `openapi-fetch` for the client; `react-router`; `i18next` with JSON catalogues; Vitest for units; Playwright for browser tests | S04 |
-| D13 | PostgreSQL write serialization | One transaction-scoped advisory lock (`pg_advisory_xact_lock`) per write transaction, matching SQLite `BEGIN IMMEDIATE`; reads in `REPEATABLE READ`; payloads stored as canonical JSON `TEXT` (not `jsonb`) so bytes stay identical; an insertion sequence column replaces `rowid` ordering | S02 |
-| D14 | Jobs store | Separate tables in a separate PostgreSQL schema (`jobs`), never in the ALM tables; the ALM `request_id` stays the idempotency key | S08 |
-| D15 | Synthetic demo data | A dev-only seed command builds a database through the production commands with synthetic model responses (the existing test fixtures), used by API tests, UI development and browser tests | S05 |
-
-Open decisions that block later steps, not decided here:
-
-| Id | Decision | Blocks |
-| --- | --- | --- |
-| D16 | Scenario input independent of the AIM-PRO export (today the Curator reads the AIM-PRO project export) | nothing before S13; needed when scenarios change |
-| D21 | The trainer's role once a course is validated, beyond authoring trainer content. Owner direction (9 Nov 2026), to be clarified: the trainer is used to give learners practice, a kind of Socratic agent that hands out exercises with a method. Open points: whether the trainer is a person, an agent or both, and how it relates to the Socratic coach of S13 | after S13 |
-| D28 | A Curator revision of the syllabus in use. Today an applied syllabus can be edited by the teacher but not revised by the Curator: a revision needs a revision request, and a decision on an applied proposal is not one. Options: a revision job that carries its own reason, or a new decision kind (Chat 19 finding 2) | when a course is refined after it is applied |
-| D29 | The form of the optional agent review of a teacher's edit (D27): a job that records a new proposal with the review agent's verdict, or a review record beside the edited proposal. Needs a model call (Chat 19 finding 3) | before the review of an edit is offered |
-| D31 | Whether a citation that is true but only loosely relevant to its unit may stand when the draft declares the transfer to the audience as a gap. Since D30 the review agent accepts it and the teacher judges its relevance from the gaps and the excerpts in the syllabus view; the alternative is a further calibration that asks for relevance to the unit's purpose (Chat 20 finding 5) | before the syllabus review is relied on without a teacher reading the gaps |
-| D32 | Details of the review loop (D30): whether the drafts the review agent refused are kept beside their verdicts (up to three syllabi per request), and whether an administrator's abandonment stops the loop between drafts instead of at the final write (Chat 20 findings 2 and 3) | none; when the review of a draft is audited, or long jobs are abandoned |
-| D33 | A measurement of the syllabus review with another `lead` model than the free `nvidia/nemotron-3.5-super-vl:free`, with the owner's authorization for the live runs; the configured models are not changed without the owner (Chat 20 finding 6) | none; before a shared deployment chooses its models |
-| D17 | Deployment owner and shared environment | any shared deployment |
-| D6 | Sending the convergence draft to `rik99` | nothing in this roadmap |
-| Decision 6 details | Organisation documents and guidance | S15 |
-| Decision 3, #28, #17, #19 | Learner data, governance, twins, dashboards | Phase 7 of the role plan; not scheduled here |
+| D6 | open | Sending the convergence draft to `rik99` | nothing in this roadmap |
+| D16 | open | Scenario input independent of the AIM-PRO export (today the Curator reads the AIM-PRO project export) | nothing before S13; needed when scenarios change |
+| D17 | open | Deployment owner and shared environment | any shared deployment |
+| D21 | open | The trainer's role once a course is validated, beyond authoring trainer content. Owner direction (9 Nov 2026), to be clarified: the trainer is used to give learners practice, a kind of Socratic agent that hands out exercises with a method. Open points: whether the trainer is a person, an agent or both, and how it relates to the Socratic coach of S13 | after S13 |
+| D28 | open | A Curator revision of the syllabus in use. Today an applied syllabus can be edited by the teacher but not revised by the Curator: a revision needs a revision request, and a decision on an applied proposal is not one. Options: a revision job that carries its own reason, or a new decision kind (Chat 19 finding 2) | when a course is refined after it is applied |
+| D29 | open | The form of the optional agent review of a teacher's edit (D27): a job that records a new proposal with the review agent's verdict, or a review record beside the edited proposal. Needs a model call (Chat 19 finding 3) | before the review of an edit is offered |
+| D31 | open | Whether a citation that is true but only loosely relevant to its unit may stand when the draft declares the transfer to the audience as a gap. Since D30 the review agent accepts it and the teacher judges its relevance from the gaps and the excerpts in the syllabus view; the alternative is a further calibration that asks for relevance to the unit's purpose (Chat 20 finding 5) | before the syllabus review is relied on without a teacher reading the gaps |
+| D32 | open | Details of the review loop (D30): whether the drafts the review agent refused are kept beside their verdicts (up to three syllabi per request), and whether an administrator's abandonment stops the loop between drafts instead of at the final write (Chat 20 findings 2 and 3) | none; when the review of a draft is audited, or long jobs are abandoned |
+| D33 | open | A measurement of the syllabus review with another `lead` model than the free `nvidia/nemotron-3.5-super-vl:free`, with the owner's authorization for the live runs; the configured models are not changed without the owner (Chat 20 finding 6) | none; before a shared deployment chooses its models |
+| AN3 | open | Learner data, governance, twins, dashboards | Phase 7 of the role plan; not scheduled here |
+| AN6 | open | Organisation documents and guidance | S15 |
+<!-- aim:decisions end -->
 
 ## Working protocol for every chat
 
 Each step is one chat and normally one PR. A step may need a second chat; it
-then continues the same step id.
+then continues the same step id. The `./aim` harness does the bookkeeping of
+this protocol (see the [harness guide](harness-guide.md)); the rules are the
+same.
 
 1. **Start by verifying.** Read `AGENTS.md`, this file, the previous handoff and
-   the files the step names. Run: `git status`, `git log --oneline -3`,
-   `gh pr list --state open`, the step's baseline test command. Report any
-   difference from what the previous handoff says before changing anything.
-2. **Open the step issue.** Create a GitHub issue titled with the step id, with
-   the step's acceptance list as a checklist. Work against that issue.
+   the files the step names (`./aim prompt SNN` lists them). Run `./aim status`,
+   `./aim log`, `git status`, `gh pr list --state open` and the baseline
+   (`./aim check baseline`). Report any difference from what the previous
+   handoff says before changing anything.
+2. **Claim the step and open its issue.** `./aim claim SNN --agent <name>
+   --worktree` marks the step in progress, gives the chat its number and
+   creates the worktree and branch. Create a GitHub issue titled with the step
+   id, with the step's acceptance list as a checklist. Work against that issue.
 3. **Stay in scope.** Do only what the step lists. Anything else found goes into
    the handoff under "Findings", not into the PR.
-4. **Never decide for the owner.** If an open decision blocks the step, stop and
-   ask. Do not pick an option and continue.
+4. **Never decide for the owner.** If an open decision blocks the step, record
+   it with `./aim propose` (or `./aim block SNN --reason …`), stop and ask. Do
+   not pick an option and continue. Only the owner runs `./aim accept` and
+   `./aim reject`.
 5. **Contracts before code.** Write or extend the contract test first (schema,
    OpenAPI snapshot, store interface, parity test), then the implementation.
 6. **Evidence for every claim.** The handoff quotes commands and their results,
    commits and CI run links. Anything not verified is written as "not verified".
    Never infer an earlier state from memory or from a previous chat.
 7. **Verification before publishing.** Run the step's commands plus the full
-   offline suite and `python -m aimpro.generate --check`. Publish a focused PR,
-   wait for CI and report its result.
-8. **Handoff.** Write `docs/plans/handoffs/chat-NN.md` (next free number) with:
-   step id, objective, changes, PR and commits, verification, findings, open
-   decisions and the exact next step id. Include it in the PR.
-9. **Plan changes.** A chat never edits this roadmap on its own initiative. It
-   proposes a change in the handoff; the owner applies it in a PR.
+   baseline (`./aim check baseline`: the offline suite, `python -m
+   aimpro.generate --check`, the OpenAPI and evaluation checks, the front-end
+   checks). Publish a focused PR, wait for CI and report its result.
+8. **Handoff.** `./aim handoff SNN --agent <name> --done … --next …` writes
+   `docs/plans/handoffs/chat-NN.md` from the template (step id, objective,
+   baseline, changes, verification, findings, open decisions, the exact next
+   step); replace every `TODO(aim)` with evidence. An agent that stops early runs
+   the same command: it appends an update for the next agent. Then
+   `./aim review SNN --pr <number>`. Include `docs/plans` in the PR.
+9. **Plan changes.** A chat never edits this roadmap, `steps.json` or
+   `decisions.json` on its own initiative, except through the commands above.
+   It proposes a change in the handoff; the owner applies it in a PR.
 
 Stop and report instead of continuing when: a test that passed at the start now
 fails for reasons outside the step; the step needs a model call, a live run or
@@ -169,32 +147,33 @@ no learner personal data; no change to AIM-PRO/jjodel exports or to the ALM
 metamodel.
 
 ## Steps
-
-| Step | Role-plan phase | Result | Depends on |
-| --- | --- | --- | --- |
-| S01 | 0a | Store transaction API; no SQL outside `learning/store.py` | this roadmap |
-| S02 | 0b | PostgreSQL store backend, copy tool, CI service | S01 |
-| S03 | 0c | API skeleton, OpenAPI check, OIDC with Keycloak | S02, D8, D9, D11 |
-| S04 | 0c | Front-end workspace and studio shell with login | S03, D12 |
-| S05 | 1 | Read-only Authoring API, policy resolver, synthetic seed | S04, D10, D15 |
-| S06 | 2 | Review endpoints: decide and apply with review key | S05 |
-| S07 | 2 | Studio review inbox, with a teacher view — **milestone M1: first usable app** | S06 |
-| S07b | 2 | Studio course overview, read only (owner, 9 Nov 2026) | S07 |
-| S08 | 3 | Agent job worker and progress stream | S07b, D14 |
-| S09a | 4 | Course from an uploaded AIM-PRO model: course creation, upload, Curator job, syllabus proposal, project initialization (done: PR #98) | S08 |
-| S09a2 | 4 | Source preparation as a job; the teacher reviews and accepts the prepared sources for the Curator (done: PR #103) | S09a, D22 |
-| S09b | 4 | Progressive refinement of the syllabus with the Curator and the teacher (done: PR #105) | S09a, D18 |
-| S09c | 4 | Rubrics, assessments, teacher and trainer content from the studio; teacher view for every proposal kind | S09a (S09a2 for prepared sources) |
-| S09d | 4 | Generation by blocks of units: a 48-unit course gets its assessments and content with the configured model (owner, 11 Nov 2026; before S09c2 part 2) | S09c, D34 |
-| S10 | 8 | Course validation: release and delivery views — **milestone M2: authoring to delivery** | S09c |
-| S11 | — | Runtime assessor role and evaluation adapter (G7); course membership (D25) (done: PR #131) | S10, D25, G7 / D4 |
-| S11b | — | Studio flow fixes from the SE-AI case study: an existing course id as delivery course (#132), pending activation and membership proposals (#133); batch membership (D36) (done: PR #139) | S11, D36 (decided) |
-| S12 | 5 | Learner API, including the learner's own courses (#136) (done: PRs #142, #143) | S11 (done), D19 (answered for S12), D20 (decided, projection on #136) |
-| S12b | — | Teams-style enrolment: a course code or link for students, students added by the teacher in the same way, a course version that enrolments leave unchanged, automatic subject keys (D9 revised) (#141) (done: PRs #146, #147) | S12, D37 |
-| S13 | 5 | Learner app: my courses, course view, practice — **milestone M3: learner practice end to end**; the stale rule for evaluation drafts is decided here with the owner | S12, S12b |
-| S13b | — | Review and release readability for the teacher: release views (#125), the next action on long review pages (#134) | S13, the layout owner |
-| S14 | — | Scenario input independent of the AIM-PRO export | D16 |
-| S15 | 6 | Organisation context and guidance | decision 6 details |
+<!-- aim:steps start: generated by ./aim, do not edit -->
+| Step | Role-plan phase | Result | Depends on | Status |
+| --- | --- | --- | --- | --- |
+| S01 | 0a | Store transaction API; no SQL outside `learning/store.py` | this roadmap | done: PR #75 |
+| S02 | 0b | PostgreSQL store backend, copy tool, CI service | S01, D13 | done: PR #77 |
+| S03 | 0c | API skeleton, OpenAPI check, OIDC with Keycloak | S02, D8, D9, D11 | done: PR #79 |
+| S04 | 0c | Front-end workspace and studio shell with login | S03, D12 | done: PR #81 |
+| S05 | 1 | Read-only Authoring API, policy resolver, synthetic seed | S04, D10, D15 | done: PR #83 |
+| S06 | 2 | Review endpoints: decide and apply with review key | S05 | done: PRs #85, #87 |
+| S07 | 2 | Studio review inbox, with a teacher view — **milestone M1: first usable app** | S06 | done: PRs #88, #92 |
+| S07b | 2 | Studio course overview, read only (owner, 9 Nov 2026) | S07 | done: PRs #90, #92 |
+| S08 | 3 | Agent job worker and progress stream | S07b, D14 | done: PR #95 |
+| S09a | 4 | Course from an uploaded AIM-PRO model: course creation, upload, Curator job, syllabus proposal, project initialization | S08, D23, D24 | done: PRs #98, #100 |
+| S09a2 | 4 | Source preparation as a job; the teacher reviews and accepts the prepared sources for the Curator | S09a, D22, D26 | done: PR #103 |
+| S09b | 4 | Progressive refinement of the syllabus with the Curator and the teacher | S09a, D18, D27, D30 | done: PRs #105, #108 |
+| S09c | 4 | Rubrics, assessments, teacher and trainer content from the studio; teacher view for every proposal kind | S09a, S09a2 for prepared sources | done: PRs #111, #113, #116, #122 |
+| S09d | 4 | Generation by blocks of units: a 48-unit course gets its assessments and content with the configured model (owner, 11 Nov 2026; before S09c2 part 2) | S09c, D34 | done: PR #119 |
+| S10 | 8 | Course validation: release and delivery views — **milestone M2: authoring to delivery** | S09c, D35 | done: PRs #124, #126, #128 |
+| S11 | — | Runtime assessor role and evaluation adapter (G7); course membership (D25) | S10, D25, G7 | done: PRs #130, #131 |
+| S11b | — | Studio flow fixes from the SE-AI case study: an existing course id as delivery course (#132), pending activation and membership proposals (#133); batch membership (D36) | S11, D36 | done: PR #139 |
+| S12 | 5 | Learner API, including the learner's own courses (#136) | S11, D19, D20 | done: PRs #137, #142, #143 |
+| S12b | — | Teams-style enrolment: a course code or link for students, students added by the teacher in the same way, a course version that enrolments leave unchanged, automatic subject keys (D9 revised) (#141) | S12, D37, D9 | done: PRs #146, #147 |
+| S13 | 5 | Learner app: my courses, course view, practice — **milestone M3: learner practice end to end**; the stale rule for evaluation drafts is decided here with the owner | S12, S12b, D38 | done: PRs #148, #149, #156 |
+| S13b | — | Review and release readability for the teacher: release views (#125), the next action on long review pages (#134) | S13, C3, the layout owner | todo |
+| S14 | — | Scenario input independent of the AIM-PRO export | D16 | todo |
+| S15 | 6 | Organisation context and guidance | AN6, decision 6 details | todo |
+<!-- aim:steps end -->
 
 Planned order (owner, 17 November 2026, after the SE-AI case study): Chat 30 writes
 the D19 and D36 options for the owner and specifies S12 (done, PR #137); then S11b
@@ -695,13 +674,19 @@ again every second until its job ends; My progress is a page per course with
 the learner's attempts, applied evaluations, learning states and questions.
 Chat 36 finding 2 (the studio's join link default) waits for D17.
 
+The stale rule for evaluation drafts (D38, option B; Chat 38, 20 November 2026, three choices awaiting the
+owner's confirmation): an evaluation draft stays applicable after joins and after attempts other than its own
+learner's new attempt at the judged assessment activity; that attempt makes it stale, and the core says why; an
+applied proposal of any kind, another learner's evaluation included, still does. The studio's proposal page shows
+the reason before the decision, and again once the application was refused, with a link to "Attempts to evaluate".
+
 **Acceptance.**
 
 - [x] Browser test: practice, submission and a reviewed evaluation on the seed delivery (part 2: `e2e/practice.spec.ts`).
 - [x] The learner build contains no authoring code (bundle check, part 1).
 - [x] A learner joins the course with its code or link (S12b) before practising (part 1: the join page and `enrolment.spec.ts`).
 - [x] My courses and the course view (D19, D20) in the browser (part 1).
-- [ ] The stale rule for evaluation drafts (Chat 29 finding 3): decided as D38 (19 Nov 2026, option B: only the evaluated learner's own new attempt makes the draft stale); to implement in Chat 38.
+- [x] The stale rule for evaluation drafts (Chat 29 finding 3): D38 (19 Nov 2026, option B), implemented in Chat 38: another learner's attempt, or the evaluated learner's attempt at another activity, leaves a pending evaluation draft applicable; the evaluated learner's new attempt at the assessment makes it stale ("the learner submitted a new attempt at this assessment"), as does any applied proposal; the studio's proposal page says so before the decision and links to the attempts to evaluate (`tests/test_enrolment.py`, `tests/services/test_learner_writes.py`, `review-model.test.ts`, `review.test.tsx`).
 
 ### S13b — Review and release readability
 
@@ -717,44 +702,8 @@ rule that the policy preview is shown in full stays unless the owner changes it.
 
 ## Chat prompts
 
-Copy the prompt for the next step. Replace `NN` with the next free handoff number.
-
-### Prompt for S01
-
-```text
-Work in /Users/juridirocco/development/py-prototype (GitHub:
-thesis-fedfalco-2026/AIM-PRO-AILiteracy). Read AGENTS.md,
-docs/plans/prototype-roadmap.md (sections "Working protocol" and "S01"), the
-latest docs/plans/handoffs/chat-NN.md, learning/store.py and every core module
-the S01 scope lists. Chat in Italian; write code, docs and GitHub content in
-English. Do not spawn agents. Follow the working protocol exactly: verify the
-baseline first, open the S01 issue, stay in scope, stop on any open decision.
-
-Implement S01. Write the architecture test first, then move each direct database
-use behind LearningStore methods without changing transaction boundaries.
-No PostgreSQL work, no schema change, no model calls.
-
-Run the S01 acceptance commands, the full offline suite and
-python -m aimpro.generate --check. Publish a focused PR, check CI, and write the
-handoff with evidence and the next step id.
-```
-
-### Prompt for later steps
-
-```text
-Work in /Users/juridirocco/development/py-prototype (GitHub:
-thesis-fedfalco-2026/AIM-PRO-AILiteracy). Read AGENTS.md,
-docs/plans/prototype-roadmap.md (sections "Working protocol", the step SNN and
-any decision it depends on), the latest docs/plans/handoffs/chat-NN.md and the
-files the step names. Chat in Italian; write code, docs and GitHub content in
-English. Do not spawn agents. Follow the working protocol exactly: verify the
-baseline first, confirm the step's dependencies are merged and its decisions are
-recorded, open the step issue, stay in scope, stop on any open decision.
-
-Implement step SNN as written. Contract tests first. No model calls or live runs
-without explicit owner authorization; synthetic data only.
-
-Run the step's acceptance checks, the full offline suite and
-python -m aimpro.generate --check. Publish a focused PR, check CI, and write the
-handoff with evidence and the next step id.
-```
+`./aim prompt SNN` writes the prompt for the next chat of step SNN, for any
+coding agent (`--tool claude|codex|chatgpt|generic`; `--inline` adds the shared
+files for tools that cannot read the repository). It includes the step section,
+the decisions it depends on, the previous handoffs, the standing limits and the
+harness commands to claim, hand off and publish. Paste it into the new chat.

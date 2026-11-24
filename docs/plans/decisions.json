@@ -1,0 +1,280 @@
+{
+  "version": 1,
+  "decisions": [
+    {
+      "id": "D6",
+      "status": "open",
+      "blocks": "nothing in this roadmap",
+      "question": "Sending the convergence draft to `rik99`"
+    },
+    {
+      "id": "D8",
+      "status": "accepted",
+      "topic": "Browser authentication pattern",
+      "decision": "Backend-for-frontend: the API runs the OIDC code flow with PKCE, keeps tokens server-side, sets an `HttpOnly` `SameSite=Lax` session cookie, and requires a CSRF header on writes. No token in the browser.",
+      "date": "8 Nov 2026",
+      "needed_by": "S03",
+      "note": "proposed default approved with the roadmap (PR #73)"
+    },
+    {
+      "id": "D9",
+      "status": "accepted",
+      "topic": "Identity → subject key",
+      "decision": "A person who signs in through the configured identity provider and is not in the identity map gets a subject key automatically; Keycloak roles still grant nothing and course authority still comes from the trusted policy and the participant record (S12b, #141)",
+      "date": "18 Nov 2026",
+      "needed_by": "S03",
+      "note": "revised on 18 Nov 2026 (S12b, #141)",
+      "history": [
+        "8 Nov 2026: A host-side `identity-map.json` maps (issuer, `sub`) to a policy `subject_key`. Keycloak roles grant nothing; the trusted policy stays the only authority. Unmapped users get 403."
+      ]
+    },
+    {
+      "id": "D10",
+      "status": "accepted",
+      "topic": "Policy resolution in a multi-context API",
+      "decision": "A configured directory of trusted policy files; for each request the API loads the file whose `policy_ref` equals the context's `policies` ref. No match → the context is unavailable (activation requires the installed preview, as today).",
+      "date": "8 Nov 2026",
+      "needed_by": "S05",
+      "note": "proposed default approved with the roadmap (PR #73)"
+    },
+    {
+      "id": "D11",
+      "status": "accepted",
+      "topic": "Python libraries",
+      "decision": "`fastapi`, `uvicorn`, `pyjwt[crypto]` (JWKS validation), `httpx` (already pinned) for the OIDC client; exact versions pinned in `requirements.txt`",
+      "date": "8 Nov 2026",
+      "needed_by": "S03",
+      "note": "proposed default approved with the roadmap (PR #73)"
+    },
+    {
+      "id": "D12",
+      "status": "accepted",
+      "topic": "Front-end libraries",
+      "decision": "npm workspaces; `openapi-typescript` + `openapi-fetch` for the client; `react-router`; `i18next` with JSON catalogues; Vitest for units; Playwright for browser tests",
+      "date": "8 Nov 2026",
+      "needed_by": "S04",
+      "note": "proposed default approved with the roadmap (PR #73)"
+    },
+    {
+      "id": "D13",
+      "status": "accepted",
+      "topic": "PostgreSQL write serialization",
+      "decision": "One transaction-scoped advisory lock (`pg_advisory_xact_lock`) per write transaction, matching SQLite `BEGIN IMMEDIATE`; reads in `REPEATABLE READ`; payloads stored as canonical JSON `TEXT` (not `jsonb`) so bytes stay identical; an insertion sequence column replaces `rowid` ordering",
+      "date": "8 Nov 2026",
+      "needed_by": "S02",
+      "note": "proposed default approved with the roadmap (PR #73)"
+    },
+    {
+      "id": "D14",
+      "status": "accepted",
+      "topic": "Jobs store",
+      "decision": "Separate tables in a separate PostgreSQL schema (`jobs`), never in the ALM tables; the ALM `request_id` stays the idempotency key",
+      "date": "8 Nov 2026",
+      "needed_by": "S08",
+      "note": "proposed default approved with the roadmap (PR #73)"
+    },
+    {
+      "id": "D15",
+      "status": "accepted",
+      "topic": "Synthetic demo data",
+      "decision": "A dev-only seed command builds a database through the production commands with synthetic model responses (the existing test fixtures), used by API tests, UI development and browser tests",
+      "date": "8 Nov 2026",
+      "needed_by": "S05",
+      "note": "proposed default approved with the roadmap (PR #73)"
+    },
+    {
+      "id": "D16",
+      "status": "open",
+      "blocks": "nothing before S13; needed when scenarios change",
+      "question": "Scenario input independent of the AIM-PRO export (today the Curator reads the AIM-PRO project export)"
+    },
+    {
+      "id": "D17",
+      "status": "open",
+      "blocks": "any shared deployment",
+      "question": "Deployment owner and shared environment"
+    },
+    {
+      "id": "D18",
+      "status": "accepted",
+      "decision": "A teacher refines a proposal both ways: a conversation with the Design Agent, and manual edits of the proposed content. The agents' output and the teacher's edits stay proposals that a human decides and applies",
+      "date": "9 Nov 2026"
+    },
+    {
+      "id": "D19",
+      "status": "accepted",
+      "decision": "A learner's courses are those they are enrolled in; for now the deliveries where they are `LEARNER` by D25 membership (policy ∩ participant), behind one function that D37 may change. One delivery context per learner is excluded (#136)",
+      "date": "17 Nov 2026",
+      "note": "partial: answered for S12; D37 may change the function"
+    },
+    {
+      "id": "D20",
+      "status": "accepted",
+      "decision": "A learner sees everything needed to follow and learn from the course: syllabus, material, activities, exercises and the rest of the learning content. What the learner sees comes from the validated course, never from drafts or other learners' records; the exact projection (for example rubrics and assessment criteria) is defined in S12 with the owner. Projection (17 Nov 2026, #136): for an assessment, its activity, conditions, accepted evidence and the rubric's criteria and levels; the learner's own applied evaluations with each criterion's level and reason and the result; never an answer key, never a pending draft",
+      "date": "9 Nov 2026, 17 Nov 2026"
+    },
+    {
+      "id": "D21",
+      "status": "open",
+      "blocks": "after S13",
+      "question": "The trainer's role once a course is validated, beyond authoring trainer content. Owner direction (9 Nov 2026), to be clarified: the trainer is used to give learners practice, a kind of Socratic agent that hands out exercises with a method. Open points: whether the trainer is a person, an agent or both, and how it relates to the Socratic coach of S13"
+    },
+    {
+      "id": "D22",
+      "status": "accepted",
+      "decision": "Source preparation becomes an agent job, in its own step (S09a2), not in S09a. Its result is the prepared sources, not a proposal: the teacher reviews them and decides whether the Curator syllabus job uses them; nothing is used until the teacher accepts. The job contract gains an outcome for \"completed, awaiting the teacher's choice\" (Chat 16 owner answer 1, Chat 17)",
+      "date": "9 Nov 2026"
+    },
+    {
+      "id": "D23",
+      "status": "accepted",
+      "decision": "A teacher creates a course from the studio, and the API writes its policy. An operator installs a course template (`ALM_COURSE_TEMPLATE`, read only for the API) naming the subjects who may create courses and the source scopes of a new course. `POST /courses` writes one new policy file in `ALM_POLICY_DIR` granting the creator `ADMINISTRATOR` and `CONTENT_RESPONSIBLE` in that context only, and bootstraps the context in PREPARATION/DRAFT. The API never changes or removes an existing policy file; the same request returns the same course (Chat 17, issue #97)",
+      "date": "9 Nov 2026"
+    },
+    {
+      "id": "D24",
+      "status": "accepted",
+      "decision": "Uploaded AIM-PRO exports are stored unchanged in the worker's export directory (`ALM_AIMPRO_EXPORTS`) as `<sha256>.json`. An upload is refused when it is not JSON, is over the size limit (10 MiB, configurable), is not a jjodel megamodel 1.0 export, its metamodels cannot be read, or the chosen scenario and competency catalogue cannot be resolved. Findings against the generated contracts do not refuse it: they are diagnostics shown in plain words (Chat 16 owner answer 2, Chat 17)",
+      "date": "9 Nov 2026"
+    },
+    {
+      "id": "D25",
+      "status": "accepted",
+      "decision": "Course membership, option A: the administrator of a course adds a member (any subject of the identity map, as `CONTENT_RESPONSIBLE`, `ASSESSOR`, `LEARNER` or `OBSERVER`; never `ADMINISTRATOR`); the API writes a new trusted policy file (an installed file is never changed or removed, as D23) and records a proposal that adds the member's `Participant` and changes the context's `policies` reference; the member's authority starts when a person applies it (Chat 28, #129)",
+      "date": "16 Nov 2026"
+    },
+    {
+      "id": "D26",
+      "status": "accepted",
+      "decision": "Source preparation (S09a2) is two jobs. A model-free discovery job runs the teacher's queries and records what they found (in the ALM requests store, replayed without a new search); the teacher picks excerpts with their purpose and limitations; the preparation job fetches them exactly (`SourcePlan` unchanged). The teacher's acceptance is recorded in the jobs store: a preparation job ends `AWAITING_CHOICE` and the teacher moves it to `ACCEPTED` or `DECLINED`; the API and the worker refuse a Curator job on a preparation that is not accepted, while the CLI `--prepared-sources` stays an operator path without acceptance. A minimal job list is on the build page. Coverage requirements are an optional form guided by the uploaded export (Chat 18, issue #101)",
+      "date": "10 Nov 2026"
+    },
+    {
+      "id": "D27",
+      "status": "accepted",
+      "decision": "Syllabus refinement (S09b, refines D18). Units of two syllabi are paired by learning target (`source_target_id`), in their order when several share a target. The Curator holds the conversation (no separate Design Agent): a revision request is one turn, and the revision job gives the Curator the previous syllabus and the reasons of the whole chain. A teacher's edit is complete (every field; units added, removed and reordered), passes the same checks as a generated syllabus and is a proposal by that teacher, declared not reviewed by the agent; the agent's review of an edit is optional and does not block (its form is D29). A refinement reuses the input of the proposal it refines, accepted sources included, while the course is still at that proposal's step; otherwise the sources are prepared again (Chat 19, issue #104)",
+      "date": "10 Nov 2026"
+    },
+    {
+      "id": "D28",
+      "status": "open",
+      "blocks": "when a course is refined after it is applied",
+      "question": "A Curator revision of the syllabus in use. Today an applied syllabus can be edited by the teacher but not revised by the Curator: a revision needs a revision request, and a decision on an applied proposal is not one. Options: a revision job that carries its own reason, or a new decision kind (Chat 19 finding 2)"
+    },
+    {
+      "id": "D29",
+      "status": "open",
+      "blocks": "before the review of an edit is offered",
+      "question": "The form of the optional agent review of a teacher's edit (D27): a job that records a new proposal with the review agent's verdict, or a review record beside the edited proposal. Needs a model call (Chat 19 finding 3)"
+    },
+    {
+      "id": "D30",
+      "status": "accepted",
+      "decision": "The review of a Curator syllabus (Chat 20, issue #107, refines D27). A request makes at most three drafts: a draft refused by the deterministic checks or not accepted by the review agent (`REJECT`, `UNCERTAIN`, a flag false) goes back to the Curator with its draft and the reason, as untrusted data; the review agent judges each draft on its own. When the drafts run out the request fails as before, so a generated syllabus always carries an `ACCEPT` review. Every attempt's verdict, or the fixed text of the check that refused it, is kept with the request's result in the ALM requests store, read through the API and shown in the studio; the review agent's reason is shown as model text and never becomes an error message, a log line or an event. The review of a revision receives the previous syllabus and the teacher's reasons. The review prompt was calibrated on 4 + 4 owner-authorized live jobs, in three clauses only: source diagnostics are not by themselves grounds for rejection, uncited excerpts are not grounds for rejection, and a claim is judged as worded. The configured models are unchanged",
+      "date": "10 Nov 2026"
+    },
+    {
+      "id": "D31",
+      "status": "open",
+      "blocks": "before the syllabus review is relied on without a teacher reading the gaps",
+      "question": "Whether a citation that is true but only loosely relevant to its unit may stand when the draft declares the transfer to the audience as a gap. Since D30 the review agent accepts it and the teacher judges its relevance from the gaps and the excerpts in the syllabus view; the alternative is a further calibration that asks for relevance to the unit's purpose (Chat 20 finding 5)"
+    },
+    {
+      "id": "D32",
+      "status": "open",
+      "blocks": "none; when the review of a draft is audited, or long jobs are abandoned",
+      "question": "Details of the review loop (D30): whether the drafts the review agent refused are kept beside their verdicts (up to three syllabi per request), and whether an administrator's abandonment stops the loop between drafts instead of at the final write (Chat 20 findings 2 and 3)"
+    },
+    {
+      "id": "D33",
+      "status": "open",
+      "blocks": "none; before a shared deployment chooses its models",
+      "question": "A measurement of the syllabus review with another `lead` model than the free `nvidia/nemotron-3.5-super-vl:free`, with the owner's authorization for the live runs; the configured models are not changed without the owner (Chat 20 finding 6)"
+    },
+    {
+      "id": "D34",
+      "status": "accepted",
+      "decision": "Generation by blocks of units (S09d, issue #118, refines D30 for the generators). The Evaluator, Teacher (unstructured) and Trainer write a request in blocks of 12 target units; the generator of a block receives the whole input (the whole syllabus included), its units and the accepted drafts of the earlier blocks, as untrusted data. Each block is judged by the review agent on its own, with the full input and that block only, up to three drafts per block; the assembled draft is judged once at the end, also for one block. One proposal per job. A flow ends with something for the teacher to decide (13 November 2026, changes D30 for these generators): a block the review agent does not accept keeps its last checked draft, and a final review that is not `ACCEPT` is proposed with its verdict and a fixed notice; a block whose drafts all fail the checks is written in two halves, and only a one-unit block failing them fails the job. Accepted blocks are kept and reused, without a model call, by a new job over the same exact inputs. The structured Teacher and the Curator keep one response. A block whose response does not fit (a call past its deadline, or a response cut at its output length limit) is written in two halves, down to one unit, so the approach does not depend on the model; only a one-unit block that does not fit stops the request, with a fixed text, never the provider's message; the deadline of a model call is 1200 s (was 600); block progress is a content-free event shown in the studio job list. A draft that does not cover its units is refused in words the author can read, naming the units by their position in the syllabus; the retry receives the unit keys as data (Chat 23, 12–13 November 2026)",
+      "date": "13 Nov 2026"
+    },
+    {
+      "id": "D35",
+      "status": "accepted",
+      "decision": "Responses may reveal which contexts exist: the rule \"a response never reveals which contexts exist\" (D10, S05) is removed, so the API may list the contexts of the signed-in subject, for the studio home (in place of the context id field) and for the learner's courses (D19, S12). A missing context and an uninstalled policy still both answer 404 `context_unavailable`",
+      "date": "16 Nov 2026"
+    },
+    {
+      "id": "D36",
+      "status": "accepted",
+      "decision": "Membership proposals made together (#133): the studio shows the pending membership proposals and warns that one is applied at a time; one membership proposal may add several members (batch); the core does not refuse a proposal while another is pending (options B + batch, S11b)",
+      "date": "17 Nov 2026"
+    },
+    {
+      "id": "D37",
+      "status": "accepted",
+      "decision": "Enrolment like Microsoft Teams: students join a published course with a course code (or a link carrying it) and take part at once; the teacher's reviewed choice to open the course with a code is the human decision. Teaching staff are still added by the reviewed membership proposal (D25, D36). The course is authored independently of its students; once approved, students join or are added, and **the course version stays the same whatever students enrol**: proposals, approvals and the stale check use a course version that leaves out participants and learners' own records, and a student, whether joining with the code or added by the teacher, is recorded as a participant only under the delivery's reviewed learner grant, with no new policy version (this replaces D25/D36 membership for the `LEARNER` role). Staff are left as they are for now. Implemented in S12b (#141)",
+      "date": "18 Nov 2026"
+    },
+    {
+      "id": "D38",
+      "status": "accepted",
+      "decision": "The stale rule for evaluation drafts (Chat 29 finding 3), option B: another learner's attempt no longer makes a pending evaluation draft stale, since in a real class drafts would almost always expire; a new attempt by the learner whose attempt is evaluated still does, so the assessor starts again from the latest attempt. Any other change of the course still makes the draft stale. Implemented in Chat 38 (20 Nov 2026) with three choices the owner has not confirmed yet: only the learner's new attempt at the same assessment activity counts (an attempt at another activity does not); an applied evaluation of another learner still makes the draft stale, as D38 says (open: with many drafts, applying one expires the others); the studio says why on the proposal page, before the decision",
+      "date": "19 Nov 2026",
+      "note": "implemented in PR #156 (Chat 38); its three choices wait for the owner's confirmation (check C1)"
+    },
+    {
+      "id": "AN3",
+      "status": "open",
+      "blocks": "Phase 7 of the role plan; not scheduled here",
+      "refs": [
+        "docs/architecture/agentic-network-decisions.md"
+      ],
+      "question": "Learner data, governance, twins, dashboards"
+    },
+    {
+      "id": "AN6",
+      "status": "open",
+      "blocks": "S15",
+      "refs": [
+        "docs/architecture/agentic-network-decisions.md"
+      ],
+      "question": "Organisation documents and guidance"
+    },
+    {
+      "id": "D1-D5",
+      "status": "accepted",
+      "decision": "R1 scope, manifest format 1, policy preview, D4 = a, tracking in #71",
+      "date": "8 Nov 2026"
+    },
+    {
+      "id": "EARLIER",
+      "status": "accepted",
+      "decision": "Socratic option b; live model runs only with owner authorization; never edit AIM-PRO/jjodel exports",
+      "date": "see `docs/architecture/agentic-network-decisions.md`"
+    },
+    {
+      "id": "G7",
+      "status": "accepted",
+      "decision": "D4 is lifted by an assessor-requested evaluation draft (option A): a person with the `ASSESSOR` role asks the runtime evaluator `learner-response-evaluator` for a draft on one observed attempt; control builds the `Evaluation`, checks it with `validate_evaluation` (at most three drafts) and records it as a proposal that a person decides and applies; FORMATIVE and FORMAL; the import configures the EVALUATOR worker (Chat 28–29, #129, PR #131)",
+      "date": "16 Nov 2026"
+    },
+    {
+      "id": "STACK",
+      "status": "accepted",
+      "decision": "FastAPI backend; React + TypeScript + Vite front-end, one app per audience",
+      "date": "8 Nov 2026"
+    },
+    {
+      "id": "STORE",
+      "status": "accepted",
+      "decision": "ALM store on PostgreSQL now (SQLite kept for tests and single-host use)",
+      "date": "8 Nov 2026"
+    },
+    {
+      "id": "UI-LANG",
+      "status": "accepted",
+      "decision": "English first, externalised strings",
+      "date": "8 Nov 2026"
+    }
+  ]
+}

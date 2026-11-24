@@ -1,0 +1,595 @@
+{
+  "version": 1,
+  "milestones": {
+    "M1": {
+      "title": "First usable app: the studio review inbox",
+      "steps": [
+        "S01",
+        "S02",
+        "S03",
+        "S04",
+        "S05",
+        "S06",
+        "S07"
+      ],
+      "checks": []
+    },
+    "M2": {
+      "title": "Authoring to delivery: a course built in the studio is released and delivered",
+      "steps": [
+        "S07b",
+        "S08",
+        "S09a",
+        "S09a2",
+        "S09b",
+        "S09c",
+        "S09d",
+        "S10"
+      ],
+      "checks": []
+    },
+    "M3": {
+      "title": "Learner practice end to end",
+      "steps": [
+        "S11",
+        "S11b",
+        "S12",
+        "S12b",
+        "S13",
+        "C1",
+        "C2"
+      ],
+      "checks": [
+        "baseline:quick"
+      ]
+    }
+  },
+  "steps": [
+    {
+      "id": "S01",
+      "phase": "0a",
+      "milestone": "M1",
+      "title": "Store transaction API; no SQL outside `learning/store.py`",
+      "depends_on": [],
+      "depends_note": "this roadmap",
+      "decisions": [],
+      "issues": [
+        74
+      ],
+      "prs": [
+        75
+      ],
+      "chats": [
+        9
+      ],
+      "status": "done"
+    },
+    {
+      "id": "S02",
+      "phase": "0b",
+      "milestone": "M1",
+      "title": "PostgreSQL store backend, copy tool, CI service",
+      "depends_on": [
+        "S01"
+      ],
+      "decisions": [
+        "D13"
+      ],
+      "issues": [],
+      "prs": [
+        77
+      ],
+      "chats": [
+        10
+      ],
+      "status": "done"
+    },
+    {
+      "id": "S03",
+      "phase": "0c",
+      "milestone": "M1",
+      "title": "API skeleton, OpenAPI check, OIDC with Keycloak",
+      "depends_on": [
+        "S02"
+      ],
+      "decisions": [
+        "D8",
+        "D9",
+        "D11"
+      ],
+      "issues": [],
+      "prs": [
+        79
+      ],
+      "chats": [
+        11
+      ],
+      "status": "done"
+    },
+    {
+      "id": "S04",
+      "phase": "0c",
+      "milestone": "M1",
+      "title": "Front-end workspace and studio shell with login",
+      "depends_on": [
+        "S03"
+      ],
+      "decisions": [
+        "D12"
+      ],
+      "issues": [
+        80
+      ],
+      "prs": [
+        81
+      ],
+      "chats": [
+        12
+      ],
+      "status": "done"
+    },
+    {
+      "id": "S05",
+      "phase": "1",
+      "milestone": "M1",
+      "title": "Read-only Authoring API, policy resolver, synthetic seed",
+      "depends_on": [
+        "S04"
+      ],
+      "decisions": [
+        "D10",
+        "D15"
+      ],
+      "issues": [],
+      "prs": [
+        83
+      ],
+      "chats": [
+        13
+      ],
+      "status": "done"
+    },
+    {
+      "id": "S06",
+      "phase": "2",
+      "milestone": "M1",
+      "title": "Review endpoints: decide and apply with review key",
+      "depends_on": [
+        "S05"
+      ],
+      "decisions": [],
+      "issues": [],
+      "prs": [
+        85,
+        87
+      ],
+      "chats": [
+        14
+      ],
+      "status": "done"
+    },
+    {
+      "id": "S07",
+      "phase": "2",
+      "milestone": "M1",
+      "title": "Studio review inbox, with a teacher view — **milestone M1: first usable app**",
+      "depends_on": [
+        "S06"
+      ],
+      "decisions": [],
+      "issues": [],
+      "prs": [
+        88,
+        92
+      ],
+      "chats": [
+        15
+      ],
+      "status": "done"
+    },
+    {
+      "id": "S07b",
+      "phase": "2",
+      "milestone": "M2",
+      "title": "Studio course overview, read only (owner, 9 Nov 2026)",
+      "depends_on": [
+        "S07"
+      ],
+      "decisions": [],
+      "issues": [],
+      "prs": [
+        90,
+        92
+      ],
+      "chats": [
+        15
+      ],
+      "status": "done"
+    },
+    {
+      "id": "S08",
+      "phase": "3",
+      "milestone": "M2",
+      "title": "Agent job worker and progress stream",
+      "depends_on": [
+        "S07b"
+      ],
+      "decisions": [
+        "D14"
+      ],
+      "issues": [],
+      "prs": [
+        95
+      ],
+      "chats": [
+        16
+      ],
+      "status": "done"
+    },
+    {
+      "id": "S09a",
+      "phase": "4",
+      "milestone": "M2",
+      "title": "Course from an uploaded AIM-PRO model: course creation, upload, Curator job, syllabus proposal, project initialization",
+      "depends_on": [
+        "S08"
+      ],
+      "decisions": [
+        "D23",
+        "D24"
+      ],
+      "issues": [
+        97
+      ],
+      "prs": [
+        98,
+        100
+      ],
+      "chats": [
+        17
+      ],
+      "status": "done"
+    },
+    {
+      "id": "S09a2",
+      "phase": "4",
+      "milestone": "M2",
+      "title": "Source preparation as a job; the teacher reviews and accepts the prepared sources for the Curator",
+      "depends_on": [
+        "S09a"
+      ],
+      "decisions": [
+        "D22",
+        "D26"
+      ],
+      "issues": [
+        101
+      ],
+      "prs": [
+        103
+      ],
+      "chats": [
+        18
+      ],
+      "status": "done"
+    },
+    {
+      "id": "S09b",
+      "phase": "4",
+      "milestone": "M2",
+      "title": "Progressive refinement of the syllabus with the Curator and the teacher",
+      "depends_on": [
+        "S09a"
+      ],
+      "decisions": [
+        "D18",
+        "D27",
+        "D30"
+      ],
+      "issues": [
+        104,
+        107
+      ],
+      "prs": [
+        105,
+        108
+      ],
+      "chats": [
+        19,
+        20
+      ],
+      "status": "done"
+    },
+    {
+      "id": "S09c",
+      "phase": "4",
+      "milestone": "M2",
+      "title": "Rubrics, assessments, teacher and trainer content from the studio; teacher view for every proposal kind",
+      "depends_on": [
+        "S09a"
+      ],
+      "depends_note": "S09a2 for prepared sources",
+      "decisions": [],
+      "issues": [
+        121
+      ],
+      "prs": [
+        111,
+        113,
+        116,
+        122
+      ],
+      "chats": [
+        21,
+        22,
+        24
+      ],
+      "parts": "S09c (Chat 21), S09c2 part 1 (Chat 22), S09c2 part 2 (Chat 24)",
+      "status": "done"
+    },
+    {
+      "id": "S09d",
+      "phase": "4",
+      "milestone": "M2",
+      "title": "Generation by blocks of units: a 48-unit course gets its assessments and content with the configured model (owner, 11 Nov 2026; before S09c2 part 2)",
+      "depends_on": [
+        "S09c"
+      ],
+      "decisions": [
+        "D34"
+      ],
+      "issues": [
+        118
+      ],
+      "prs": [
+        119
+      ],
+      "chats": [
+        23
+      ],
+      "status": "done"
+    },
+    {
+      "id": "S10",
+      "phase": "8",
+      "milestone": "M2",
+      "title": "Course validation: release and delivery views — **milestone M2: authoring to delivery**",
+      "depends_on": [
+        "S09c"
+      ],
+      "decisions": [
+        "D35"
+      ],
+      "issues": [
+        123
+      ],
+      "prs": [
+        124,
+        126,
+        128
+      ],
+      "chats": [
+        25,
+        26
+      ],
+      "status": "done"
+    },
+    {
+      "id": "S11",
+      "phase": "—",
+      "milestone": "M3",
+      "title": "Runtime assessor role and evaluation adapter (G7); course membership (D25)",
+      "depends_on": [
+        "S10"
+      ],
+      "decisions": [
+        "D25",
+        "G7"
+      ],
+      "issues": [
+        129
+      ],
+      "prs": [
+        130,
+        131
+      ],
+      "chats": [
+        27,
+        28,
+        29
+      ],
+      "status": "done"
+    },
+    {
+      "id": "S11b",
+      "phase": "—",
+      "milestone": "M3",
+      "title": "Studio flow fixes from the SE-AI case study: an existing course id as delivery course (#132), pending activation and membership proposals (#133); batch membership (D36)",
+      "depends_on": [
+        "S11"
+      ],
+      "decisions": [
+        "D36"
+      ],
+      "issues": [
+        132,
+        133
+      ],
+      "prs": [
+        139
+      ],
+      "chats": [
+        31
+      ],
+      "status": "done"
+    },
+    {
+      "id": "S12",
+      "phase": "5",
+      "milestone": "M3",
+      "title": "Learner API, including the learner's own courses (#136)",
+      "depends_on": [
+        "S11"
+      ],
+      "decisions": [
+        "D19",
+        "D20"
+      ],
+      "issues": [
+        136
+      ],
+      "prs": [
+        137,
+        142,
+        143
+      ],
+      "chats": [
+        30,
+        32,
+        33
+      ],
+      "status": "done"
+    },
+    {
+      "id": "S12b",
+      "phase": "—",
+      "milestone": "M3",
+      "title": "Teams-style enrolment: a course code or link for students, students added by the teacher in the same way, a course version that enrolments leave unchanged, automatic subject keys (D9 revised) (#141)",
+      "depends_on": [
+        "S12"
+      ],
+      "decisions": [
+        "D37",
+        "D9"
+      ],
+      "issues": [
+        141
+      ],
+      "prs": [
+        146,
+        147
+      ],
+      "chats": [
+        34,
+        35
+      ],
+      "status": "done"
+    },
+    {
+      "id": "S13",
+      "phase": "5",
+      "milestone": "M3",
+      "title": "Learner app: my courses, course view, practice — **milestone M3: learner practice end to end**; the stale rule for evaluation drafts is decided here with the owner",
+      "depends_on": [
+        "S12",
+        "S12b"
+      ],
+      "decisions": [
+        "D38"
+      ],
+      "issues": [],
+      "prs": [
+        148,
+        149,
+        156
+      ],
+      "chats": [
+        36,
+        37,
+        38
+      ],
+      "branch": "feat/s13-stale-rule",
+      "status": "done",
+      "owner": "claude",
+      "since": "2026-11-20 17:00",
+      "finished": "2026-11-24 15:25"
+    },
+    {
+      "id": "S13b",
+      "phase": "—",
+      "milestone": null,
+      "title": "Review and release readability for the teacher: release views (#125), the next action on long review pages (#134)",
+      "depends_on": [
+        "S13",
+        "C3"
+      ],
+      "depends_note": "the layout owner",
+      "decisions": [],
+      "issues": [
+        125,
+        134
+      ],
+      "prs": [],
+      "chats": [],
+      "status": "todo"
+    },
+    {
+      "id": "S14",
+      "phase": "—",
+      "milestone": null,
+      "title": "Scenario input independent of the AIM-PRO export",
+      "depends_on": [],
+      "decisions": [
+        "D16"
+      ],
+      "issues": [],
+      "prs": [],
+      "chats": [],
+      "status": "todo"
+    },
+    {
+      "id": "S15",
+      "phase": "6",
+      "milestone": null,
+      "title": "Organisation context and guidance",
+      "depends_on": [],
+      "depends_note": "decision 6 details",
+      "decisions": [
+        "AN6"
+      ],
+      "issues": [],
+      "prs": [],
+      "chats": [],
+      "status": "todo"
+    }
+  ],
+  "checks": [
+    {
+      "id": "C1",
+      "title": "Confirm the three Chat 38 choices of PR #156 (D38): same activity only; another learner's applied evaluation still makes a draft stale; the studio warns before the decision",
+      "depends_on": [],
+      "steps_to_do": [
+        "Read docs/plans/handoffs/chat-38.md on the branch feat/s13-stale-rule (PR #156), section on the three choices and finding 1.",
+        "Answer in the PR or in chat: confirm each choice or ask for a change.",
+        "When the PR is merged: ./aim done C1 and ./aim done S13."
+      ],
+      "status": "todo"
+    },
+    {
+      "id": "C2",
+      "title": "SE-AI case study run again as a live check at M3 (owner-authorized model calls)",
+      "depends_on": [
+        "S13"
+      ],
+      "steps_to_do": [
+        "Authorize the live run explicitly (model, budget, stack).",
+        "Run the SE-AI case study (examples/se-ai/) on your own stack and record the findings.",
+        "./aim done C2"
+      ],
+      "status": "todo"
+    },
+    {
+      "id": "C3",
+      "title": "Agree the S13b acceptance with the layout owner",
+      "depends_on": [
+        "S13"
+      ],
+      "steps_to_do": [
+        "Read the S13b section of the roadmap, #125 and #134.",
+        "Agree with the layout owner which page structure changes are allowed and write the acceptance list into the S13b section.",
+        "./aim done C3"
+      ],
+      "status": "todo"
+    }
+  ]
+}

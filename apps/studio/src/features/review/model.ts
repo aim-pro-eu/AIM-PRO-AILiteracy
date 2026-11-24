@@ -104,7 +104,8 @@ export interface OpenProposal {
   /**
    * Whether it was made on the course as it is now. Applying any proposal gives the course a new version, and the
    * core refuses a proposal made on an earlier one as stale: it is proposed again. Students joining or added, and
-   * their attempts, leave the course version as it was (D37, S12b).
+   * their attempts, leave the course version as it was (D37, S12b); an evaluation draft no longer applies once its
+   * student attempted the same assessment again (D38).
    */
   current: boolean;
 }
@@ -117,22 +118,47 @@ const refs = (value: JsonValue | undefined): EntityRef[] => (Array.isArray(value
 const LEARNER_CAUSES = ['Participant', 'LearningEvidence'];
 
 /**
- * Whether the course is the same now as at the version `base`: every change since then is a learner's event, as the
- * core checks it (`learning/decisions.py`). An evaluation draft is judged on the learners' records too: for it only a
- * student joining or added counts (Chat 29 finding 3).
+ * The causes of the changes since the version `base`, newest first, when each is a learner's event (a join, an
+ * attempt), as the core checks it (`learning/decisions.py`); otherwise null: the course itself changed.
  */
-function sameCourse(inbox: Inbox, base: string, causes: string[]): boolean {
+function learnerEvents(inbox: Inbox, base: string): EntityRef[] | null {
   const changes = new Map(inbox.entities.filter(({ type }) => type === 'StateChange')
     .map((change) => [String(change.fields.newVersion ?? ''), change]));
+  const events: EntityRef[] = [];
   let version = inbox.context.version;
   while (version !== base) {
     const change = changes.get(version);
     changes.delete(version);
-    const cause = change?.fields.cause;
-    if (!change || !isObject(cause) || !causes.includes(String(cause.type ?? ''))) return false;
+    const [cause] = refs(change ? [change.fields.cause ?? null] : []);
+    if (!change || !cause || !LEARNER_CAUSES.includes(cause.type)) return null;
+    events.push(cause);
     version = String(change.fields.baseVersion ?? '');
   }
-  return true;
+  return events;
+}
+
+/** What an evaluation draft can still do: be applied, or not since its student attempted again or the course changed. */
+export type DraftState = 'current' | 'attemptedAgain' | 'courseChanged';
+
+/**
+ * The state of an evaluation draft made on the course at its base version (D38): another student's attempt, or the
+ * student's attempt at another activity, leaves it current; the student's new attempt at the same assessment does
+ * not, nor any applied proposal. Students and activities are compared by id, as the core does.
+ */
+export function evaluationDraftState(inbox: Inbox, proposal: Entity, candidates: Entity[]): DraftState {
+  const events = learnerEvents(inbox, String(proposal.fields.baseContextVersion ?? ''));
+  if (events === null) return 'courseChanged';
+  const evidence = new Map(inbox.entities.filter(({ type }) => type === 'LearningEvidence').map((item) => [item.id, item]));
+  const key = (item: Entity | undefined) => {
+    const [learner] = refs(item ? [item.fields.learner ?? null] : []);
+    const [activity] = refs(item ? [item.fields.activity ?? null] : []);
+    return learner && activity ? `${learner.id}\u0000${activity.id}` : null;
+  };
+  const judged = new Set(candidates.filter(({ type }) => type === 'Evaluation')
+    .flatMap(({ fields }) => refs(fields.evidence)).map(({ id }) => key(evidence.get(id))));
+  judged.delete(null);
+  return events.some(({ type, id }) => type === 'LearningEvidence' && judged.has(key(evidence.get(id))))
+    ? 'attemptedAgain' : 'current';
 }
 
 /** The proposals of the course that await a decision or, approved, their application; those awaiting a decision first. */
@@ -143,9 +169,12 @@ export function openProposals(inbox: Inbox): OpenProposal[] {
   return [...inbox.pending.map((pending) => pending.proposal), ...open.filter((proposal) => !records.has(proposal.id))]
     .map((proposal) => {
       const candidates = refs(proposal.fields.candidateDefinitions);
-      const causes = candidates.some(({ type }) => type === 'Evaluation') ? ['Participant'] : LEARNER_CAUSES;
-      return { proposal, candidates, records: records.get(proposal.id) ?? null,
-        current: sameCourse(inbox, String(proposal.fields.baseContextVersion ?? ''), causes) };
+      const found = records.get(proposal.id) ?? null;
+      // An approved evaluation draft comes without its records: only a change of the course is seen for it.
+      const current = candidates.some(({ type }) => type === 'Evaluation')
+        ? evaluationDraftState(inbox, proposal, found ?? []) === 'current'
+        : learnerEvents(inbox, String(proposal.fields.baseContextVersion ?? '')) !== null;
+      return { proposal, candidates, records: found, current };
     });
 }
 
