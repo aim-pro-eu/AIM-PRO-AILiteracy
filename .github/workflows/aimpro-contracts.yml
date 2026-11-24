@@ -156,3 +156,13 @@ jobs:
       - run: python -m unittest tests.test_evaluation tests.test_events -v
       - run: python -m evaluation --check
       - run: python -m evaluation --planning-mode controlled-two-step --check
+
+  roadmap-harness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+      - run: python tools/harness/aim.py selfcheck
+      - run: python -m unittest tests.test_aim_harness -v

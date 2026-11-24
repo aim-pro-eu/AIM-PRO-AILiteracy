@@ -1,0 +1,36 @@
+{
+  "github": "aim-pro-eu/AIM-PRO-AILiteracy",
+  "base_branch": "main",
+  "worktrees": ".worktrees",
+  "env": {
+    "LANGFUSE_ENABLED": "false",
+    "CREWAI_DISABLE_TELEMETRY": "true",
+    "CREWAI_TRACING_ENABLED": "false"
+  },
+  "checks": {
+    "baseline:quick": [
+      {"name": "harness selfcheck", "cmd": "{python} tools/harness/aim.py selfcheck"},
+      {"name": "AIM-PRO contracts", "cmd": "{python} -m aimpro.generate --check"},
+      {"name": "OpenAPI snapshots", "cmd": "{python} -m services.api_common.openapi --check"},
+      {"name": "evaluation", "cmd": "{python} -m evaluation --check"}
+    ],
+    "baseline:apps": [
+      {"name": "npm check:client", "cmd": "npm run check:client", "cwd": "apps"},
+      {"name": "npm typecheck", "cmd": "npm run typecheck", "cwd": "apps"},
+      {"name": "npm test", "cmd": "npm test", "cwd": "apps"},
+      {"name": "npm build", "cmd": "npm run build", "cwd": "apps"},
+      {"name": "npm check:bundle", "cmd": "npm run check:bundle", "cwd": "apps"}
+    ],
+    "baseline": [
+      "@baseline:quick",
+      {"name": "Python offline suite (about 8 minutes)", "cmd": "{python} -m unittest discover -q"},
+      "@baseline:apps"
+    ],
+    "stack": [
+      {"name": "Keycloak realm alm-dev", "url": "http://127.0.0.1:58080/realms/alm-dev/.well-known/openid-configuration"},
+      {"name": "studio (Authoring API)", "url": "http://127.0.0.1:58000/health"},
+      {"name": "Learner API", "url": "http://127.0.0.1:58002/health"},
+      {"name": "learner app", "url": "http://127.0.0.1:58003/learn/"}
+    ]
+  }
+}
