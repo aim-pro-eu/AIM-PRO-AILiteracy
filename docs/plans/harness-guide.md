@@ -31,12 +31,14 @@ the item waits for S13 and the owner check C3; a decision id there means the dec
 ## For the owner: the work cycle
 
 ```
-./aim next                          what can start, what is active, decisions waiting for you
-./aim prompt S13b --tool codex      the brief for the next chat; paste it into the agent
-      … the agent claims the step, works in its worktree, writes the handoff, opens the PR,
+./aim watch                                   live view; leave it open in a terminal tab
+./aim next                                    what can start, what is active, decisions waiting for you
+./aim run S13b --tool codex --agent codex-1   claim + worktree + prompt + start the agent
+      (or ./aim prompt S13b and paste the brief into any agent)
+      … the agent works in .worktrees/s13b, writes the handoff, opens the PR,
         runs ./aim review S13b --pr <n> …
 review and merge the PR
-./aim done S13b                     on main after the merge (or let the next chat do it)
+./aim issues --sync                           closes the steps whose PR is merged (in the next PR)
 ```
 
 Your part: choose the next step, answer decisions, do the owner checks (C1…), review and merge the PRs.
@@ -79,6 +81,73 @@ The prompt carries the step section, the working protocol, the decisions the ste
 the harness commands the agent must run. It is saved in `var/prompts/S13b-<tool>.md`. When the step is already in
 progress the prompt tells the agent to continue from the handoff of the current chat instead of starting again:
 use it to switch agents when one runs out of tokens.
+
+### Start an agent from the terminal
+
+```bash
+./aim run S13b --tool claude --agent claude-1                 # interactive: the agent asks you
+./aim run S13b --tool codex --agent codex-1 --mode auto       # unattended: no questions, log in var/logs/
+```
+
+`run` claims the step with a worktree (`.worktrees/s13b`), writes the prompt and starts the agent CLI (`claude` or
+`codex`, which must be on `PATH`) inside the worktree. Running it again for the same agent resumes the step in the
+same chat. In `--mode auto` the agent cannot ask you anything: the prompt tells it to record any choice with
+`./aim propose`, block the step and stop; Claude Code runs with `acceptEdits` and a list of allowed tools (git, gh,
+`./aim`, Python, npm, file tools), Codex with its workspace sandbox and automatic approval review. Neither mode
+skips permissions. The output goes to `var/logs/<step>-<agent>-<time>.log`; at the end `run` warns if the step is
+still in progress. Use `auto` for well-specified steps only; steps that need the owner (S13b, with the layout
+owner) are better interactive.
+
+### Follow the work live
+
+```bash
+./aim watch                  # refresh every 30 s; Ctrl-C to stop
+./aim watch --interval 60
+./aim watch --once           # one snapshot
+```
+
+It shows the milestones, the active steps **of every worktree** with the time of the last file change there (⚠
+after 20 quiet minutes), the open PRs with their CI state, what waits for you (owner checks, proposals, also those
+still on a branch), the steps ready for an agent, the agent processes on this machine and the tail of the latest
+unattended log. On macOS it notifies you when a step goes to review or is blocked, a decision waits for you, an owner
+check becomes ready or CI fails on a PR.
+
+### Ask a question without changing anything
+
+```bash
+./aim ask "Which PR is waiting for me and why?"
+./aim ask C1 "What exactly do I have to confirm?"
+./aim ask S13b "Which files show the release views?" --tool codex
+```
+
+A read-only agent answers in Italian from the repository, the plan, the handoffs, GitHub and the running stack
+(`curl` on 127.0.0.1 only). It cannot edit files, change git state, claim steps or call a model API. The answer is
+saved in `var/logs/ask-…md`.
+
+### Investigate a decision
+
+```bash
+./aim investigate "Where does the scenario input come from once it is independent of the AIM-PRO export?" \
+  --blocks S14 --options "A: a scenario file in the course; B: a scenario API" --criteria "works with SE-AI"
+```
+
+It opens the next `D<n>` with the question, writes a brief in `docs/plans/investigations/D<n>.md` (question,
+context, options, criteria, empty Findings and Recommendation) and adds an investigation `I<n>` that an agent can
+run (`./aim run I1 …`). The blocked steps wait until you accept `D<n>`. The agent fills the brief with evidence,
+runs `./aim propose D<n> "…" --why "…"` and publishes a PR; it never implements the choice.
+
+### Worktrees and GitHub
+
+```bash
+./aim worktrees              # every worktree: branch, ahead/behind main, uncommitted changes, last change, claims
+./aim worktrees --fetch      # fetch origin/main first
+./aim issues                 # issues and PRs of the open steps, CI of open PRs, open PRs linked to no step
+./aim issues --all           # also the finished steps
+./aim issues --sync          # steps in review whose last PR is merged → done
+```
+
+`./aim status` and `./aim next` also list the claims and proposals that live only in other worktrees ("In other
+worktrees (not on this branch yet)").
 
 ### Decisions
 
@@ -157,7 +226,10 @@ The rules are the roadmap's working protocol; these are the commands that carry 
 6. **Finish.** Replace every `TODO(aim)` of the handoff with evidence (commands and results, commits, CI links),
    publish the PR, then `./aim review S13b --pr 160 --agent codex`. It refuses while the handoff misses a section
    or still has a placeholder. Commit `docs/plans` (the JSON files, the generated files, the handoff) in the PR.
-7. **Never** edit `STATUS.md`, `DECISIONS.md` or the generated roadmap blocks by hand, and never run
+7. **Investigations** (`I<n>`): the guidance is the brief in `docs/plans/investigations/`. Fill its Findings and
+   Recommendation with evidence, `./aim propose D<n> "…" --why "…"`, then hand off and publish as for a step. Do not
+   implement the choice.
+8. **Never** edit `STATUS.md`, `DECISIONS.md` or the generated roadmap blocks by hand, and never run
    `./aim accept`, `./aim reject`, `./aim skip` or `./aim done C…`.
 
 ## Troubleshooting
@@ -165,7 +237,9 @@ The rules are the roadmap's working protocol; these are the commands that carry 
 | Symptom | Cause and fix |
 | --- | --- |
 | `./aim: no such file or directory` | You are not at the repository root or in a worktree. `cd /Users/juridirocco/development/py-prototype` |
-| `./aim status` on `main` does not show a step that an agent claimed | The claim lives on the step's branch until its PR is merged. Run `./aim status` in the worktree (`.worktrees/<step>`) |
+| `./aim status` on `main` does not mark a step that an agent claimed | The claim lives on the step's branch until its PR is merged; `./aim status` lists it under "In other worktrees", and `./aim watch` shows it |
+| `./aim run` says the tool is not on `PATH` | Install the CLI (`claude` or `codex`) or use `./aim prompt` and paste the brief |
+| `./aim issues` fails | `gh` is missing or not signed in: `gh auth status` |
 | Merge conflict in `STATUS.md`, `DECISIONS.md` or the roadmap | Resolve `steps.json` and `decisions.json` (the sources), then `./aim render` |
 | `./aim review` refuses | The handoff misses a section or has `TODO(aim)` left: the message lists them |
 | `… is the owner's action` | `accept`, `reject`, `skip`, `done C…` need the owner's terminal (or `--yes`) |

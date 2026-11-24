@@ -203,6 +203,8 @@ def depends_text(t: dict) -> str:
 def roadmap_steps_table(data: dict) -> str:
     lines = ["| Step | Role-plan phase | Result | Depends on | Status |", "| --- | --- | --- | --- | --- |"]
     for t in data["steps"]:
+        if t["id"].startswith("I"):
+            continue  # investigations are listed in STATUS.md, not in the roadmap
         lines.append(f"| {t['id']} | {t.get('phase') or '—'} | {t['title']} | {depends_text(t)} | {step_state_text(t)} |")
     return "\n".join(lines)
 
@@ -356,6 +358,7 @@ def cmd_status(args) -> None:
     opened = [d["id"] for d in dec["decisions"] if d["status"] == "open"]
     print(f"\nDecisions: {len(waiting)} waiting for the owner" + (f" ({', '.join(waiting)})" if waiting else "")
           + f", {len(opened)} open: {', '.join(opened)}")
+    print_elsewhere()
     print("Generated: docs/plans/STATUS.md, docs/plans/DECISIONS.md, roadmap tables")
 
 
@@ -369,7 +372,8 @@ def cmd_next(args) -> None:
         print(f"{t['id']:<6} {plain(t['title'])[:100]}{who}")
     steps = [t for t in r if not is_check(t)]
     if steps:
-        print(f"\nStart with: ./aim prompt {steps[0]['id']}   (then the agent runs ./aim claim {steps[0]['id']} --agent <name> --worktree)")
+        print(f"\nStart with: ./aim run {steps[0]['id']} --tool claude|codex --agent <name>"
+              f"   (or ./aim prompt {steps[0]['id']} and paste it)")
     active = [t for t in items(data) if t["status"] in ("in_progress", "review")]
     if active:
         print("\nActive:")
@@ -381,6 +385,7 @@ def cmd_next(args) -> None:
         for d in waiting:
             print(f"  {d['id']:<5} {plain(d.get('proposal', ''))[:100]}")
             print(f"        ./aim accept {d['id']}   |   ./aim reject {d['id']} --why \"…\"")
+    print_elsewhere()
     blocked = [t for t in items(data) if t["status"] == "todo" and t not in r]
     if blocked:
         print("\nWaiting:")
@@ -767,7 +772,12 @@ def cmd_prompt(args) -> None:
                   f"read docs/plans/handoffs/chat-{t['current_chat']:02d}.md if it exists and the branch "
                   f"`{t.get('branch', '?')}`; do not redo finished work.", ""]
     lines += ["## Read first", ""] + [f"- {r}" for r in reading] + [""]
-    lines += ["## The step (from the roadmap)", "", roadmap_section(t["id"]) or "(no section: stop and ask the owner)", ""]
+    if t.get("brief"):
+        lines += [f"## The investigation (brief {t['brief']})", "",
+                  f"Fill its Findings and Recommendation with evidence, then ./aim propose {t.get('decision')} \"…\" "
+                  "--why \"…\". Do not implement the choice: the owner accepts it first.", "", file_block(t["brief"]), ""]
+    else:
+        lines += ["## The step (from the roadmap)", "", roadmap_section(t["id"]) or "(no section: stop and ask the owner)", ""]
     protocol = roadmap_part("Working protocol for every chat").split("\n", 1)[-1].strip()
     lines += ["## The working protocol (from the roadmap)", "", protocol, ""]
     if decisions:
@@ -800,6 +810,8 @@ def cmd_prompt(args) -> None:
     PROMPTS.mkdir(parents=True, exist_ok=True)
     out = PROMPTS / f"{t['id']}-{args.tool}.md"
     out.write_text(text + "\n", encoding="utf-8")
+    if getattr(args, "quiet", False):
+        return
     print(text)
     print(f"\n(saved to {out.relative_to(ROOT)})", file=sys.stderr)
 
@@ -937,7 +949,9 @@ def validate(data: dict, dec: dict) -> list[str]:
         for d in t.get("decisions", []):
             if d not in dids:
                 problems.append(f"{t['id']}: needs unknown decision {d}")
-        if not is_check(t) and t["status"] != "todo" and not roadmap_section(t["id"]) and t["id"] not in ("S14", "S15"):
+        if t.get("brief") and not (ROOT / t["brief"]).exists():
+            problems.append(f"{t['id']}: brief {t['brief']} is missing")
+        if not is_check(t) and not t.get("brief") and t["status"] != "todo" and not roadmap_section(t["id"]):
             problems.append(f"{t['id']}: no '### {t['id']} — …' section in the roadmap")
         if t.get("milestone") and t["milestone"] not in data["milestones"]:
             problems.append(f"{t['id']}: unknown milestone {t['milestone']}")
@@ -976,6 +990,494 @@ def cmd_selfcheck(args) -> None:
     print(f"selfcheck OK: {len(load()['steps'])} steps, {len(load_decisions()['decisions'])} decisions, "
           f"{len(COMMANDS)} commands documented, generated files up to date.")
 
+# ----------------------------------------------------------------- worktrees and GitHub
+
+
+def worktree_list() -> list[dict]:
+    """Every worktree of the repository: path, branch, and the plan it holds (claims live on step branches)."""
+    out = git("worktree", "list", "--porcelain", check=False)
+    trees, cur = [], {}
+    for line in out.splitlines() + [""]:
+        if not line.strip():
+            if cur:
+                trees.append(cur)
+            cur = {}
+        elif line.startswith("worktree "):
+            cur["path"] = Path(line[9:])
+        elif line.startswith("branch "):
+            cur["branch"] = line[7:].removeprefix("refs/heads/")
+        elif line.startswith("detached"):
+            cur["branch"] = "(detached)"
+        elif line.startswith("prunable"):
+            cur["prunable"] = True
+    return trees
+
+
+def plan_at(path: Path) -> tuple[dict | None, dict | None]:
+    try:
+        return (read_json(path / "docs" / "plans" / "steps.json"), read_json(path / "docs" / "plans" / "decisions.json"))
+    except (OSError, ValueError):
+        return None, None
+
+
+def elsewhere() -> list[dict]:
+    """Claims and proposals recorded in other worktrees that this checkout does not have yet."""
+    here = {t["id"]: t for t in items(load())}
+    here_dec = {d["id"]: d for d in load_decisions()["decisions"]}
+    found = []
+    for wt in worktree_list():
+        if wt.get("prunable") or wt["path"].resolve() == ROOT.resolve():
+            continue
+        data, dec = plan_at(wt["path"])
+        if not data:
+            continue
+        for t in items(data):
+            mine = here.get(t["id"])
+            if t["status"] in ("in_progress", "review", "blocked") and (not mine or mine["status"] != t["status"]):
+                found.append({"kind": "step", "item": t, "worktree": wt})
+        for d in (dec or {}).get("decisions", []):
+            mine = here_dec.get(d["id"])
+            if d["status"] == "proposed" and (not mine or mine["status"] != "proposed"):
+                found.append({"kind": "decision", "item": d, "worktree": wt})
+    return found
+
+
+def rel(path: Path) -> str:
+    try:
+        return str(path.relative_to(main_checkout()))
+    except ValueError:
+        return str(path)
+
+
+def print_elsewhere() -> None:
+    rows = elsewhere()
+    if not rows:
+        return
+    print("\nIn other worktrees (not on this branch yet):")
+    for r in rows:
+        x, wt = r["item"], r["worktree"]
+        if r["kind"] == "step":
+            print(f"  {ICON[x['status']]} {x['id']:<6} {step_state_text(x)}  [{rel(wt['path'])}, {wt.get('branch')}]")
+        else:
+            print(f"  ? {x['id']:<6} proposed: {plain(x.get('proposal', ''))[:80]}  [{rel(wt['path'])}]")
+
+
+def cmd_worktrees(args) -> None:
+    cfg = config()
+    if args.fetch:
+        git("fetch", "-q", "origin", cfg["base_branch"], check=False)
+    base = f"origin/{cfg['base_branch']}"
+    for wt in worktree_list():
+        p = wt["path"]
+        if wt.get("prunable"):
+            print(f"{rel(p)}\n    prunable (folder gone): git worktree prune")
+            continue
+        counts = git("rev-list", "--left-right", "--count", f"{base}...HEAD", cwd=p, check=False).split()
+        behind, ahead = (counts + ["?", "?"])[:2]
+        dirty = len([l for l in git("status", "--porcelain", cwd=p, check=False).splitlines() if l.strip()])
+        data, _ = plan_at(p)
+        claims = [f"{t['id']} {t['status']}" for t in items(data or {"steps": []}) if t["status"] in ("in_progress", "review", "blocked")]
+        print(f"{rel(p)}  [{wt.get('branch')}]")
+        print(f"    {ahead} ahead, {behind} behind {base}; {dirty} uncommitted change(s); last change {ago(latest_change(p))}"
+              + (f"; plan: {', '.join(claims)}" if claims else ""))
+
+
+def gh_json(*a: str):
+    r = subprocess.run(["gh", *a, "--repo", config()["github"]], capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError(r.stderr.strip() or "gh failed")
+    return json.loads(r.stdout or "null")
+
+
+def ci_state(rollup: list[dict] | None) -> str:
+    states = [(c.get("conclusion") or c.get("state") or c.get("status") or "").upper() for c in rollup or []]
+    if not states:
+        return "no checks"
+    if any(s in ("FAILURE", "ERROR", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED") for s in states):
+        return "CI failing"
+    if any(s in ("PENDING", "QUEUED", "IN_PROGRESS", "EXPECTED", "WAITING", "") for s in states):
+        return "CI running"
+    return "CI green"
+
+
+def cmd_issues(args) -> None:
+    data = load()
+    try:
+        prs = gh_json("pr", "list", "--state", "all", "--limit", "200",
+                      "--json", "number,state,title,headRefName,statusCheckRollup")
+        issues = gh_json("issue", "list", "--state", "all", "--limit", "300", "--json", "number,state,title")
+    except (RuntimeError, FileNotFoundError) as e:
+        sys.exit(f"gh is not available or not signed in: {e}")
+    pr_by = {p["number"]: p for p in prs}
+    issue_by = {i["number"]: i for i in issues}
+    linked = set()
+    changed = False
+    for t in data["steps"]:
+        nums = t.get("prs", []) + t.get("issues", [])
+        linked.update(nums)
+        if t["status"] in FINISHED and not args.all:
+            continue
+        parts = []
+        for n in t.get("issues", []):
+            i = issue_by.get(n)
+            parts.append(f"issue #{n} {i['state'].lower() if i else '?'}")
+        for n in t.get("prs", []):
+            p = pr_by.get(n)
+            parts.append(f"PR #{n} {p['state'].lower() if p else '?'}" + (f" ({ci_state(p['statusCheckRollup'])})" if p and p["state"] == "OPEN" else ""))
+        print(f"{ICON[t['status']]} {t['id']:<6} " + ("; ".join(parts) or "no issue or PR"))
+        last = pr_by.get(t["prs"][-1]) if t.get("prs") else None
+        if t["status"] == "review" and last and last["state"] == "MERGED":
+            if args.sync:
+                set_status(data, t, "done")
+                t.pop("current_chat", None)
+                changed = True
+                print(f"    PR #{last['number']} merged → {t['id']} done")
+            else:
+                print(f"    PR #{last['number']} is merged: ./aim done {t['id']} (or ./aim issues --sync)")
+    open_unlinked = [p for p in prs if p["state"] == "OPEN" and p["number"] not in linked]
+    if open_unlinked:
+        print("\nOpen PRs not linked to a step:")
+        for p in open_unlinked:
+            print(f"  #{p['number']} {p['title'][:80]} [{p['headRefName']}] ({ci_state(p['statusCheckRollup'])})")
+    if changed:
+        save(data)
+
+# ----------------------------------------------------------------- investigations
+
+
+def cmd_investigate(args) -> None:
+    data, dec = load(), load_decisions()
+    did = next_decision_id(dec)
+    n = 1 + max([int(t["id"][1:]) for t in data["steps"] if re.fullmatch(r"I\d+", t["id"])], default=0)
+    iid = f"I{n}"
+    blocks = [b.strip() for b in (args.blocks or "").split(",") if b.strip()]
+    for b in blocks:
+        item_by_id(data, b)
+    brief_rel = f"docs/plans/investigations/{did}.md"
+    options = "\n".join(f"- {o.strip()}" for o in (args.options or "").split(";") if o.strip()) \
+        or "- (to be identified by the investigation)"
+    criteria = "\n".join(f"- {c.strip()}" for c in (args.criteria or "").split(";") if c.strip())
+    brief = textwrap.dedent(f"""\
+        # {did}: {args.question}
+
+        Status: open · Investigation: {iid} · Blocks: {', '.join(blocks) or 'nothing'}
+
+        ## Question
+
+        {args.question}
+
+        ## Context
+
+        {args.context or '(see the roadmap sections of the blocked steps and the decisions they cite)'}
+
+        ## Options to compare
+
+        {{options}}
+
+        ## Criteria
+
+        - Consistent with the accepted decisions (DECISIONS.md) and the roadmap's direction (ALM is the reference model)
+        - Keeps every generated artefact a proposal that a person decides and applies
+        - Testable offline with synthetic data
+        - Smallest change that serves the blocked steps
+        {{criteria}}
+
+        ## Findings
+
+        {TODO_MARK}: what was checked (code, docs, tests, throwaway experiments) and what was found, with file paths
+        and commands. No model call or live run without the owner's explicit authorization.
+
+        ## Recommendation
+
+        {TODO_MARK}: the option recommended, why, and its consequences for the blocked steps. Then
+        `./aim propose {did} "…" --why "…"`. Do not implement it: the owner accepts it first.
+        """).replace("{options}", options).replace("{criteria}", criteria)
+    (ROOT / brief_rel).parent.mkdir(parents=True, exist_ok=True)
+    (ROOT / brief_rel).write_text(brief.replace("\n\n\n", "\n\n"), encoding="utf-8")
+    dec["decisions"].append({"id": did, "status": "open", "question": args.question,
+                             "blocks": ", ".join(blocks) or "nothing yet", "brief": brief_rel})
+    data["steps"].append({"id": iid, "phase": "—", "milestone": None, "title": f"Investigate {did}: {args.question}",
+                          "depends_on": [], "decisions": [], "issues": [], "prs": [], "chats": [],
+                          "brief": brief_rel, "decision": did, "status": "todo"})
+    for t in items(data):
+        if t["id"] in blocks and did not in t.setdefault("decisions", []):
+            t["decisions"].append(did)
+    save(data, dec)
+    print(f"{did} opened; investigation {iid} created; brief {brief_rel}.")
+    if blocks:
+        print(f"{', '.join(blocks)} now wait for {did} to be accepted.")
+    print(f"Start it: ./aim run {iid} --tool claude|codex --agent <name>   (then you answer with ./aim accept {did})")
+
+# ----------------------------------------------------------------- agents: run, ask, watch
+
+
+UNATTENDED = """
+## Unattended run
+
+Nobody is watching this session and you cannot ask questions. Never decide for the owner: when a choice is
+needed, record it with ./aim propose, run ./aim block <step> --reason "…", write the handoff and stop. No model
+calls, no live runs, no pushes to main, never merge a PR. Always finish with ./aim handoff (and ./aim review
+--pr <n> when the PR is published and the handoff is complete).
+"""
+
+CLAUDE_AUTO_TOOLS = ["Read", "Edit", "Write", "Glob", "Grep", "Bash(git:*)", "Bash(gh:*)", "Bash(./aim:*)",
+                     "Bash(python:*)", "Bash(python3:*)", "Bash(.venv/bin/python:*)", "Bash(npm:*)", "Bash(npx:*)",
+                     "Bash(ls:*)", "Bash(cat:*)", "Bash(rg:*)", "Bash(find:*)", "Bash(mkdir:*)"]
+
+READ_ONLY_TOOLS = ["Read", "Grep", "Glob", "Bash(./aim status:*)", "Bash(./aim show:*)", "Bash(./aim log:*)",
+                   "Bash(./aim next:*)", "Bash(./aim decisions:*)", "Bash(./aim worktrees:*)", "Bash(./aim check stack:*)",
+                   "Bash(git log:*)", "Bash(git --no-pager log:*)", "Bash(git status:*)", "Bash(git diff:*)",
+                   "Bash(gh pr view:*)", "Bash(gh pr list:*)", "Bash(gh issue view:*)", "Bash(gh run view:*)",
+                   "Bash(curl -s http://127.0.0.1:*)", "Bash(ls:*)", "Bash(cat:*)"]
+
+
+def agent_command(tool: str, mode: str, text: str, last: Path) -> list[str]:
+    """Command line of an agent CLI. interactive: the agent asks you; auto: no prompts, limited tools or sandbox."""
+    if tool == "codex":
+        if mode == "interactive":
+            return ["codex", text]
+        return ["codex", "exec", "-o", str(last), "--approve-for-me",
+                "-c", "sandbox_workspace_write.network_access=true", text]
+    if mode == "interactive":
+        return ["claude", text]
+    return ["claude", "-p", text, "--permission-mode", "acceptEdits", "--allowedTools", *CLAUDE_AUTO_TOOLS]
+
+
+def cmd_run(args) -> None:
+    import shutil
+    if not shutil.which(args.tool):
+        sys.exit(f"'{args.tool}' is not on PATH (harness guide, section 'Start an agent from the terminal').")
+    data = load()
+    t = item_by_id(data, args.id)
+    if is_check(t):
+        sys.exit(f"{t['id']} is an owner check: nobody runs an agent on it.")
+    if t["status"] != "in_progress" or t.get("owner") != args.agent:
+        cmd_claim(argparse.Namespace(id=t["id"], agent=args.agent, worktree=True, slug=args.slug, force=args.force))
+    data = load()
+    t = item_by_id(data, args.id)
+    workdir = main_checkout() / t["worktree"] if t.get("worktree") else ROOT
+    if workdir.resolve() != ROOT.resolve():
+        os.environ["AIM_ROOT"] = str(workdir)
+        _switch_root(workdir)
+    buf = PROMPTS / f"{t['id']}-{args.tool}.md"
+    cmd_prompt(argparse.Namespace(id=t["id"], tool=args.tool, agent=args.agent, inline=False, quiet=True))
+    text = buf.read_text(encoding="utf-8")
+    if args.mode == "auto":
+        text += UNATTENDED
+    logs = main_checkout() / "var" / "logs"
+    logs.mkdir(parents=True, exist_ok=True)
+    stamp = dt.datetime.now().strftime("%Y%m%d-%H%M")
+    log, last = logs / f"{t['id']}-{args.agent}-{stamp}.log", logs / f"{t['id']}-{args.agent}-{stamp}-last.md"
+    cmd = agent_command(args.tool, args.mode, text, last)
+    os.chdir(workdir)
+    print(f"Starting {args.tool} on {t['id']} as {args.agent}, mode {args.mode}, in {workdir}.")
+    if args.mode == "interactive":
+        os.execvp(cmd[0], cmd)
+    print(f"Log: {log}")
+    with log.open("w", encoding="utf-8") as f:
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, stdin=subprocess.DEVNULL)
+        for line in proc.stdout:
+            sys.stdout.write(line)
+            f.write(line)
+        rc = proc.wait()
+    print(f"\n{args.tool} exited with {rc}. Log: {log}" + (f"  Final message: {last}" if last.exists() else ""))
+    t = item_by_id(load(), t["id"])
+    if t["status"] == "in_progress":
+        print(f"Warning: {t['id']} is still in progress: the agent did not run review or block. "
+              f"Read the log, then ./aim handoff {t['id']} yourself if needed.")
+
+
+def _switch_root(path: Path) -> None:
+    global ROOT
+    ROOT = path
+    _rebind_paths()
+
+
+def cmd_ask(args) -> None:
+    import shutil
+    if not shutil.which(args.tool):
+        sys.exit(f"'{args.tool}' is not on PATH.")
+    data = load()
+    question, about = args.question, None
+    if question is None:
+        question = args.id_or_question
+    else:
+        about = item_by_id(data, args.id_or_question)
+    context = []
+    if about:
+        context.append(f"{about['id']} ({step_state_text(about)}): {plain(about['title'])}")
+        context += [f"Depends on: {depends_text(about)}"]
+        for n in about.get("chats", [])[-2:]:
+            if handoff_path(n).exists():
+                context.append(f"Handoff: docs/plans/handoffs/chat-{n:02d}.md")
+        if about.get("worktree"):
+            context.append(f"Worktree: {about['worktree']} (branch {about.get('branch')})")
+    prompt = textwrap.dedent("""\
+        You answer a question from the owner of the AIM-PRO prototype repository at {root}.
+        Read-only: do not create, modify or delete any file, do not claim or close steps, do not change git state,
+        never call a model API or start a live run. You may read files, run ./aim status|show|log|next|decisions|
+        worktrees|check stack, git log/status/diff, gh pr/issue/run view, and curl the local stack on 127.0.0.1.
+        Never print secret values: say which file and variable hold them.
+        Answer in Italian, in at most 15 lines, concrete, with the evidence (file paths, commands, URLs) and, if
+        useful, the next command to run.
+
+        Question: {q}
+
+        Context:
+        {ctx}
+
+        Useful files: AGENTS.md, docs/plans/prototype-roadmap.md, docs/plans/STATUS.md, docs/plans/DECISIONS.md,
+        docs/plans/harness-guide.md, the latest docs/plans/handoffs/chat-NN.md, docs/guides/.
+        """).format(root=ROOT, q=question, ctx="\n".join(context) or "(no step given)")
+    logs = main_checkout() / "var" / "logs"
+    logs.mkdir(parents=True, exist_ok=True)
+    out = logs / f"ask-{(about['id'] if about else 'general')}-{dt.datetime.now().strftime('%Y%m%d-%H%M%S')}.md"
+    if args.tool == "codex":
+        cmd = ["codex", "exec", "-s", "read-only", "-o", str(out), prompt]
+    else:
+        cmd = ["claude", "-p", prompt, "--allowedTools", *READ_ONLY_TOOLS]
+    print(f"Asking {args.tool} (read-only){' about ' + about['id'] if about else ''}…\n", flush=True)
+    r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, stdin=subprocess.DEVNULL)
+    answer = out.read_text(encoding="utf-8") if out.exists() and out.stat().st_size else r.stdout
+    out.write_text(answer, encoding="utf-8")
+    print(answer.strip() or r.stderr.strip())
+    print(f"\n(saved to {out})")
+
+
+def latest_change(path: Path, skip=("/.git/", "/node_modules/", "/.venv/", "/var/", "/__pycache__/", "/dist/")) -> float | None:
+    newest = None
+    for dirpath, dirnames, filenames in os.walk(path):
+        dirnames[:] = [d for d in dirnames if f"/{d}/" not in skip and d not in (".worktrees", "test-results", "playwright-report")]
+        for name in filenames:
+            try:
+                m = os.stat(os.path.join(dirpath, name)).st_mtime
+            except OSError:
+                continue
+            newest = m if newest is None or m > newest else newest
+    return newest
+
+
+def ago(ts: float | None) -> str:
+    if ts is None:
+        return "never"
+    s = int(dt.datetime.now().timestamp() - ts)
+    return f"{s // 60} min ago" if s < 3600 else f"{s // 3600} h {s % 3600 // 60} min ago"
+
+
+def agent_processes() -> list[str]:
+    """Rough count of agent tools running on this machine (one tool may use several processes)."""
+    out = subprocess.run(["ps", "-eo", "command"], capture_output=True, text=True).stdout.splitlines()[1:]
+    kinds = {
+        "Claude Code (CLI / desktop)": lambda c: ("/.local/bin/claude" in c or "claude-code/" in c) and "--output-format" in c,
+        "Claude Code unattended (-p)": lambda c: "/claude -p" in c or c.startswith("claude -p"),
+        "Codex CLI / app sessions": lambda c: "app-server-daemon" in c,
+        "Codex exec (unattended)": lambda c: "codex" in c and " exec " in c and "exec-server" not in c,
+    }
+    rows = []
+    for name, test in kinds.items():
+        n = sum(1 for c in out if test(c))
+        if n:
+            rows.append(f"{name:30} {n} process{'es' if n > 1 else ''}")
+    return rows
+
+
+def open_prs() -> list[dict] | None:
+    try:
+        return gh_json("pr", "list", "--state", "open", "--json", "number,title,headRefName,statusCheckRollup,isDraft")
+    except (RuntimeError, FileNotFoundError, ValueError):
+        return None
+
+
+def watch_once() -> tuple[list[str], dict]:
+    data, dec = load(), load_decisions()
+    st = {t["id"]: t for t in items(data)}
+    lines = [f"AIM-PRO roadmap — {now()}   (Ctrl-C to stop)", ""]
+    for mid, m in data["milestones"].items():
+        done = sum(1 for x in m["steps"] if st.get(x, {}).get("status") in FINISHED)
+        lines.append(f"{mid}  {'█' * done}{'░' * (len(m['steps']) - done)} {done}/{len(m['steps'])}  {m['title'][:60]}")
+    active = {t["id"]: (t, ROOT) for t in items(data) if t["status"] in ("in_progress", "review", "blocked")}
+    proposals = {d["id"]: d for d in dec["decisions"] if d["status"] == "proposed"}
+    for r in elsewhere():
+        if r["kind"] == "step":
+            active[r["item"]["id"]] = (r["item"], r["worktree"]["path"])
+        else:
+            proposals.setdefault(r["item"]["id"], r["item"])
+    lines += ["", "Active steps:"]
+    for t, where in active.values():
+        change = latest_change(where) if t["status"] == "in_progress" else None
+        stale = t["status"] == "in_progress" and (change is None or dt.datetime.now().timestamp() - change > 20 * 60)
+        lines.append(f"  {ICON[t['status']]} {t['id']:<6} {t.get('owner') or '-':10} {step_state_text(t)[:40]:40} "
+                     f"{rel(where)}" + (f"  last change {ago(change)}" if t["status"] == "in_progress" else "")
+                     + ("  ⚠ quiet for 20+ min" if stale else ""))
+    if not active:
+        lines.append("  nothing")
+    prs = open_prs()
+    lines += ["", "Open PRs:"]
+    if prs is None:
+        lines.append("  (gh unavailable)")
+    else:
+        lines += [f"  #{p['number']:<5} {ci_state(p['statusCheckRollup']):11} {'draft ' if p.get('isDraft') else ''}"
+                  f"{p['title'][:70]}" for p in prs] or ["  none"]
+    checks = [t for t in ready(data, dec) if is_check(t)]
+    lines += ["", "Waiting for YOU:"]
+    lines += [f"  ☐ {t['id']} {plain(t['title'])[:90]}   → ./aim show {t['id']}" for t in checks]
+    lines += [f"  ? {d['id']} {plain(d.get('proposal', ''))[:80]}   → ./aim accept {d['id']}" for d in proposals.values()]
+    if not checks and not proposals:
+        lines.append("  nothing")
+    steps_ready = [t["id"] for t in ready(data, dec) if not is_check(t) and t["id"] not in active]
+    lines += ["", "Ready for an agent: " + (", ".join(steps_ready) or "none")]
+    procs = agent_processes()
+    lines += ["", "Agent tools running (indicative):"] + ([f"  {p}" for p in procs] or ["  none found"])
+    latest = latest_handoffs(1)
+    if latest:
+        lines += ["", f"Last handoff: chat-{latest[0][0]:02d} {latest[0][2][:90]}"]
+    logs_dir = main_checkout() / "var" / "logs"
+    logs = sorted(logs_dir.glob("*.log"), key=lambda p: p.stat().st_mtime) if logs_dir.exists() else []
+    if logs:
+        tail = [l.rstrip() for l in logs[-1].read_text(encoding="utf-8", errors="replace").splitlines() if l.strip()][-4:]
+        lines += ["", f"Latest unattended log: {logs[-1].name} ({ago(logs[-1].stat().st_mtime)})"] + [f"  {l[:110]}" for l in tail]
+    state = {"active": {k: v[0]["status"] for k, v in active.items()}, "proposals": set(proposals),
+             "checks": {t["id"] for t in checks},
+             "failing": {p["number"] for p in prs or [] if ci_state(p["statusCheckRollup"]) == "CI failing"}}
+    return lines, state
+
+
+def notify(title: str, msg: str) -> None:
+    if sys.platform == "darwin":
+        subprocess.run(["osascript", "-e", f'display notification "{msg}" with title "{title}"'], capture_output=True)
+
+
+def watch_events(before: dict, after: dict) -> list[str]:
+    events = []
+    for sid, status in after["active"].items():
+        if before["active"].get(sid) != status and status in ("review", "blocked"):
+            events.append(f"{sid} is {status}")
+    for sid in set(before["active"]) - set(after["active"]):
+        events.append(f"{sid} is no longer active")
+    events += [f"{d} waits for your decision" for d in after["proposals"] - before["proposals"]]
+    events += [f"owner check {c} is ready" for c in after["checks"] - before["checks"]]
+    events += [f"CI fails on PR #{n}" for n in after["failing"] - before["failing"]]
+    return events
+
+
+def cmd_watch(args) -> None:
+    import time
+    before = None
+    try:
+        while True:
+            lines, state = watch_once()
+            print("\033[2J\033[H" + "\n".join(lines), flush=True)
+            if args.once:
+                return
+            if before is not None:
+                for e in watch_events(before, state):
+                    notify("AIM-PRO roadmap", e)
+            before = state
+            time.sleep(args.interval)
+    except KeyboardInterrupt:
+        print()
+
+
 # ----------------------------------------------------------------- CLI
 
 HELP = """aim — AIM-PRO prototype roadmap harness (run from the repository root or a worktree)
@@ -999,12 +1501,27 @@ HELP = """aim — AIM-PRO prototype roadmap harness (run from the repository roo
   check baseline|baseline:quick|baseline:apps|stack|M3|S13b
                              run the baseline, live stack health, a milestone or a step's verify commands
   log [-n 3]                 latest handoffs and their next step
+  run S13b --tool claude|codex --agent NAME [--mode interactive|auto] [--slug words] [--force]
+                             claim (with a worktree) + prompt + start the agent CLI in the worktree
+                             interactive: the agent asks you; auto: no prompts, limited tools, log in var/logs
+  ask [S13b|C1] "question" [--tool claude|codex]
+                             read-only agent answer from the repository, the plan, GitHub and the running stack
+  watch [--interval 30] [--once]
+                             live view: milestones, active steps in every worktree, open PRs and CI,
+                             what waits for you, agent processes, latest unattended log; macOS notifications
+  investigate "question" --blocks S14 [--options "A; B"] [--criteria "x; y"] [--context "…"]
+                             open decision D<n> with a brief in docs/plans/investigations/, investigation I<n>;
+                             the blocked steps wait until the owner accepts D<n>
+  worktrees [--fetch]        every worktree: branch, ahead/behind main, uncommitted changes, last change, claims
+  issues [--all] [--sync]    GitHub issues and PRs of the steps, CI of open PRs, unlinked open PRs;
+                             --sync closes steps in review whose last PR is merged
   render [--check] | selfcheck
                              regenerate the plan files | validate data, guide and generated files
 """
 
 COMMANDS = ["status", "next", "show", "prompt", "claim", "handoff", "review", "done", "block", "reset", "skip",
-            "decisions", "propose", "accept", "reject", "check", "log", "render", "selfcheck"]
+            "decisions", "propose", "accept", "reject", "check", "log", "render", "selfcheck",
+            "run", "ask", "watch", "investigate", "worktrees", "issues"]
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -1038,6 +1555,16 @@ def main(argv: list[str] | None = None) -> None:
     s = sub.add_parser("log"); s.add_argument("-n", type=int, default=3)
     s = sub.add_parser("render"); s.add_argument("--check", action="store_true")
     sub.add_parser("selfcheck")
+    s = sub.add_parser("run"); s.add_argument("id"); s.add_argument("--tool", required=True, choices=["claude", "codex"])
+    s.add_argument("--agent", required=True); s.add_argument("--mode", default="interactive", choices=["interactive", "auto"])
+    s.add_argument("--slug"); s.add_argument("--force", action="store_true")
+    s = sub.add_parser("ask"); s.add_argument("id_or_question"); s.add_argument("question", nargs="?")
+    s.add_argument("--tool", default="claude", choices=["claude", "codex"])
+    s = sub.add_parser("watch"); s.add_argument("--interval", type=int, default=30); s.add_argument("--once", action="store_true")
+    s = sub.add_parser("investigate"); s.add_argument("question"); s.add_argument("--blocks")
+    s.add_argument("--options"); s.add_argument("--criteria"); s.add_argument("--context")
+    s = sub.add_parser("worktrees"); s.add_argument("--fetch", action="store_true")
+    s = sub.add_parser("issues"); s.add_argument("--all", action="store_true"); s.add_argument("--sync", action="store_true")
     args = p.parse_args(argv)
     if args.cmd in (None, "help"):
         print(HELP)
@@ -1054,6 +1581,8 @@ def main(argv: list[str] | None = None) -> None:
         "handoff": cmd_handoff, "review": cmd_review, "done": cmd_done, "reset": cmd_simple, "skip": cmd_simple,
         "block": cmd_block, "decisions": cmd_decisions, "propose": cmd_propose, "accept": cmd_accept,
         "reject": cmd_reject, "check": cmd_check, "log": cmd_log, "render": cmd_render, "selfcheck": cmd_selfcheck,
+        "run": cmd_run, "ask": cmd_ask, "watch": cmd_watch, "investigate": cmd_investigate,
+        "worktrees": cmd_worktrees, "issues": cmd_issues,
     }
     handlers[args.cmd](args)
 

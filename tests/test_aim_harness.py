@@ -190,6 +190,63 @@ class HarnessTest(unittest.TestCase):
         with redirect_stdout(io.StringIO()):
             self.assertTrue(self.aim.run_checks([{"name": "npm test", "cmd": "exit 0", "cwd": "apps"}], {"env": {}}))
 
+    def test_investigate_opens_a_decision_a_brief_and_an_investigation(self):
+        out = self.run_aim("investigate", "Which scenario input?", "--blocks", "S02", "--options", "A; B")
+        self.assertIn("D3 opened; investigation I1 created", out)
+        plans = self.tmp / "docs" / "plans"
+        brief = (plans / "investigations" / "D3.md").read_text()
+        self.assertIn("- A\n- B", brief)
+        self.assertIn("TODO(aim)", brief)
+        self.assertIn("D3", self.step("S02")["decisions"])
+        self.assertEqual(self.step("I1")["brief"], "docs/plans/investigations/D3.md")
+        self.assertNotIn("| I1 |", (plans / "prototype-roadmap.md").read_text())
+        self.assertIn("I1", (plans / "STATUS.md").read_text())
+        prompt = self.run_aim("prompt", "I1")
+        self.assertIn('<file path="docs/plans/investigations/D3.md">', prompt)
+        self.assertIn("./aim propose D3", prompt)
+        data = json.loads((plans / "steps.json").read_text())
+        dec = json.loads((plans / "decisions.json").read_text())
+        self.assertEqual(self.aim.validate(data, dec), [])
+
+    def test_agent_commands_limit_unattended_runs(self):
+        last = self.tmp / "last.md"
+        self.assertEqual(self.aim.agent_command("claude", "interactive", "brief", last), ["claude", "brief"])
+        auto = self.aim.agent_command("claude", "auto", "brief", last)
+        self.assertIn("acceptEdits", auto)
+        self.assertNotIn("--dangerously-skip-permissions", auto)
+        self.assertIn("Bash(./aim:*)", auto)
+        codex = self.aim.agent_command("codex", "auto", "brief", last)
+        self.assertEqual(codex[:4], ["codex", "exec", "-o", str(last)])
+        self.assertNotIn("--dangerously-bypass-approvals-and-sandbox", codex)
+
+    def test_ci_state_and_watch_events(self):
+        self.assertEqual(self.aim.ci_state([{"conclusion": "SUCCESS"}]), "CI green")
+        self.assertEqual(self.aim.ci_state([{"conclusion": "SUCCESS"}, {"conclusion": "FAILURE"}]), "CI failing")
+        self.assertEqual(self.aim.ci_state([{"status": "IN_PROGRESS"}]), "CI running")
+        before = {"active": {"S01": "in_progress"}, "proposals": set(), "checks": set(), "failing": set()}
+        after = {"active": {"S01": "review"}, "proposals": {"D3"}, "checks": {"C1"}, "failing": {12}}
+        self.assertEqual(self.aim.watch_events(before, after),
+                         ["S01 is review", "D3 waits for your decision", "owner check C1 is ready", "CI fails on PR #12"])
+
+    def test_issues_sync_closes_a_step_whose_pr_is_merged(self):
+        self.run_aim("claim", "S01", "--agent", "claude")
+        data = json.loads((self.tmp / "docs" / "plans" / "steps.json").read_text())
+        data["steps"][0].update(status="review", prs=[12])
+        data["steps"][0].pop("current_chat")
+        (self.tmp / "docs" / "plans" / "steps.json").write_text(json.dumps(data))
+        prs = [{"number": 12, "state": "MERGED", "title": "S01", "headRefName": "feat/s01", "statusCheckRollup": []},
+               {"number": 13, "state": "OPEN", "title": "Other", "headRefName": "x", "statusCheckRollup": []}]
+
+        def fake_gh(*a):
+            return prs if a[0] == "pr" else []
+        with mock.patch.object(self.aim, "gh_json", side_effect=fake_gh):
+            out = self.run_aim("issues")
+            self.assertIn("./aim done S01", out)
+            self.assertIn("#13 Other", out)
+            self.assertEqual(self.step("S01")["status"], "review")
+            self.run_aim("issues", "--sync")
+        self.assertEqual(self.step("S01")["status"], "done")
+
     def test_selfcheck_reports_unknown_ids(self):
         data = json.loads((self.tmp / "docs" / "plans" / "steps.json").read_text())
         data["steps"][1]["depends_on"].append("S99")

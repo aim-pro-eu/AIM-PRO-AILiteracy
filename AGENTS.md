@@ -14,6 +14,8 @@ The prototype roadmap is run with `./aim` (guide: `docs/plans/harness-guide.md`,
   published and the handoff has no `TODO(aim)` left: `./aim review <step> --pr <number>`.
 - Never decide for the owner: record a choice with `./aim propose`, ask, stop. Never run `./aim accept`,
   `./aim reject`, `./aim skip` or close an owner check (`C…`).
+- Investigations (`I<n>`): fill the brief in `docs/plans/investigations/` with evidence and end with
+  `./aim propose D<n>`; never implement the choice before the owner accepts it.
 - Never edit `docs/plans/STATUS.md`, `docs/plans/DECISIONS.md` or the generated blocks of the roadmap by hand;
   change `docs/plans/steps.json` and `docs/plans/decisions.json` only through `./aim`.
 - If you change `tools/harness/aim.py`, update `docs/plans/harness-guide.md` in the same commit and run
