@@ -8,7 +8,7 @@ import { ApplyStep } from './ApplyStep';
 import { Changes } from './Changes';
 import { DECISION_KEYS, DecisionForm } from './DecisionForm';
 import { Diagnostics } from './Diagnostics';
-import { compareCandidates, latestProposals, proposalExplanation, proposalStatus, refOf } from './model';
+import { compareCandidates, evaluationDraftState, latestProposals, proposalExplanation, proposalStatus, refOf } from './model';
 import { LoadFailure, useStatusLabel } from './parts';
 import { ReviewError } from './reviewApi';
 import type {
@@ -16,7 +16,7 @@ import type {
 } from './reviewApi';
 import { useCsrfToken, useReviewServices } from './ReviewServices';
 import { RevisionStep } from './RevisionStep';
-import { coursePath, inboxPath, releasePath, syllabusEditPath } from './paths';
+import { assessmentsPath, coursePath, inboxPath, releasePath, syllabusEditPath } from './paths';
 import { isSyllabusProposal } from './syllabus';
 import { SyllabusView } from './SyllabusView';
 import { KIND_TITLES, plainIssues, teacherView } from './teacher';
@@ -161,6 +161,28 @@ function SyllabusContent({ inbox, proposal, issues }: {
   );
 }
 
+/** The statuses in which an evaluation draft is still to be applied, or was refused as stale. */
+const UNAPPLIED = new Set(['AWAITING_DECISION', 'APPROVED', 'STALE']);
+
+/**
+ * Why an evaluation draft can no longer be applied (D38): its student attempted the same assessment again, so the
+ * assessor asks for a draft of the latest attempt; or the course changed since it was made. Nothing while it applies.
+ */
+function DraftStale({ inbox, proposal, candidates }: { inbox: Inbox; proposal: Entity; candidates: Entity[] }) {
+  const { t } = useTranslation();
+  const state = evaluationDraftState(inbox, proposal, candidates);
+  if (state === 'current') return null;
+  return (
+    <div data-testid="draft-stale">
+      <StatusMessage tone="error">
+        {t(state === 'attemptedAgain' ? 'review.teacher.evaluation.attemptedAgain' : 'review.teacher.evaluation.courseChanged')}
+      </StatusMessage>
+      {state === 'attemptedAgain'
+        ? <p><Link to={assessmentsPath(inbox.context.id)}>{t('review.teacher.evaluation.latest')}</Link></p> : null}
+    </div>
+  );
+}
+
 function ProposalContent({ inbox, proposalId, busy, onDecide, onApply }: {
   inbox: Inbox; proposalId: string; busy: boolean;
   onDecide(pending: PendingProposal, decision: DecisionKind, reason: string): void;
@@ -204,6 +226,8 @@ function ProposalBody({ inbox, proposal, pending, busy, onDecide, onApply }: {
       {status === 'APPROVED' ? <ApplyStep busy={busy} onApply={() => onApply(proposal, view?.kind ?? 'other')} /> : null}
       {!syllabus && content.status === 'loading' ? <StatusMessage>{t('review.proposal.loadingContent')}</StatusMessage> : null}
       {!syllabus && content.status === 'error' ? <StatusMessage tone="error">{t('review.proposal.contentFailed')}</StatusMessage> : null}
+      {view?.kind === 'evaluation' && content.status === 'ready' && UNAPPLIED.has(status)
+        ? <DraftStale inbox={inbox} proposal={proposal} candidates={content.candidates} /> : null}
       {view ? <TeacherView view={view} issues={issues} /> : null}
       {status === 'APPLIED' && view?.release?.resource ? (
         <p><Link to={releasePath(inbox.context.id, view.release.resource)}>{t('review.teacher.release.inspect')}</Link></p>

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import type { Entity } from '../src/features/review/reviewApi';
-import { compareCandidates, diffValues, latestProposals, parseExplanation } from '../src/features/review/model';
+import type { Entity, Inbox } from '../src/features/review/reviewApi';
+import {
+  compareCandidates, diffValues, evaluationDraftState, latestProposals, openProposals, parseExplanation,
+} from '../src/features/review/model';
 
 const entity = (type: string, id: string, version: string, fields: Entity['fields']): Entity => ({
   type, id, version, fields, provenance: { origin: 'GENERATED_PROPOSAL', responsible: 'admin', sources: [] },
@@ -93,5 +95,57 @@ describe('proposals of a context summary', () => {
     ];
     expect(latestProposals(entities).map((p) => [p.id, p.version, p.fields.status]))
       .toEqual([['p-1', 'r3', 'APPLIED'], ['p-2', 'r1', 'APPLIED']]);
+  });
+});
+
+describe('the stale rule for evaluation drafts (D38)', () => {
+  const ref = (type: string, id: string, version = '1') => ({ type, id, version });
+  const evidence = (id: string, learner: string, activity: string) => entity('LearningEvidence', id, '1', {
+    learner: ref('Participant', learner), activity: ref('ActivityDefinition', activity) });
+  const change = (base: string, next: string, cause: { type: string; id: string; version: string }) =>
+    entity('StateChange', `change-${next}`, '1', { baseVersion: base, newVersion: next, cause });
+  const judged = evidence('evidence-judged', 'participant-learner', 'activity-assess');
+  const evaluation = entity('Evaluation', 'evaluation-1', '1', { evidence: [ref('LearningEvidence', 'evidence-judged')] });
+  const proposal = entity('ChangeProposal', 'proposal-1', 'p1', {
+    status: 'AWAITING_DECISION', baseContextVersion: 'v1', candidateDefinitions: [ref('Evaluation', 'evaluation-1')] });
+  const inbox = (version: string, ...records: Entity[]): Inbox => ({
+    context: entity('ExecutionContext', 'delivery', version, {}),
+    entities: [judged, proposal, ...records], findings: [],
+    pending: [{ proposal, candidates: [evaluation], reviewPayloadKey: 'key' }],
+  });
+
+  it('is current when nothing changed since the draft or only a student joined', () => {
+    expect(evaluationDraftState(inbox('v1'), proposal, [evaluation])).toBe('current');
+    const joined = inbox('v2', change('v1', 'v2', ref('Participant', 'participant-new')));
+    expect(evaluationDraftState(joined, proposal, [evaluation])).toBe('current');
+  });
+
+  it('stays current after another student’s attempt or the student’s attempt at another activity', () => {
+    const records = inbox('v3',
+      evidence('evidence-other', 'participant-other', 'activity-assess'),
+      evidence('evidence-practice', 'participant-learner', 'activity-practice'),
+      change('v1', 'v2', ref('LearningEvidence', 'evidence-other')),
+      change('v2', 'v3', ref('LearningEvidence', 'evidence-practice')));
+    expect(evaluationDraftState(records, proposal, [evaluation])).toBe('current');
+    expect(openProposals(records)[0]?.current).toBe(true);
+  });
+
+  it('says the student attempted the assessment again', () => {
+    const records = inbox('v3',
+      evidence('evidence-other', 'participant-other', 'activity-assess'),
+      evidence('evidence-again', 'participant-learner', 'activity-assess'),
+      change('v1', 'v2', ref('LearningEvidence', 'evidence-again')),
+      change('v2', 'v3', ref('LearningEvidence', 'evidence-other')));
+    expect(evaluationDraftState(records, proposal, [evaluation])).toBe('attemptedAgain');
+    expect(openProposals(records)[0]?.current).toBe(false);
+  });
+
+  it('says the course changed when a proposal was applied since, another student’s evaluation included', () => {
+    const records = inbox('v3',
+      evidence('evidence-again', 'participant-learner', 'activity-assess'),
+      change('v1', 'v2', ref('LearningEvidence', 'evidence-again')),
+      change('v2', 'v3', ref('ChangeProposal', 'proposal-other')));
+    expect(evaluationDraftState(records, proposal, [evaluation])).toBe('courseChanged');
+    expect(evaluationDraftState(inbox('v9'), proposal, [evaluation])).toBe('courseChanged');
   });
 });
