@@ -1,5 +1,8 @@
 # ALM prototype with CrewAI agents
 
+Start with the [system overview: capabilities, agents and architecture](docs/architecture/system-overview.md)
+for the agent catalogue, interaction diagrams, application boundaries and current limitations.
+
 For a colleague presentation, follow the [SCN01 step-by-step demo runbook](docs/demo/scn01-colleague-runbook.md).
 It provides a fresh isolated database, explicit review steps, live MCP checks,
 Teacher/Trainer commands and expected state changes using a fixed illustrative workshop.
