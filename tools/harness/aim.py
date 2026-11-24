@@ -466,17 +466,18 @@ def cmd_claim(args) -> None:
     if args.worktree:
         branch = t.get("branch") or f"feat/{t['id'].lower()}-{args.slug or slug(t['title'])}"
         cfg = config()
-        target = ROOT / cfg["worktrees"] / t["id"].lower()
+        main_root = main_checkout()  # worktrees are always created under the main checkout, never nested
+        target = main_root / cfg["worktrees"] / t["id"].lower()
         if not target.exists():
-            git("fetch", "-q", "origin", cfg["base_branch"])
-            exists = subprocess.run(["git", "rev-parse", "--verify", "-q", f"refs/heads/{branch}"], cwd=ROOT,
+            git("fetch", "-q", "origin", cfg["base_branch"], cwd=main_root)
+            exists = subprocess.run(["git", "rev-parse", "--verify", "-q", f"refs/heads/{branch}"], cwd=main_root,
                                     capture_output=True).returncode == 0
             if exists:
-                git("worktree", "add", str(target), branch)
+                git("worktree", "add", str(target), branch, cwd=main_root)
             else:
-                git("worktree", "add", "-b", branch, str(target), f"origin/{cfg['base_branch']}")
+                git("worktree", "add", "-b", branch, str(target), f"origin/{cfg['base_branch']}", cwd=main_root)
         t["branch"] = branch
-        print(f"Worktree {target.relative_to(ROOT)} on branch {branch}. Work there: cd {target}")
+        print(f"Worktree {target.relative_to(main_root)} on branch {branch}. Work there: cd {target}")
         # The claim is recorded in the worktree's copy of the plan, so it travels with the step's PR.
         ROOT = target
         _rebind_paths()
